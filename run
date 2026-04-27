@@ -1,0 +1,4 @@
+gcloud run deploy line-bot \
+  --source . \
+  --region asia-east1 \
+  --allow-unauthenticated \

@@ -1,0 +1,16 @@
+{
+  "name": "line-bot",
+  "version": "1.0.0",
+  "description": "LINE LLM Bot with Google Sheets today-link tool",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^9.7.0",
+    "express": "^4.21.2",
+    "googleapis": "^150.0.1",
+    "openai": "^5.18.1"
+  }
+}

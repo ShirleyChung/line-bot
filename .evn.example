@@ -1,0 +1,23 @@
+# =========================
+# LINE 設定
+# =========================
+LINE_CHANNEL_SECRET=your_line_channel_secret
+LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_access_token
+
+# =========================
+# Google Sheets 設定
+# =========================
+SPREADSHEET_ID=your_spreadsheet_id
+SHEET_NAME=your_sheet_name
+START_COLUMN=6
+
+# 這裡直接放完整 service account JSON 字串
+# 正式上線建議放到 Secret Manager
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"...","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"...","client_id":"..."}
+
+# =========================
+# OpenAI 設定
+# =========================
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-5.5
+OPENAI_SYSTEM_PROMPT=你是一個親切、準確、簡潔的 LINE 助手。遇到已知工具型問題時，不要捏造資料。
