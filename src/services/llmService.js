@@ -1,11 +1,15 @@
 /**
- * 這個 service 專門呼叫 OpenAI。
- * 這裡使用官方 JavaScript SDK 與 Responses API。
- * OpenAI 官方文件指出，新專案建議優先使用 Responses API。:contentReference[oaicite:4]{index=4}
+ * 這裡負責：
+ * 1. 呼叫 OpenAI Responses API
+ * 2. 把 tools 定義傳給模型
+ * 3. 如果模型要求呼叫工具，就執行工具
+ * 4. 再把工具結果回送給模型，讓模型產生最後回答
  */
 
 import OpenAI from "openai";
 import { env } from "../config/env.js";
+import { botTools } from "../llm/tools.js";
+import { executeTool } from "../llm/toolDispatcher.js";
 
 // 初始化 OpenAI client
 const client = new OpenAI({
@@ -13,22 +17,69 @@ const client = new OpenAI({
 });
 
 /**
- * 呼叫 LLM 取得回覆文字
+ * 使用 LLM + tools 處理使用者輸入
+ *
  * @param {string} userText - 使用者輸入
- * @returns {Promise<string>}
+ * @param {object} context - 可傳入 replyToken、source、userId 等上下文
+ * @returns {Promise<{type:string,text?:string,toolUsed?:boolean}>}
  */
-export async function askLlm(userText) {
-  const response = await client.responses.create({
+export async function askLlmWithTools(userText, context = {}) {
+  // 如果尚未設定 OpenAI key，直接回固定訊息，避免整個流程失敗
+  if (!env.OPENAI_API_KEY) {
+    return {
+      type: "text",
+      text: "目前尚未設定 OpenAI API Key，無法使用 LLM 功能。",
+    };
+  }
+
+  let response = await client.responses.create({
     model: env.OPENAI_MODEL,
     instructions: env.OPENAI_SYSTEM_PROMPT,
     input: userText,
+    tools: botTools,
   });
 
-  const output = response.output_text?.trim();
+  // 最多允許幾輪工具呼叫，避免模型陷入無限循環
+  for (let round = 0; round < 5; round++) {
+    const functionCalls = (response.output || []).filter(
+      (item) => item.type === "function_call"
+    );
 
-  if (!output) {
-    return "我暫時無法產生回覆，請稍後再試。";
+    // 如果模型沒有要求工具呼叫，直接回一般文字
+    if (!functionCalls.length) {
+      return {
+        type: "text",
+        text: response.output_text?.trim() || "我暫時無法產生回覆。",
+        toolUsed: round > 0,
+      };
+    }
+
+    // 逐一執行模型要求的工具
+    const toolOutputs = [];
+
+    for (const call of functionCalls) {
+      const args = JSON.parse(call.arguments || "{}");
+      const result = await executeTool(call.name, args, context);
+
+      toolOutputs.push({
+        type: "function_call_output",
+        call_id: call.call_id,
+        output: JSON.stringify(result),
+      });
+    }
+
+    // 把工具執行結果再送回模型，讓模型產生下一步或最終回答
+    response = await client.responses.create({
+      model: env.OPENAI_MODEL,
+      previous_response_id: response.id,
+      input: toolOutputs,
+      tools: botTools,
+    });
   }
 
-  return output;
+  return {
+    type: "text",
+    text: "工具處理次數過多，已停止。",
+    toolUsed: true,
+  };
 }

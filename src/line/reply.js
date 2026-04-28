@@ -22,3 +22,20 @@ export async function replyText(replyToken, text) {
     ],
   });
 }
+
+/**
+ * 主動推送純文字訊息
+ * @param {string} to - userId 或 groupId
+ * @param {string} text - 要推送的文字
+ */
+export async function pushText(to, text) {
+  return lineClient.pushMessage({
+    to,
+    messages: [
+      {
+        type: "text",
+        text,
+      },
+    ],
+  });
+}

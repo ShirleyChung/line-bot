@@ -12,7 +12,7 @@ import {
   isMonthDayInRange,
   calcOffsetFromStart,
 } from "../utils/dateRange.js";
-import { isUrl } from "../utils/format.js";
+import { isUrl, formatMonthDay } from "../utils/format.js";
 
 /**
  * 抓取今天對應的連結
@@ -76,6 +76,27 @@ export async function getTodayLinkFromSheet() {
   }
 
   return null;
+}
+
+/**
+ * 取得今天對應的連結文字（包含完整訊息格式）
+ * @returns {Promise<string>}
+ */
+export async function get_today_link() {
+  const url = await getTodayLinkFromSheet();
+  const todayStr = formatMonthDay(new Date());
+
+  if (!url) {
+    return `今天（${todayStr}）找不到對應連結。`;
+  }
+
+  return `通知：今晚 9:45
+今天（${todayStr}）的連結如下：
+${url}
+
+線上聯結：https://us06web.zoom.us/j/87317139779?pwd=0oJsbadeBpeCOc2RUYQscgLjbTIbcd.1
+會議ID：873 1713 9779
+密碼：707070`;
 }
 
 /**

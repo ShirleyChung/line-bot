@@ -6,27 +6,32 @@
  * 3. 呼叫 replyText
  */
 
-import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
-import { replyText } from "../line/reply.js";
-import { formatMonthDay } from "../utils/format.js";
+import { get_today_link } from "../services/sheetLinkService.js";
+import { replyText, pushText } from "../line/reply.js";
 
 /**
  * 處理今天連結命令
  * @param {object} event - LINE webhook event
  */
 export async function handleTodayLink(event) {
-  const url = await getTodayLinkFromSheet();
-  const todayStr = formatMonthDay(new Date());
-
-  const message = url
-    ? `通知：今晚 9:45
-今天（${todayStr}）的連結如下：
-${url}
-
-線上聯結：https://us06web.zoom.us/j/87317139779?pwd=0oJsbadeBpeCOc2RUYQscgLjbTIbcd.1
-會議ID：873 1713 9779
-密碼：707070`
-    : `今天（${todayStr}）找不到對應連結。`;
-
+  const message = await get_today_link();
   return replyText(event.replyToken, message);
+}
+
+/**
+ * 在目前 webhook 對話裡直接 reply 今天連結
+ * @param {string} replyToken - LINE webhook event 內的 replyToken
+ */
+export async function reply_today_link(replyToken) {
+  const message = await get_today_link();
+  return replyText(replyToken, message);
+}
+
+/**
+ * 主動發通知給指定 userId 或 groupId
+ * @param {string} target - userId 或 groupId
+ */
+export async function push_today_link(target) {
+  const message = await get_today_link();
+  return pushText(target, message);
 }
