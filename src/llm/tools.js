@@ -33,6 +33,7 @@ export const botTools = [
           description: "是否在回覆內容中附上 Zoom 資訊",
         },
       },
+      required: ["includeZoomInfo"],
       additionalProperties: false,
     },
     strict: true,
