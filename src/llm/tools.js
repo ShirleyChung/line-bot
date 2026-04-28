@@ -17,6 +17,7 @@ export const botTools = [
     parameters: {
       type: "object",
       properties: {},
+      required: [],
       additionalProperties: false,
     },
     strict: true,
@@ -54,7 +55,7 @@ export const botTools = [
           description: "是否附上 Zoom 資訊",
         },
       },
-      required: ["targetId"],
+      required: ["targetId", "includeZoomInfo"],
       additionalProperties: false,
     },
     strict: true,
