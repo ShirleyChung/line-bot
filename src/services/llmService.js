@@ -10,6 +10,11 @@ import OpenAI from "openai";
 import { env } from "../config/env.js";
 import { botTools } from "../llm/tools.js";
 import { executeTool } from "../llm/toolDispatcher.js";
+import {
+  buildSessionKey,
+  getConversationState,
+  setConversationState,
+} from "./conversationStateService.js";
 
 // 初始化 OpenAI client
 const client = new OpenAI({
@@ -32,10 +37,14 @@ export async function askLlmWithTools(userText, context = {}) {
     };
   }
 
+  const sessionKey = buildSessionKey(context.source);
+  const savedState = getConversationState(sessionKey);
+
   let response = await client.responses.create({
     model: env.OPENAI_MODEL,
     instructions: env.OPENAI_SYSTEM_PROMPT,
     input: userText,
+    previous_response_id: savedState?.lastResponseId || undefined,
     tools: botTools,
   });
 
@@ -47,6 +56,11 @@ export async function askLlmWithTools(userText, context = {}) {
 
     // 如果模型沒有要求工具呼叫，直接回一般文字
     if (!functionCalls.length) {
+      // 保存最新 response.id，供下一輪延續上下文
+      if (response.id) {
+        setConversationState(sessionKey, response.id);
+      }
+
       return {
         type: "text",
         text: response.output_text?.trim() || "我暫時無法產生回覆。",
@@ -75,6 +89,11 @@ export async function askLlmWithTools(userText, context = {}) {
       input: toolOutputs,
       tools: botTools,
     });
+  }
+
+  // 即使超過迴圈，也盡量保存最後一次 response.id
+  if (response?.id) {
+    setConversationState(sessionKey, response.id);
   }
 
   return {

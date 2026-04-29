@@ -13,8 +13,15 @@ import express from "express";
 import { env } from "./config/env.js";
 import { line, lineConfig } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
+import {
+  loadConversationStateFile,
+  saveConversationStateFile,
+} from "./services/conversationStateService.js";
 
 const app = express();
+
+// 啟動時先載入對話狀態
+loadConversationStateFile();
 
 /**
  * 健康檢查
@@ -43,7 +50,18 @@ app.post("/webhook", line.middleware(lineConfig), async (req, res) => {
   }
 });
 
+// 程式結束前盡量保存一次
 // 啟動 HTTP 服務
+process.on("SIGINT", () => {
+  saveConversationStateFile();
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  saveConversationStateFile();
+  process.exit(0);
+});
+
 app.listen(env.PORT, () => {
   console.log(`Server running on port ${env.PORT}`);
 });
