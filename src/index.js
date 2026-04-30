@@ -47,6 +47,10 @@ app.post("/webhook", line.middleware(lineConfig), async (req, res) => {
 /**
  * 提醒功能
  */
+function toLineTargetId(owner) {
+  if (!owner) return "";
+  return owner.replace(/^user:/, "").replace(/^group:/, "").replace(/^room:/, "");
+}
 app.get("/cron/check-reminders", async (req, res) => {
   try {
     const now = new Date().toISOString();
@@ -54,7 +58,10 @@ app.get("/cron/check-reminders", async (req, res) => {
     const reminders = await getDueReminders(now);
 
     for (const r of reminders) {
-      await line.pushMessage(r.owner, {
+      const targetId = toLineTargetId(r.owner);
+      if (!targetId) continue;
+
+      await line.pushMessage(targetId, {
         type: "text",
         text: `提醒：${r.target} 要 ${r.action}`,
       });
