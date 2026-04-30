@@ -10,6 +10,7 @@ import OpenAI from "openai";
 import { env } from "../config/env.js";
 import { botTools } from "../llm/tools.js";
 import { executeTool } from "../llm/toolDispatcher.js";
+import { getUserMemory } from "./userMemoryService.js";
 import {
   buildSessionKey,
   getConversationState,
@@ -39,10 +40,18 @@ export async function askLlmWithTools(userText, context = {}) {
 
   const sessionKey = buildSessionKey(context.source);
   const savedState = await getConversationState(sessionKey);
+  const memory = await getUserMemory(sessionKey);
+  let instructions = env.OPENAI_SYSTEM_PROMPT;
+  if (memory) {
+    instructions += `
+  以下是這位使用者的偏好與背景：
+  ${JSON.stringify(memory, null, 2)}
+  請依照這些偏好回覆。`;
+  }
 
   let response = await client.responses.create({
     model: env.OPENAI_MODEL,
-    instructions: env.OPENAI_SYSTEM_PROMPT,
+    instructions: instructions,
     input: userText,
     previous_response_id: savedState?.lastResponseId || undefined,
     tools: botTools,
