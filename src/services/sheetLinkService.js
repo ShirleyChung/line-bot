@@ -23,7 +23,7 @@ export async function getTodayLinkFromSheet() {
   const rows = parseCsv(csvText);
 
   if (!rows.length) {
-    throw new Error("公開 CSV 沒有資料");
+    return "公開 CSV 沒有資料";
   }
 
   const today = new Date();
@@ -64,14 +64,14 @@ export async function getTodayLinkFromSheet() {
       const value = (row[targetColIndex] || "").trim();
 
       if (!value) {
-        throw new Error("已找到今天對應欄位，但內容為空");
+        return "已找到今天對應欄位，但內容為空";
       }
 
       if (isUrl(value)) {
         return value;
       }
 
-      throw new Error(`已找到今天對應欄位，但不是可辨識的 URL：${value}`);
+      return `已找到今天對應欄位，但不是可辨識的 URL：${value}`;
     }
   }
 
@@ -108,7 +108,7 @@ async function fetchPublishedCsv(url) {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`下載公開 CSV 失敗，HTTP ${response.status}`);
+    return `下載公開 CSV 失敗，HTTP ${response.status}`;
   }
 
   return await response.text();
