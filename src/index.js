@@ -11,7 +11,7 @@
 
 import express from "express";
 import { env } from "./config/env.js";
-import { line, lineConfig } from "./line/client.js";
+import { line, lineConfig, lineClient } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
 import { getDueReminders, markNotified } from "./services/reminderService.js";
 
@@ -59,9 +59,21 @@ app.get("/cron/check-reminders", async (req, res) => {
 
     for (const r of reminders) {
       const targetId = toLineTargetId(r.owner);
-      if (!targetId) continue;
+      if (!targetId) {
+        console.log("[cron] skip empty targetId:", r);
+        continue;
+      }
 
-      await line.pushMessage(targetId, {
+      console.log("[cron] pushing reminder:", {
+        id: r.id,
+        owner: r.owner,
+        targetId,
+        target: r.target,
+        action: r.action,
+        time: r.time,
+      });
+
+      await lineClient.pushMessage(targetId, {
         type: "text",
         text: `提醒：${r.target} 要 ${r.action}`,
       });
