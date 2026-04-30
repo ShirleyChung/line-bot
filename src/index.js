@@ -13,6 +13,7 @@ import express from "express";
 import { env } from "./config/env.js";
 import { line, lineConfig } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
+import { getDueReminders, markNotified } from "./services/reminderService.js";
 
 const app = express();
 
@@ -40,6 +41,31 @@ app.post("/webhook", line.middleware(lineConfig), async (req, res) => {
   } catch (error) {
     console.error("Webhook error:", error);
     res.status(500).end();
+  }
+});
+
+/**
+ * 提醒功能
+ */
+app.get("/cron/check-reminders", async (req, res) => {
+  try {
+    const now = new Date().toISOString();
+
+    const reminders = await getDueReminders(now);
+
+    for (const r of reminders) {
+      await line.pushMessage(r.owner, {
+        type: "text",
+        text: `提醒：${r.target} 要 ${r.action}`,
+      });
+
+      await markNotified(r.id);
+    }
+
+    res.send("ok");
+  } catch (err) {
+    console.error("cron error:", err);
+    res.status(500).send("error");
   }
 });
 

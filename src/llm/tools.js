@@ -60,4 +60,23 @@ export const botTools = [
     },
     strict: true,
   },
+  {
+    type: "function",
+    name: "create_reminder",
+    description: "建立提醒事項，例如提醒某人在某時間做某事",
+    parameters: {
+      type: "object",
+      properties: {
+        target: { type: "string" },
+        action: { type: "string" },
+        time: {
+          type: "string",
+          description: "ISO 8601 格式，例如 2026-05-01T06:00:00+08:00",
+        },
+      },
+      required: ["target", "action", "time"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
