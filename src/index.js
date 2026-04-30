@@ -83,8 +83,9 @@ app.get("/cron/check-reminders", async (req, res) => {
         ],
       });
 
-      await markNotified(r.id);
-      console.log("[cron] marked notified:", r.id);
+      //await markNotified(r.id);
+      await deleteReminder(r.id);
+      console.log("[cron] deleted reminder:", r.id);
     }
 
     res.send("ok");
