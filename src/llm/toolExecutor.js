@@ -3,9 +3,9 @@ import { buildSessionKey } from "../services/conversationStateService.js";
 
 export async function executeTool(name, args, context) {
   if (name === "create_reminder") {
-    // °ò¥»¨¾§b
+    // å»ºç«‹æé†’
     if (!args.time || isNaN(Date.parse(args.time))) {
-      throw new Error("®É¶¡®æ¦¡¿ù»~");
+      throw new Error("æ™‚é–“æ ¼å¼éŒ¯èª¤");
     }
 
     await createReminder({
@@ -17,9 +17,9 @@ export async function executeTool(name, args, context) {
 
     return {
       success: true,
-      message: `¤w«Ø¥ß´£¿ô¡G${args.target} ¦b ${args.time} ­n ${args.action}`,
+      message: `å·²å»ºç«‹æé†’ï¼š${args.target} æ–¼ ${args.time} è¦ ${args.action}`,
     };
   }
 
-  throw new Error(`¥¼ª¾¤u¨ã: ${name}`);
+  throw new Error(`æœªçŸ¥çš„å·¥å…·: ${name}`);
 }

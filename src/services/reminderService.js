@@ -4,7 +4,7 @@ const db = new Firestore({ projectId: "shirleylineagent" });
 const COLLECTION = "reminders";
 
 /**
- * 建立提醒
+ *
  */
 export async function createReminder(data) {
   const doc = await db.collection(COLLECTION).add({
@@ -17,7 +17,7 @@ export async function createReminder(data) {
 }
 
 /**
- * 取得到期提醒
+ *
  */
 export async function getDueReminders(nowIso) {
   const snapshot = await db
@@ -33,7 +33,7 @@ export async function getDueReminders(nowIso) {
 }
 
 /**
- * 標記已通知
+ *
  */
 export async function markNotified(id) {
   await db.collection(COLLECTION).doc(id).update({
