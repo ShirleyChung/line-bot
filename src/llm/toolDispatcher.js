@@ -7,7 +7,6 @@
 import { createReminder } from "../services/reminderService.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
-import { getTodayEvents, createCalendarEvent } from "../services/calendarService.js";
 import { replyText } from "../line/reply.js";
 import { lineClient } from "../line/client.js";
 
