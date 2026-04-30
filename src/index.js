@@ -73,12 +73,18 @@ app.get("/cron/check-reminders", async (req, res) => {
         time: r.time,
       });
 
-      await lineClient.pushMessage(targetId, {
-        type: "text",
-        text: `提醒：${r.target} 要 ${r.action}`,
+      await lineClient.pushMessage({
+        to: targetId,
+        messages: [
+          {
+            type: "text",
+            text: `提醒：${r.target} 要 ${r.action}`,
+          },
+        ],
       });
 
       await markNotified(r.id);
+      console.log("[cron] marked notified:", r.id);
     }
 
     res.send("ok");
