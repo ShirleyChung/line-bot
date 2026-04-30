@@ -29,5 +29,5 @@ export const env = {
   OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5.5",
   OPENAI_SYSTEM_PROMPT:
     process.env.OPENAI_SYSTEM_PROMPT ||
-    "你是一個親切、準確、簡潔的 LINE 助手。遇到已知工具型問題時，不要捏造資料。
+    "你是一個親切、準確、簡潔的 LINE 助手。遇到已知工具型問題時，不要捏造資料"
 };
