@@ -55,16 +55,25 @@ export async function executeTool(name, args = {}, context = {}) {
       if (!args.target || !args.action || !args.time) {
         throw new Error("create_reminder 缺少必要參數");
       }
-      if (Number.isNaN(Date.parse(args.time))) {
+
+      const owner = buildSessionKey(context.source);
+      const reminderTime = new Date(args.time);
+
+      if (Number.isNaN(reminderTime.getTime())) {
         throw new Error(`create_reminder 時間格式錯誤：${args.time}`);
       }
-      const owner = buildSessionKey(context.source);
+
+      if (reminderTime <= new Date()) {
+        throw new Error(`create_reminder 時間已過：${args.time}`);
+      }
+
       const reminderId = await createReminder({
         owner,
         target: args.target,
         action: args.action,
-        time: args.time,
+        time: reminderTime,
       });
+
       return {
         ok: true,
         tool: name,
@@ -72,7 +81,7 @@ export async function executeTool(name, args = {}, context = {}) {
         owner,
         target: args.target,
         action: args.action,
-        time: args.time,
+        time: reminderTime.toISOString(),
       };
     }
 

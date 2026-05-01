@@ -51,11 +51,14 @@ function toLineTargetId(owner) {
   if (!owner) return "";
   return owner.replace(/^user:/, "").replace(/^group:/, "").replace(/^room:/, "");
 }
+
 app.get("/cron/check-reminders", async (req, res) => {
   try {
-    const now = new Date().toISOString();
+    const now = new Date();
+    console.log("[cron] now =", now.toISOString());
 
     const reminders = await getDueReminders(now);
+    console.log("[cron] reminders =", reminders);
 
     for (const r of reminders) {
       const targetId = toLineTargetId(r.owner);
@@ -70,7 +73,7 @@ app.get("/cron/check-reminders", async (req, res) => {
         targetId,
         target: r.target,
         action: r.action,
-        time: r.time,
+        time: r.time?.toDate ? r.time.toDate().toISOString() : r.time,
       });
 
       await lineClient.pushMessage({
@@ -83,14 +86,14 @@ app.get("/cron/check-reminders", async (req, res) => {
         ],
       });
 
-      //await markNotified(r.id);
+      // 你若要省空間，可直接刪掉
       await deleteReminder(r.id);
       console.log("[cron] deleted reminder:", r.id);
     }
 
     res.send("ok");
   } catch (err) {
-    console.error("cron error:", err);
+    console.error("[cron] error:", err);
     res.status(500).send("error");
   }
 });
