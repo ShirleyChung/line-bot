@@ -13,7 +13,7 @@ import express from "express";
 import { env } from "./config/env.js";
 import { line, lineConfig, lineClient } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
-import { getDueReminders, markNotified } from "./services/reminderService.js";
+import { getDueReminders, markNotified, deleteReminder } from "./services/reminderService.js";
 
 const app = express();
 
