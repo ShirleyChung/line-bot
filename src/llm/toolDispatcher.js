@@ -29,7 +29,7 @@ function getAllowedPushTargets() {
  * 組合今日連結訊息內容
  */
 function buildTodayLinkMessage(url, includeZoomInfo = true) {
-  let text = `今日的上課連結如下：\n${url}`;
+  let text = `今日的共追連結如下：\n${url}`;
 
   if (includeZoomInfo) {
     text +=

@@ -1,15 +1,15 @@
 /**
- * �ϥ� Firestore �x�s��ܪ��A
+ * 使用 Firestore 儲存對話狀態
  *
- * �o�Ӫ����� collection / document �ӫO�s�C�� session �� lastResponseId�C
- * �A�X LINE bot �o�ءG
- * - �@��@��ѡGuser:Uxxxx
- * - �s�ղ�ѡGgroup:Gxxxx
- * - room ��ѡGroom:Rxxxx
+ * 本檔案使用 collection / document 來保存各個 session 的 lastResponseId。
+ * 對應 LINE bot 來源：
+ * - 一對一聊天：user:Uxxxx
+ * - 群組聊天：group:Gxxxx
+ * - room 聊天：room:Rxxxx
  *
- * �ݨD�ܳ�¡G
- * 1. �ھ� session key Ū�� lastResponseId
- * 2. �b�C����ܧ������s lastResponseId
+ * 主要需求：
+ * 1. 根據 session key 讀取 lastResponseId
+ * 2. 在每次對話結束後更新 lastResponseId
  */
 
 import { Firestore } from "@google-cloud/firestore";
