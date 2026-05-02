@@ -81,7 +81,7 @@ app.get("/cron/check-reminders", async (req, res) => {
         messages: [
           {
             type: "text",
-            text: `提醒：${r.target} 要 ${r.action}`,
+            text: `${r.action} 囉`,
           },
         ],
       });

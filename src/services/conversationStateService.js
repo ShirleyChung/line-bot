@@ -120,10 +120,7 @@ export async function setConversationState(sessionKey, lastResponseId) {
 }
 
 /**
- * �M���Y�� session ����ܪ��A
- *
- * �A����Y�Q���u���]�O�Сv���O�A�i�H�����I�s�o�ӡC
- *
+  * 刪除指定 session 的對話狀態
  * @param {string} sessionKey
  * @returns {Promise<void>}
  */
