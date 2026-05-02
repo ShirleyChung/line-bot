@@ -48,7 +48,12 @@ export async function askLlmWithTools(userText, context = {}) {
   ${JSON.stringify(memory, null, 2)}
   請依照這些偏好回覆。`;
   }
-
+  instructions += `
+  目前時間（Asia/Taipei）是：${taipeiNow}。
+  當使用者提到相對或自然語言時間時，例如「5分鐘後」「10分鐘後」「1小時後」「今晚9:10」「明天早上8點」「下週三下午3點」，
+  請以這個時間為基準進行推算。如果使用者提供的時間資訊已足夠，就不要再要求精確時間。
+  如果要呼叫 reminder 相關工具，時間一律輸出為 ISO 8601 格式，並包含 +08:00。
+  `;
   let response = await client.responses.create({
     model: env.OPENAI_MODEL,
     instructions: instructions,
