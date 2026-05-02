@@ -48,6 +48,18 @@ export async function askLlmWithTools(userText, context = {}) {
   ${JSON.stringify(memory, null, 2)}
   請依照這些偏好回覆。`;
   }
+  const now = new Date();
+  const taipeiNow =
+  new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(now).replace(" ", "T") + "+08:00";
   instructions += `
   目前時間（Asia/Taipei）是：${taipeiNow}。
   當使用者提到相對或自然語言時間時，例如「5分鐘後」「10分鐘後」「1小時後」「今晚9:10」「明天早上8點」「下週三下午3點」，
