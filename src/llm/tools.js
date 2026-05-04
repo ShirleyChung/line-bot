@@ -79,4 +79,21 @@ export const botTools = [
     },
     strict: true,
   },
+  {
+    type: "function",
+    name: "extract_image_data",
+    description: "從使用者上傳的圖片中進行 OCR 並整理成結構化 JSON",
+    parameters: {
+        type: "object",
+        properties: {
+            imageId: {
+                type: "string",
+                description: "LINE messageId 或暫存圖片 ID"
+            }
+        },
+        required: ["imageId"],
+        additionalProperties: false
+    },
+    strict: true
+  }
 ];

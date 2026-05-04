@@ -9,6 +9,12 @@ import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
 import { replyText } from "../line/reply.js";
 import { lineClient } from "../line/client.js";
+// src/llm/toolDispatcher.js
+
+import { fetchImageBuffer } from "../services/imageService.js";
+import { ocrImage } from "../services/ocrService.js";
+import { parseOCRToJSON } from "../services/dataParserService.js";
+import { jsonToCSV } from "../services/csvService.js";
 
 /**
  * 可設定允許 push 的目標 id 清單
@@ -51,6 +57,27 @@ function buildTodayLinkMessage(url, includeZoomInfo = true) {
  */
 export async function executeTool(name, args = {}, context = {}) {
   switch (name) {
+    case "extract_image_data": {
+      const imageId = args.imageId || context.latestImageId;
+      if (!imageId) {
+        throw new Error("沒有可用的圖片");
+      }
+      const buffer = await fetchImageBuffer(imageId);
+      const text = await ocrImage(buffer);
+      const json = await parseOCRToJSON(text);
+      return {
+        ok: true,
+        data: json,
+      };
+    }
+    case "json_to_csv": {
+      const { data, fields } = args;
+      const csv = jsonToCSV(data, fields);
+      return {
+        ok: true,
+        csv,
+      };
+    }
     case "create_reminder": {
       if (!args.target || !args.action || !args.time) {
         throw new Error("create_reminder 缺少必要參數");

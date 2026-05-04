@@ -16,6 +16,11 @@ import {
   isMentionToBot,
   stripMentionsFromText,
 } from "../utils/textUtils.js";
+import { buildSessionKey } from "../services/conversationStateService.js";
+import {
+  setLatestImageId,
+  getLatestImageId,
+} from "../services/sessionStateService.js";
 
 /**
  * 路由 webhook event
@@ -23,18 +28,36 @@ import {
  * @param {object} event - LINE webhook event
  */
 export async function routeMessageEvent(event) {
+  const sessionKey = buildSessionKey(event.source);
+
+  // 收到圖片時，先記住這張圖片的 message id
+  if (event.message.type === "image") {
+    await setLatestImageId(sessionKey, event.message.id);
+
+    return replyText(
+      event.replyToken,
+      "已收到圖片，請告訴我要做什麼，例如：幫我從這張圖片取出資料。"
+    );
+  }
   // 只處理文字訊息
   if (event.type !== "message" || event.message.type !== "text") {
     return null;
   }
 
-  const sourceType = event.source?.type;
-
   // 原始文字（保留完整內容）
   const rawText = (event.message.text || "").trim();
-
   // 去掉 mention 後的文字（拿來做命令判斷）
   const userText = stripMentionsFromText(event);
+
+  const latestImageId = await getLatestImageId(sessionKey);
+  const context = {
+    replyToken: event.replyToken,
+    source: event.source,
+    sessionKey,
+    latestImageId,
+  };
+
+  const sourceType = event.source?.type;
 
   try {
     /**
@@ -57,7 +80,7 @@ export async function routeMessageEvent(event) {
 
     // 沒命中才進 LLM
     // 這裡優先丟去掉 mention 後的文字，避免把 @bot 名稱一起送進 LLM
-    return await handleLlmFallback(event, userText || rawText);
+    return await handleLlmFallback(event, userText || rawText, context);
   } catch (error) {
     console.error("routeMessageEvent error:", error);
     return replyText(event.replyToken, "處理失敗，請稍後再試。");

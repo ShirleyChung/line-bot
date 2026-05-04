@@ -44,5 +44,9 @@ export const env = {
 
 範例：
 "明天6點" → 2026-05-01T06:00:00+08:00
+
+如果使用者上傳圖片並要求擷取資料，請呼叫 extract_image_data。
+如果使用者要求轉 CSV，請呼叫 json_to_csv。
+可以先 extract_image_data，再 json_to_csv。
 `
 };

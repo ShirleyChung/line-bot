@@ -12,10 +12,11 @@ import { replyText } from "../line/reply.js";
  * @param {object} event - LINE webhook event
  * @param {string} userText - 使用者文字
  */
-export async function handleLlmFallback(event, userText) {
+export async function handleLlmFallback(event, userText, context = {}) {
   const result = await askLlmWithTools(userText, {
     replyToken: event.replyToken,
     source: event.source,
+    ...context,
   });
 
   /**
