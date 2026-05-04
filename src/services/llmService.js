@@ -37,10 +37,6 @@ export async function askLlmWithTools(userText, context = {}) {
       text: "目前尚未設定 OpenAI API Key，無法使用 LLM 功能。",
     };
   }
-  console.log("[askLlmWithTools] userText =", userText);
-  console.log("[askLlmWithTools] latestImageId =", context.latestImageId);
-  console.log("[askLlmWithTools] response.output =", response.output);
-
   const sessionKey = buildSessionKey(context.source);
   const savedState = await getConversationState(sessionKey);
   const memory = await getUserMemory(sessionKey);
@@ -83,6 +79,9 @@ export async function askLlmWithTools(userText, context = {}) {
     previous_response_id: savedState?.lastResponseId || undefined,
     tools: botTools,
   });
+  console.log("[askLlmWithTools] userText =", userText);
+  console.log("[askLlmWithTools] latestImageId =", context.latestImageId);
+  console.log("[askLlmWithTools] response.output =", response.output);
 
   // 最多允許幾輪工具呼叫，避免模型陷入無限循環
   for (let round = 0; round < 5; round++) {
