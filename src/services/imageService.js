@@ -1,9 +1,7 @@
-// src/services/imageService.js
-
-import { lineClient } from "../line/client.js";
+import { lineBlobClient } from "../line/client.js";
 
 export async function fetchImageBuffer(messageId) {
-  const stream = await lineClient.getMessageContent(messageId);
+  const stream = await lineBlobClient.getMessageContent(messageId);
 
   const chunks = [];
   for await (const chunk of stream) {

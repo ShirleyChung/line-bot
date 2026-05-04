@@ -17,5 +17,10 @@ export const lineClient = new line.messagingApi.MessagingApiClient({
   channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
 });
 
+// Blob client（下載使用者上傳圖片/影片/音訊內容）
+export const lineBlobClient = new line.messagingApi.MessagingApiBlobClient({
+  channelAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+});
+
 // 匯出整個 line namespace，方便其他檔案使用 middleware
 export { line };
