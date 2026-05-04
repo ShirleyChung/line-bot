@@ -18,20 +18,6 @@ export async function handleLlmFallback(event, userText, context = {}) {
     source: event.source,
     ...context,
   });
-
-  /**
-   * 如果工具本身已經執行 reply_today_link，
-   * 這時候模型可能還會再產生一段文字。
-   *
-   * 為避免同一個 replyToken 被重複 reply，
-   * 這裡採取保守做法：
-   * - 如果模型有純文字回覆，就只在工具未直接 reply 的情況下回
-   * - 若工具已直接 reply，則返回 null
-   *
-   * 目前用一個簡單規則：
-   * 若結果是文字，就回覆；
-   * 若未來你想更精細區分，可在 executeTool 裡加旗標。
-   */
   if (result.type === "text" && result.text) {
     return replyText(event.replyToken, result.text);
   }

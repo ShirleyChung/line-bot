@@ -33,6 +33,7 @@ export async function routeMessageEvent(event) {
   // 收到圖片時，先記住這張圖片的 message id
   if (event.message.type === "image") {
     await setLatestImageId(sessionKey, event.message.id);
+    console.log("[image] saved latestImageId =", event.message.id);
 
     return replyText(
       event.replyToken,
@@ -56,6 +57,7 @@ export async function routeMessageEvent(event) {
     sessionKey,
     latestImageId,
   };
+  console.log("[text] loaded latestImageId =", latestImageId);
 
   const sourceType = event.source?.type;
 
