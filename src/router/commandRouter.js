@@ -28,31 +28,11 @@ import {
  * @param {object} event - LINE webhook event
  */
 export async function routeMessageEvent(event) {
-  /**
-   * 群組 / 多人聊天室中：
-   * 只有 bot 被 @ 提及時才回覆
-   *
-   * source.type 可能是：
-   * - user  : 一對一聊天
-   * - group : 群組
-   * - room  : 多人聊天室
-   */
-  const sourceType = event.source?.type;
-  if ((sourceType === "group" || sourceType === "room") && !isMentionToBot(event)) {
-    return null;
-  }
-
   const sessionKey = buildSessionKey(event.source);
 
   // 收到圖片時，先記住這張圖片的 message id
   if (event.message.type === "image") {
     await setLatestImageId(sessionKey, event.message.id);
-    console.log("[image] saved latestImageId =", event.message.id);
-
-    return replyText(
-      event.replyToken,
-      "已收到圖片，請告訴我要做什麼，例如：幫我從這張圖片取出資料。"
-    );
   }
   // 只處理文字訊息
   if (event.type !== "message" || event.message.type !== "text") {
@@ -71,8 +51,23 @@ export async function routeMessageEvent(event) {
     sessionKey,
     latestImageId,
   };
-  console.log("[text] loaded latestImageId =", latestImageId);
+
+  const sourceType = event.source?.type;
+
   try {
+    /**
+     * 群組 / 多人聊天室中：
+     * 只有 bot 被 @ 提及時才回覆
+     *
+     * source.type 可能是：
+     * - user  : 一對一聊天
+     * - group : 群組
+     * - room  : 多人聊天室
+     */
+    if ((sourceType === "group" || sourceType === "room") && !isMentionToBot(event)) {
+      return null;
+    }
+
     // 先攔截內建命令（使用移除 mention 後的文字）
     if (isTodayLinkCommand(userText)) {
       return await handleTodayLink(event);
