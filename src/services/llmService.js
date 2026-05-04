@@ -37,6 +37,9 @@ export async function askLlmWithTools(userText, context = {}) {
       text: "目前尚未設定 OpenAI API Key，無法使用 LLM 功能。",
     };
   }
+  console.log("[askLlmWithTools] userText =", userText);
+  console.log("[askLlmWithTools] latestImageId =", context.latestImageId);
+  console.log("[askLlmWithTools] response.output =", response.output);
 
   const sessionKey = buildSessionKey(context.source);
   const savedState = await getConversationState(sessionKey);
@@ -44,9 +47,9 @@ export async function askLlmWithTools(userText, context = {}) {
   let instructions = env.OPENAI_SYSTEM_PROMPT;
   if (memory) {
     instructions += `
-  以下是這位使用者的偏好與背景：
+  (以下是這位使用者的偏好與背景：
   ${JSON.stringify(memory, null, 2)}
-  請依照這些偏好回覆。`;
+  請依照這些偏好回覆。)`;
   }
   const now = new Date();
   const taipeiNow =
@@ -61,11 +64,18 @@ export async function askLlmWithTools(userText, context = {}) {
     hour12: false,
   }).format(now).replace(" ", "T") + "+08:00";
   instructions += `
-  目前時間（Asia/Taipei）是：${taipeiNow}。
+  (目前時間（Asia/Taipei）是：${taipeiNow}。
   當使用者提到相對或自然語言時間時，例如「5分鐘後」「10分鐘後」「1小時後」「今晚9:10」「明天早上8點」「下週三下午3點」，
   請以這個時間為基準進行推算。如果使用者提供的時間資訊已足夠，就不要再要求精確時間。
-  如果要呼叫 reminder 相關工具，時間一律輸出為 ISO 8601 格式，並包含 +08:00。
+  如果要呼叫 reminder 相關工具，時間一律輸出為 ISO 8601 格式，並包含 +08:00。)
   `;
+  if (context.latestImageId) {
+  instructions += `
+  （系統資訊：使用者最近上傳過一張圖片，目前可供工具使用。
+  如果使用者要求「從圖片取資料」、「OCR」、「讀取圖片內容」、「擷取圖片資料」，
+  請優先呼叫 extract_image_data 工具，不要要求再次上傳圖片。）
+  `;
+  }
   let response = await client.responses.create({
     model: env.OPENAI_MODEL,
     instructions: instructions,
@@ -106,6 +116,13 @@ export async function askLlmWithTools(userText, context = {}) {
         call_id: call.call_id,
         output: JSON.stringify(result),
       });
+      console.log(
+        "[askLlmWithTools] functionCalls =",
+        functionCalls.map((c) => ({
+          name: c.name,
+          arguments: c.arguments,
+        }))
+      );
     }
 
     // 把工具執行結果再送回模型，讓模型產生下一步或最終回答
