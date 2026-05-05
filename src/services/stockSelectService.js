@@ -1,4 +1,5 @@
 import { db } from "./firestore.js";
+import { fetchTwseLatestClose } from "./twseStockDayService.js";
 
 function normalizeSymbol(symbol) {
   return String(symbol).trim().toUpperCase().replace(".TW", "").replace(".TWO", "");
@@ -99,36 +100,6 @@ export async function listWatchStocks(lineUserId) {
   };
 }
 
-export async function fetchTwseDailyAll() {
-  const url = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL";
-  const res = await fetch(url);
-
-  if (!res.ok) {
-    throw new Error(`TWSE API failed: ${res.status}`);
-  }
-
-  return await res.json();
-}
-
-export async function getTwsePriceMap() {
-  const rows = await fetchTwseDailyAll();
-
-  const map = new Map();
-
-  for (const row of rows) {
-    const symbol =
-      row.Code ||
-      row["證券代號"] ||
-      row["證券代號 "];
-
-    if (!symbol) continue;
-
-    map.set(String(symbol).trim(), row);
-  }
-
-  return map;
-}
-
 export async function getWatchPrices(lineUserId) {
   const list = await listWatchStocks(lineUserId);
 
@@ -140,38 +111,45 @@ export async function getWatchPrices(lineUserId) {
     };
   }
 
-  const twseMap = await getTwsePriceMap();
+  const listResult = await listWatchStocks(lineUserId);
+
+  if (!listResult.ok) {
+    return listResult;
+  }
+
+  const stocks = listResult.stocks || [];
+
+  if (stocks.length === 0) {
+    return {
+      ok: true,
+      prices: [],
+      message: "你目前還沒有自選股。",
+    };
+  }
 
   const prices = [];
 
-  for (const stock of list.stocks) {
-    const code = stock.symbol;
-    const row = twseMap.get(code);
+  for (const stock of stocks) {
+    const symbol = normalizeSymbol(stock.symbol);
 
-    if (!row) {
+    try {
+      const price = await fetchTwseLatestClose(symbol);
+      prices.push(price);
+    } catch (err) {
+      console.error("[getWatchPrices] TWSE fetch failed:", symbol, err);
+
       prices.push({
-        symbol: code,
+        symbol,
         found: false,
-        message: "查不到上市股資料，可能是上櫃、興櫃、ETF，或今日資料尚未更新。"
+        source: "TWSE_STOCK_DAY",
+        message: err instanceof Error ? err.message : String(err),
       });
-      continue;
     }
-
-    prices.push({
-      symbol: code,
-      name: row.Name || row["證券名稱"],
-      close: row.ClosingPrice || row["收盤價"],
-      change: row.Change || row["漲跌價差"],
-      open: row.OpeningPrice || row["開盤價"],
-      high: row.HighestPrice || row["最高價"],
-      low: row.LowestPrice || row["最低價"],
-      volume: row.TradeVolume || row["成交股數"],
-      found: true
-    });
   }
 
   return {
     ok: true,
-    prices
+    prices,
+    message: "以下是你的自選股最近收盤資訊。",
   };
 }
