@@ -4,7 +4,6 @@ export async function fetchNews({
   country = "tw",
   max = 5,
 } = {}) {
-  console.log("[fetchNews] query =", query, "lang =", lang, "country =", country, "max =", max);
   if (!query || !query.trim()) {
     throw new Error("fetchNews: query is required");
   }
@@ -17,7 +16,7 @@ export async function fetchNews({
   const url = new URL("https://gnews.io/api/v4/search");
   url.searchParams.set("q", query.trim());
   url.searchParams.set("lang", lang);
-  url.searchParams.set("country", country);
+  //url.searchParams.set("country", country);
   url.searchParams.set("max", String(max));
   url.searchParams.set("sortby", "publishedAt");
   url.searchParams.set("apikey", apiKey);
@@ -32,7 +31,6 @@ export async function fetchNews({
   const data = await resp.json();
 
   const articles = Array.isArray(data.articles) ? data.articles : [];
-  console.log("[fetchNews] articles =", articles);
 
   return articles.map((a) => ({
     title: a.title || "",
