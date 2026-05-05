@@ -79,9 +79,6 @@ export async function askLlmWithTools(userText, context = {}) {
     previous_response_id: savedState?.lastResponseId || undefined,
     tools: botTools,
   });
-  console.log("[askLlmWithTools] userText =", userText);
-  console.log("[askLlmWithTools] latestImageId =", context.latestImageId);
-  console.log("[askLlmWithTools] response.output =", response.output);
 
   // 最多允許幾輪工具呼叫，避免模型陷入無限循環
   for (let round = 0; round < 5; round++) {
@@ -109,8 +106,10 @@ export async function askLlmWithTools(userText, context = {}) {
     for (const call of functionCalls) {
       const args = JSON.parse(call.arguments || "{}");
       const result = await executeTool(call.name, args, context);
-console.log("[askLlmWithTools] tool result =", JSON.stringify(result, null, 2));
-
+      // 已經格式化好的 LINE 文字，直接回覆，不再交給 LLM 重排
+      if (call.name === "get_watch_prices" && result?.text) {
+        return result.text;
+      }
       toolOutputs.push({
         type: "function_call_output",
         call_id: call.call_id,
