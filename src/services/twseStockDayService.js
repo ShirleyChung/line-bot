@@ -134,6 +134,8 @@ export async function fetchTwseStockDay(symbol, dateYmd = yyyymmddTaipei()) {
     `&stockNo=${encodeURIComponent(code)}` +
     `&response=json`;
 
+  console.log("[fetchTwseStockDay] url =", url);
+
   const res = await fetch(url, {
     headers: {
       "Accept": "application/json,text/plain,*/*",
@@ -142,11 +144,29 @@ export async function fetchTwseStockDay(symbol, dateYmd = yyyymmddTaipei()) {
     },
   });
 
+  const text = await res.text();
+
+  console.log("[fetchTwseStockDay] status =", res.status);
+  console.log("[fetchTwseStockDay] content-type =", res.headers.get("content-type"));
+  console.log("[fetchTwseStockDay] body first 500 =", text.slice(0, 500));
+
   if (!res.ok) {
-    throw new Error(`TWSE STOCK_DAY failed: ${res.status}`);
+    throw new Error(`TWSE STOCK_DAY failed: HTTP ${res.status}, body=${text.slice(0, 200)}`);
   }
 
-  const json = await res.json();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch (err) {
+    console.error("[fetchTwseStockDay] JSON parse failed:", err);
+    throw new Error(`TWSE 回傳內容不是 JSON：${text.slice(0, 200)}`);
+  }
+
+  console.log("[fetchTwseStockDay] json.stat =", json.stat);
+  console.log("[fetchTwseStockDay] json.title =", json.title);
+  console.log("[fetchTwseStockDay] fields =", JSON.stringify(json.fields));
+  console.log("[fetchTwseStockDay] data length =", Array.isArray(json.data) ? json.data.length : "not array");
+  console.log("[fetchTwseStockDay] last row =", Array.isArray(json.data) ? JSON.stringify(json.data[json.data.length - 1]) : null);
 
   twseStockDayCache.set(cacheKey, {
     cachedAt: now,
