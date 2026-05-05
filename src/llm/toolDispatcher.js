@@ -281,7 +281,7 @@ export async function executeTool(name, args = {}, context = {}) {
       }
 
       const result = await getWatchPrices(owner);
-      const text = buildWatchPricesMessage(result);
+      const text = buildWatchPricesMessage(result.prices || []);
 
       return {
         ok: true,
