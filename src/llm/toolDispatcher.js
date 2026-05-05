@@ -53,6 +53,32 @@ function buildTodayLinkMessage(url, includeZoomInfo = true) {
   return text;
 }
 
+function escapeCsvValue(value) {
+  const s = value == null ? "" : String(value);
+
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+
+  return s;
+}
+
+function rowsToCSV(fields, rows) {
+  const header = fields.map(escapeCsvValue).join(",");
+
+  const body = rows
+    .map((row) => {
+      if (!Array.isArray(row)) {
+        throw new Error("json_to_csv 的每一列都必須是陣列");
+      }
+
+      return row.map(escapeCsvValue).join(",");
+    })
+    .join("\n");
+
+  return `${header}\n${body}`;
+}
+
 /**
  * 執行指定的工具
  *
@@ -78,8 +104,14 @@ export async function executeTool(name, args = {}, context = {}) {
     }
 
     case "json_to_csv": {
-      const { data, fields } = args;
-      const csv = jsonToCSV(data, fields);
+      const { fields, rows } = args;
+      if (!Array.isArray(fields)) {
+        throw new Error("json_to_csv 的 fields 必須是陣列");
+      }
+      if (!Array.isArray(rows)) {
+        throw new Error("json_to_csv 的 rows 必須是二維陣列");
+      }
+      const csv = rowsToCSV(fields, rows);
       return {
         ok: true,
         csv,

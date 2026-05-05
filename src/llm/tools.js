@@ -94,20 +94,30 @@ export const botTools = [
   {
     type: "function",
     name: "json_to_csv",
-    description: "將 JSON 依照指定欄位轉成 CSV",
+    description: "將表格資料依照指定欄位轉成 CSV。rows 每一列的順序要對應 fields。",
     parameters: {
-        type: "object",
-        properties: {
-            data: {
-                type: "object"
-            },
-            fields: {
-                type: "array",
-                items: { type: "string" }
-            }
+      type: "object",
+      properties: {
+        fields: {
+          type: "array",
+          description: "CSV 欄位名稱，例如 ['股票代碼', '名稱', '股價']",
+          items: {
+            type: "string"
+          }
         },
-        required: ["data", "fields"],
-        additionalProperties: false
+        rows: {
+          type: "array",
+          description: "CSV 資料列。每一列是一個陣列，順序對應 fields。",
+          items: {
+            type: "array",
+            items: {
+              type: "string"
+            }
+          }
+        }
+      },
+      required: ["fields", "rows"],
+      additionalProperties: false
     },
     strict: true
   },
