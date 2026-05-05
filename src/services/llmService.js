@@ -108,7 +108,10 @@ export async function askLlmWithTools(userText, context = {}) {
       const result = await executeTool(call.name, args, context);
       // 已經格式化好的 LINE 文字，直接回覆，不再交給 LLM 重排
       if (call.name === "get_watch_prices" && result?.text) {
-        return result.text;
+        return {
+          type: "text",
+          text: result.text,
+        };
       }
       toolOutputs.push({
         type: "function_call_output",
