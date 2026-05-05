@@ -157,6 +157,7 @@ export async function fetchTwseStockDay(symbol, dateYmd = yyyymmddTaipei()) {
 }
 
 export async function fetchTwseLatestClose(symbol, dateYmd = yyyymmddTaipei()) {
+  console.log("[fetchTwseLatestClose] symbol =", symbol, "dateYmd =", dateYmd);
   const code = String(symbol).trim();
 
   const json = await fetchTwseStockDay(code, dateYmd);

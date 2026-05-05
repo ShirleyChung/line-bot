@@ -130,6 +130,7 @@ export async function getWatchPrices(lineUserId) {
   const prices = [];
 
   for (const stock of stocks) {
+    console.log("[getWatchPrices] Processing stock:", stock.symbol);
     const symbol = normalizeSymbol(stock.symbol);
 
     try {
