@@ -4,6 +4,7 @@ export async function fetchNews({
   country = "tw",
   max = 5,
 } = {}) {
+  console.log("[fetchNews] query =", query, "lang =", lang, "country =", country, "max =", max);
   if (!query || !query.trim()) {
     throw new Error("fetchNews: query is required");
   }
@@ -31,6 +32,7 @@ export async function fetchNews({
   const data = await resp.json();
 
   const articles = Array.isArray(data.articles) ? data.articles : [];
+  console.log("[fetchNews] articles =", articles);
 
   return articles.map((a) => ({
     title: a.title || "",
