@@ -107,13 +107,13 @@ export async function askLlmWithTools(userText, context = {}) {
       const args = JSON.parse(call.arguments || "{}");
       const result = await executeTool(call.name, args, context);
       // 已經格式化好的 LINE 文字，直接回覆，不再交給 LLM 重排
-      if (call.name === "get_watch_prices" && result?.text) {
-        return {
-          type: "text",
-          text: result.text,
-        };
-      }
-      toolOutputs.push({
+    if (["get_watch_prices", "get_stock_price"].includes(call.name) && result?.text) {
+      return {
+        type: "text",
+        text: result.text,
+      };
+    }
+    toolOutputs.push({
         type: "function_call_output",
         call_id: call.call_id,
         output: JSON.stringify(result),

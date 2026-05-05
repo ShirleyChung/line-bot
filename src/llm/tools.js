@@ -173,4 +173,21 @@ export const botTools = [
       additionalProperties: false
     }
   },
+  {
+  type: "function",
+    name: "get_stock_price",
+    description: "查詢單一台股股票或 ETF 的最近收盤資訊，不需要加入自選股。",
+    parameters: {
+      type: "object",
+      properties: {
+        symbol: {
+          type: "string",
+          description: "台股股票代碼或 ETF 代碼，例如 2330、2454、2887、00981A。"
+        }
+      },
+      required: ["symbol"],
+      additionalProperties: false
+      },
+    strict: true
+  },
 ];

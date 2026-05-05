@@ -80,7 +80,7 @@ export function buildWatchPricesMessage(prices) {
 
   const lines = [];
 
-  lines.push("你的自選股最近收盤資訊");
+  lines.push("最近收盤資訊");
   if (firstDate) {
     lines.push(`資料日期：${firstDate}`);
   }

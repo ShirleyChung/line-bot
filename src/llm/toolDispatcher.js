@@ -21,6 +21,7 @@ import {
   listWatchStocks,
   getWatchPrices,
 } from "../services/stockSelectService.js";
+import { fetchTwseLatestClose } from "../services/twseStockDayService.js";
 import { buildWatchPricesMessage } from "../utils/format.js";
 
 /**
@@ -288,6 +289,24 @@ export async function executeTool(name, args = {}, context = {}) {
         tool: name,
         owner,
         ...result,
+        text,
+      };
+    }
+
+    case "get_stock_price": {
+      const symbol = String(args.symbol || "").trim().toUpperCase();
+
+      if (!symbol) {
+        throw new Error("get_stock_price 缺少股票代碼 symbol");
+      }
+
+      const price = await fetchTwseLatestClose(symbol);
+      const text = buildWatchPricesMessage([price]);
+
+      return {
+        ok: true,
+        tool: name,
+        price,
         text,
       };
     }
