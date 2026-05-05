@@ -109,6 +109,7 @@ export async function askLlmWithTools(userText, context = {}) {
     for (const call of functionCalls) {
       const args = JSON.parse(call.arguments || "{}");
       const result = await executeTool(call.name, args, context);
+console.log("[askLlmWithTools] tool result =", JSON.stringify(result, null, 2));
 
       toolOutputs.push({
         type: "function_call_output",
@@ -132,7 +133,6 @@ export async function askLlmWithTools(userText, context = {}) {
       tools: botTools,
     });
   }
-
   // 即使超過迴圈，也盡量保存最後一次 response.id
   if (response?.id) {
     await setConversationState(sessionKey, response.id);
