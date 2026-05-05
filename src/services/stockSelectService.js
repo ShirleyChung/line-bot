@@ -4,22 +4,11 @@ function normalizeSymbol(symbol) {
   return String(symbol).trim().toUpperCase().replace(".TW", "").replace(".TWO", "");
 }
 
-function isValidTaiwanStockSymbol(symbol) {
-  return /^[0-9]{4,6}$/.test(symbol);
-}
-
 export async function addWatchStock(lineUserId, symbol) {
   const code = normalizeSymbol(symbol);
 
   if (!lineUserId) {
     throw new Error("addWatchStock 缺少 lineUserId");
-  }
-
-  if (!isValidTaiwanStockSymbol(code)) {
-    return {
-      ok: false,
-      message: `股票代碼格式看起來不正確：${symbol}`,
-    };
   }
 
   const ref = db
