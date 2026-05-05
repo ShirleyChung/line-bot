@@ -21,6 +21,7 @@ import {
   listWatchStocks,
   getWatchPrices,
 } from "../services/stockSelectService.js";
+import { buildWatchPricesMessage } from "../utils/format.js";
 
 /**
  * 可設定允許 push 的目標 id 清單
@@ -280,12 +281,14 @@ export async function executeTool(name, args = {}, context = {}) {
       }
 
       const result = await getWatchPrices(owner);
+      const text = buildWatchPricesMessage(result);
 
       return {
         ok: true,
         tool: name,
         owner,
         ...result,
+        text,
       };
     }
 
