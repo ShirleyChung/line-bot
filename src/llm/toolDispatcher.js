@@ -15,6 +15,12 @@ import { fetchImageBuffer } from "../services/imageService.js";
 import { ocrImage } from "../services/ocrService.js";
 import { parseOCRToJSON } from "../services/dataParserService.js";
 import { jsonToCSV } from "../services/csvService.js";
+import {
+  addWatchStock,
+  removeWatchStock,
+  listWatchStocks,
+  getWatchPrices,
+} from "../services/stockSelectService.js";
 
 /**
  * 可設定允許 push 的目標 id 清單
@@ -70,6 +76,7 @@ export async function executeTool(name, args = {}, context = {}) {
         data: json,
       };
     }
+
     case "json_to_csv": {
       const { data, fields } = args;
       const csv = jsonToCSV(data, fields);
@@ -78,6 +85,7 @@ export async function executeTool(name, args = {}, context = {}) {
         csv,
       };
     }
+
     case "create_reminder": {
       if (!args.target || !args.action || !args.time) {
         throw new Error("create_reminder 缺少必要參數");
@@ -146,7 +154,6 @@ export async function executeTool(name, args = {}, context = {}) {
         throw new Error("push_today_link 需要 targetId");
       }
 
-      // 若有限制目標 id，則檢查 targetId 是否允許
       const allowedTargets = getAllowedPushTargets();
       if (allowedTargets.size > 0 && !allowedTargets.has(targetId)) {
         throw new Error(`不允許推播到此 targetId：${targetId}`);
@@ -171,6 +178,82 @@ export async function executeTool(name, args = {}, context = {}) {
         pushed: true,
         url,
         targetId,
+      };
+    }
+
+    case "add_watch_stock": {
+      const owner = buildSessionKey(context.source);
+
+      if (!owner) {
+        throw new Error("add_watch_stock 無法取得 owner");
+      }
+
+      if (!args.symbol) {
+        throw new Error("add_watch_stock 缺少股票代碼 symbol");
+      }
+
+      const result = await addWatchStock(owner, args.symbol);
+
+      return {
+        ok: true,
+        tool: name,
+        owner,
+        ...result,
+      };
+    }
+
+    case "remove_watch_stock": {
+      const owner = buildSessionKey(context.source);
+
+      if (!owner) {
+        throw new Error("remove_watch_stock 無法取得 owner");
+      }
+
+      if (!args.symbol) {
+        throw new Error("remove_watch_stock 缺少股票代碼 symbol");
+      }
+
+      const result = await removeWatchStock(owner, args.symbol);
+
+      return {
+        ok: true,
+        tool: name,
+        owner,
+        ...result,
+      };
+    }
+
+    case "list_watch_stocks": {
+      const owner = buildSessionKey(context.source);
+
+      if (!owner) {
+        throw new Error("list_watch_stocks 無法取得 owner");
+      }
+
+      const result = await listWatchStocks(owner);
+
+      return {
+        ok: true,
+        tool: name,
+        owner,
+        ...result,
+      };
+    }
+
+    case "get_watch_prices": {
+      const owner = buildSessionKey(context.source);
+
+      if (!owner) {
+        throw new Error("get_watch_prices 無法取得 owner");
+      }
+
+      const result = await getWatchPrices(owner);
+
+      return {
+        ok: true,
+        tool: name,
+        owner,
+        ...result,
       };
     }
 

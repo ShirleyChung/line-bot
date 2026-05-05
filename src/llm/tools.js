@@ -90,5 +90,77 @@ export const botTools = [
       additionalProperties: false,
     },
     strict: true,
-  }
+  },
+  {
+    type: "function",
+    name: "json_to_csv",
+    description: "將 JSON 依照指定欄位轉成 CSV",
+    parameters: {
+        type: "object",
+        properties: {
+            data: {
+                type: "object"
+            },
+            fields: {
+                type: "array",
+                items: { type: "string" }
+            }
+        },
+        required: ["data", "fields"],
+        additionalProperties: false
+    },
+    strict: true
+  },
+  {
+    type: "function",
+    name: "add_watch_stock",
+    description: "將股票代碼加入使用者的自選股清單",
+    parameters: {
+      type: "object",
+      properties: {
+        symbol: {
+          type: "string",
+          description: "台股股票代碼，例如 2330, 2454, 006208"
+        }
+      },
+      required: ["symbol"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "remove_watch_stock",
+    description: "從使用者的自選股清單移除指定股票代碼",
+    parameters: {
+      type: "object",
+      properties: {
+        symbol: {
+          type: "string",
+          description: "台股股票代碼，例如 2330"
+        }
+      },
+      required: ["symbol"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "list_watch_stocks",
+    description: "列出使用者目前儲存的自選股清單",
+    parameters: {
+      type: "object",
+      properties: {},
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "get_watch_prices",
+    description: "查詢使用者自選股的目前或最近股價",
+    parameters: {
+      type: "object",
+      properties: {},
+      additionalProperties: false
+    }
+  },
 ];

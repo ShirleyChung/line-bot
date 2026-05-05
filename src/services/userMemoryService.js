@@ -1,6 +1,4 @@
-import { Firestore } from "@google-cloud/firestore";
-
-const db = new Firestore({ projectId: "shirleylineagent" });
+import { db } from "./firestore.js";
 const COLLECTION = "user_memory";
 
 function getDocRef(sessionKey) {

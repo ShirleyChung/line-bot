@@ -11,18 +11,7 @@
  * 1. 根據 session key 讀取 lastResponseId
  * 2. 在每次對話結束後更新 lastResponseId
  */
-
-import { Firestore } from "@google-cloud/firestore";
-
-/**
- * 建立 Firestore client
- *
- * 在 Cloud Run / GCP 環境下，通常可以直接使用預設憑證。
- * 如果需要，可指定 projectId，也可以改為：
- *
- * const db = new Firestore({ projectId: "your-project-id" });
- */
-const db = new Firestore();
+import { db } from "./firestore.js";
 
 /**
  * collection 名稱
@@ -126,7 +115,7 @@ export async function setConversationState(sessionKey, lastResponseId) {
  */
 export async function clearConversationState(sessionKey) {
   if (!sessionKey) {
-    throw new Error("clearConversationState �ʤ� sessionKey");
+    throw new Error("clearConversationState 需要 sessionKey");
   }
 
   const docRef = getCollection().doc(sessionKey);

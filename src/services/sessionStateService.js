@@ -1,8 +1,5 @@
 // src/services/sessionStateService.js
-
-import { Firestore } from "@google-cloud/firestore";
-
-const db = new Firestore({ projectId: "shirleylineagent" });
+import { db } from "./firestore.js";
 const COLLECTION = "session_state";
 
 export async function setLatestImageId(sessionKey, imageId) {
