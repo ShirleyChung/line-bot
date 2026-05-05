@@ -16,6 +16,9 @@ export const env = {
   // ===== 基本執行設定 =====
   PORT: Number(process.env.PORT || 8080),
 
+  // ===== NEWs =====
+  GNEWS_API_KEY: required("GNEWS_API_KEY"),
+
   // ===== LINE =====
   LINE_CHANNEL_SECRET: required("LINE_CHANNEL_SECRET"),
   LINE_CHANNEL_ACCESS_TOKEN: required("LINE_CHANNEL_ACCESS_TOKEN"),

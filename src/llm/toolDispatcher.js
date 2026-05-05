@@ -23,6 +23,8 @@ import {
 } from "../services/stockSelectService.js";
 import { fetchTwseLatestClose } from "../services/twseStockDayService.js";
 import { buildWatchPricesMessage } from "../utils/format.js";
+import { fetchNews } from "../services/newsService.js";
+import { buildNewsMessage } from "../utils/format.js";
 
 /**
  * 可設定允許 push 的目標 id 清單
@@ -308,6 +310,19 @@ export async function executeTool(name, args = {}, context = {}) {
         tool: name,
         price,
         text,
+      };
+    }
+    case "searchNews": {
+      const query = args.query;
+      const news = await fetchNews({
+        query,
+        lang: args.lang || "zh",
+        country: args.country || "tw",
+        max: args.max || 5,
+      });
+      return {
+        type: "text",
+        text: buildNewsMessage(news, query),
       };
     }
 

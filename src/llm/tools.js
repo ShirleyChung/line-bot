@@ -190,4 +190,35 @@ export const botTools = [
       },
     strict: true
   },
+  {
+    type: "function",
+    name: "searchNews",
+    description: "查詢最新新聞。適合使用者詢問某公司、股票、產業、人物或事件的最新消息。",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "新聞搜尋關鍵字，例如：聯發科、台積電、AI伺服器、美元匯率",
+        },
+        lang: {
+          type: "string",
+          description: "語言，例如 zh 或 en",
+          default: "zh",
+        },
+        country: {
+          type: "string",
+          description: "國家/地區，例如 tw、us",
+          default: "tw",
+        },
+        max: {
+          type: "number",
+          description: "最多回傳幾則新聞",
+          default: 5,
+        },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
 ];
