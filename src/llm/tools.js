@@ -81,6 +81,43 @@ export const botTools = [
   },
   {
     type: "function",
+    name: "list_reminders",
+    description: "列出使用者目前的所有提醒事項",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "delete_reminder",
+    description: "刪除提醒事項。可以指定 id 刪除特定提醒，或用 target/action 刪除符合條件的提醒",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "提醒的 id，若提供則直接刪除該筆",
+        },
+        target: {
+          type: "string",
+          description: "提醒對象，例如「媽媽」、「自己」",
+        },
+        action: {
+          type: "string",
+          description: "提醒動作，例如「吃藥」、「開會」",
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
     name: "extract_image_data",
     description: "從最近上傳的圖片中擷取文字與結構化資料。",
     parameters: {

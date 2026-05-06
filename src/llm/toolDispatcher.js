@@ -4,7 +4,7 @@
  * 並根據需求執行對應工具。
  */
 
-import { createReminder } from "../services/reminderService.js";
+import { createReminder, listReminders, deleteReminderByOwner } from "../services/reminderService.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
 import { replyText } from "../line/reply.js";
@@ -153,6 +153,55 @@ export async function executeTool(name, args = {}, context = {}) {
         target: args.target,
         action: args.action,
         time: reminderTime.toISOString(),
+      };
+    }
+
+    case "list_reminders": {
+      const owner = buildSessionKey(context.source);
+
+      if (!owner) {
+        throw new Error("list_reminders 無法取得 owner");
+      }
+
+      const reminders = await listReminders(owner);
+
+      return {
+        ok: true,
+        tool: name,
+        owner,
+        count: reminders.length,
+        reminders: reminders.map((r) => ({
+          id: r.id,
+          target: r.target,
+          action: r.action,
+          time: r.time?.toDate ? r.time.toDate().toISOString() : r.time,
+        })),
+      };
+    }
+
+    case "delete_reminder": {
+      const owner = buildSessionKey(context.source);
+
+      if (!owner) {
+        throw new Error("delete_reminder 無法取得 owner");
+      }
+
+      const criteria = {};
+      if (args.id) criteria.id = args.id;
+      if (args.target) criteria.target = args.target;
+      if (args.action) criteria.action = args.action;
+
+      if (!criteria.id && !criteria.target && !criteria.action) {
+        throw new Error("delete_reminder 需要至少提供 id、target 或 action 其中一項");
+      }
+
+      const result = await deleteReminderByOwner(owner, criteria);
+
+      return {
+        ok: true,
+        tool: name,
+        owner,
+        ...result,
       };
     }
 

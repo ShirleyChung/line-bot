@@ -57,3 +57,82 @@ export async function markNotified(id) {
 export async function deleteReminder(id) {
   await db.collection(COLLECTION).doc(id).delete();
 }
+
+/**
+ * 列出使用者的所有提醒
+ * @param {string} owner - 提醒擁有者，格式如 user:Uxxxx、group:Gxxxx
+ * @returns {Promise<Array>} - 回傳提醒事項陣列
+ */
+export async function listReminders(owner) {
+  if (!owner) {
+    throw new Error("listReminders 需要 owner 參數");
+  }
+  const snapshot = await db
+    .collection(COLLECTION)
+    .where("owner", "==", owner)
+    .where("notified", "==", false)
+    .orderBy("time", "asc")
+    .get();
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+}
+
+/**
+ * 根據條件刪除使用者的提醒
+ * @param {string} owner - 提醒擁有者
+ * @param {object} criteria - 刪除條件，可包含 target、action、id
+ * @returns {Promise<object>} - 回傳刪除結果
+ */
+export async function deleteReminderByOwner(owner, criteria = {}) {
+  if (!owner) {
+    throw new Error("deleteReminderByOwner 需要 owner 參數");
+  }
+
+  // 如果提供 id，直接刪除該筆
+  if (criteria.id) {
+    const doc = await db.collection(COLLECTION).doc(criteria.id).get();
+    if (!doc.exists) {
+      return { deleted: 0, message: "找不到此提醒" };
+    }
+    const data = doc.data();
+    if (data.owner !== owner) {
+      return { deleted: 0, message: "無權刪除此提醒" };
+    }
+    await db.collection(COLLECTION).doc(criteria.id).delete();
+    return { deleted: 1, id: criteria.id, reminder: data };
+  }
+
+  // 否則根據條件查詢後刪除
+  let query = db.collection(COLLECTION).where("owner", "==", owner).where("notified", "==", false);
+
+  if (criteria.target) {
+    query = query.where("target", "==", criteria.target);
+  }
+  if (criteria.action) {
+    query = query.where("action", "==", criteria.action);
+  }
+
+  const snapshot = await query.get();
+
+  if (snapshot.empty) {
+    return { deleted: 0, message: "找不到符合條件的提醒" };
+  }
+
+  // 刪除所有符合的提醒
+  const batch = db.batch();
+  const deletedReminders = [];
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+    deletedReminders.push({ id: doc.id, ...doc.data() });
+  });
+
+  await batch.commit();
+
+  return {
+    deleted: deletedReminders.length,
+    reminders: deletedReminders,
+    message: `已刪除 ${deletedReminders.length} 筆提醒`,
+  };
+}
