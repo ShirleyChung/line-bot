@@ -111,7 +111,7 @@ export const botTools = [
           description: "提醒動作，例如「吃藥」、「開會」",
         },
       },
-      required: [],
+      required: ["id", "target", "action"],
       additionalProperties: false,
     },
     strict: true,
