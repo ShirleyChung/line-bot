@@ -161,13 +161,13 @@ export const botTools = [
   {
     type: "function",
     name: "add_watch_stock",
-    description: "將股票代碼加入使用者的自選股清單",
+    description: "將股票代碼加入使用者的自選股清單。支援台股（例如 2330, 2454, 006208）與美股（例如 NVDA, QCOM, AAPL）",
     parameters: {
       type: "object",
       properties: {
         symbol: {
           type: "string",
-          description: "台股股票代碼，例如 2330, 2454, 006208"
+          description: "股票代碼，台股例如 2330, 2454, 006208；美股例如 NVDA, QCOM, AAPL"
         }
       },
       required: ["symbol"],
@@ -177,13 +177,13 @@ export const botTools = [
   {
     type: "function",
     name: "remove_watch_stock",
-    description: "從使用者的自選股清單移除指定股票代碼",
+    description: "從使用者的自選股清單移除指定股票代碼。支援台股與美股",
     parameters: {
       type: "object",
       properties: {
         symbol: {
           type: "string",
-          description: "台股股票代碼，例如 2330"
+          description: "股票代碼，台股例如 2330；美股例如 NVDA"
         }
       },
       required: ["symbol"],
@@ -193,7 +193,7 @@ export const botTools = [
   {
     type: "function",
     name: "list_watch_stocks",
-    description: "列出使用者目前儲存的自選股清單",
+    description: "列出使用者目前儲存的自選股清單（包含台股與美股）",
     parameters: {
       type: "object",
       properties: {},
@@ -203,7 +203,7 @@ export const botTools = [
   {
     type: "function",
     name: "get_watch_prices",
-    description: "查詢使用者自選股的目前或最近股價",
+    description: "查詢使用者自選股的目前或最近股價（包含台股與美股）",
     parameters: {
       type: "object",
       properties: {},
@@ -213,13 +213,13 @@ export const botTools = [
   {
   type: "function",
     name: "get_stock_price",
-    description: "查詢單一台股股票或 ETF 的最近收盤資訊，不需要加入自選股。",
+    description: "查詢單一股票的最近收盤或即時資訊，不需要加入自選股。支援台股股票/ETF（例如 2330、2454、00981A）與美股（例如 NVDA、QCOM、AAPL）。",
     parameters: {
       type: "object",
       properties: {
         symbol: {
           type: "string",
-          description: "台股股票代碼或 ETF 代碼，例如 2330、2454、2887、00981A。"
+          description: "股票代碼，台股例如 2330、2454、2887、00981A；美股例如 NVDA、QCOM、AAPL。"
         }
       },
       required: ["symbol"],

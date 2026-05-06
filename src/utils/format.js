@@ -76,36 +76,72 @@ export function buildWatchPricesMessage(prices) {
     return "你目前還沒有自選股。";
   }
 
-  const firstDate = prices.find((p) => p.found && p.date)?.date;
+  const twStocks = prices.filter(p => p.source === "TWSE_STOCK_DAY");
+  const usStocks = prices.filter(p => p.source === "FINNHUB");
 
   const lines = [];
-
   lines.push("最近收盤資訊");
-  if (firstDate) {
-    lines.push(`資料日期：${firstDate}`);
-  }
+  lines.push("");
 
-  for (const p of prices) {
-    lines.push("");
-
-    if (!p.found) {
-      lines.push(`${p.symbol || "未知代碼"}`);
-      lines.push(`查詢失敗：${p.message || "查無資料"}`);
-      continue;
+  if (twStocks.length > 0) {
+    lines.push("【台股】");
+    const firstDate = twStocks.find((p) => p.found && p.date)?.date;
+    if (firstDate) {
+      lines.push(`資料日期：${firstDate}`);
     }
 
-    const name = p.name || "未取得名稱";
-    const symbol = p.symbol || "";
+    for (const p of twStocks) {
+      lines.push("");
 
-    lines.push(`${name}：${symbol}`);
-    lines.push(`價：${formatPrice(p.close)} ${formatChange(p.change)}`);
-    lines.push(`成交量：${formatNumber(p.volume)}`);
+      if (!p.found) {
+        lines.push(`${p.symbol || "未知代碼"}`);
+        lines.push(`查詢失敗：${p.message || "查無資料"}`);
+        continue;
+      }
+
+      const name = p.name || "未取得名稱";
+      const symbol = p.symbol || "";
+
+      lines.push(`${name}：${symbol}`);
+      lines.push(`價：${formatPrice(p.close)} ${formatChange(p.change)}`);
+      lines.push(`成交量：${formatNumber(p.volume)}`);
+    }
+
+    lines.push("");
+    lines.push("資料來源：TWSE 個股日成交資訊");
   }
 
-  lines.push("");
-  lines.push("資料來源：TWSE 個股日成交資訊，非盤中即時報價。");
+  if (usStocks.length > 0) {
+    if (twStocks.length > 0) {
+      lines.push("");
+    }
+    lines.push("【美股】");
 
-  return lines.join("\n");
+    for (const p of usStocks) {
+      lines.push("");
+
+      if (!p.found) {
+        lines.push(`${p.symbol || "未知代碼"}`);
+        lines.push(`查詢失敗：${p.message || "查無資料"}`);
+        continue;
+      }
+
+      const name = p.name || p.symbol || "未取得名稱";
+      const symbol = p.symbol || "";
+
+      lines.push(`${name} (${symbol})`);
+      lines.push(`價：$${formatPrice(p.close)} ${formatChange(p.change)} (${formatChange(p.changePercent)}%)`);
+      
+      if (p.high != null && p.low != null) {
+        lines.push(`高/低：$${formatPrice(p.high)} / $${formatPrice(p.low)}`);
+      }
+    }
+
+    lines.push("");
+    lines.push("資料來源：Finnhub 即時報價");
+  }
+
+  return lines.join("\n").trim();
 }
 
 export function buildNewsMessage(news, query = "") {

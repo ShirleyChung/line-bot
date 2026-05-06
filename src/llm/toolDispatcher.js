@@ -1,15 +1,8 @@
-
-/**
- * 本檔案負責處理來自 LLM 的 tool call，
- * 並根據需求執行對應工具。
- */
-
 import { createReminder, listReminders, deleteReminderByOwner } from "../services/reminderService.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
 import { replyText } from "../line/reply.js";
 import { lineClient } from "../line/client.js";
-// src/llm/toolDispatcher.js
 
 import { fetchImageBuffer } from "../services/imageService.js";
 import { ocrImage } from "../services/ocrService.js";
@@ -22,9 +15,18 @@ import {
   getWatchPrices,
 } from "../services/stockSelectService.js";
 import { fetchTwseLatestClose } from "../services/twseStockDayService.js";
+import { fetchUSStockLatest } from "../services/finnhubService.js";
 import { buildWatchPricesMessage } from "../utils/format.js";
 import { fetchNews } from "../services/newsService.js";
 import { buildNewsMessage } from "../utils/format.js";
+
+function detectMarket(symbol) {
+  const code = String(symbol).trim().toUpperCase();
+  if (/^[A-Z]+$/.test(code) && code.length >= 1 && code.length <= 5) {
+    return "US";
+  }
+  return "TW";
+}
 
 /**
  * 可設定允許 push 的目標 id 清單
@@ -351,7 +353,15 @@ export async function executeTool(name, args = {}, context = {}) {
         throw new Error("get_stock_price 缺少股票代碼 symbol");
       }
 
-      const price = await fetchTwseLatestClose(symbol);
+      const market = detectMarket(symbol);
+      let price;
+
+      if (market === "US") {
+        price = await fetchUSStockLatest(symbol);
+      } else {
+        price = await fetchTwseLatestClose(symbol);
+      }
+
       const text = buildWatchPricesMessage([price]);
 
       return {

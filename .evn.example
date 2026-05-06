@@ -21,3 +21,14 @@ GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"...","privat
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-5.5
 OPENAI_SYSTEM_PROMPT=你是一個親切、準確、簡潔的 LINE 助手。遇到已知工具型問題時，不要捏造資料。
+
+# =========================
+# Finnhub 設定（美股股價查詢）
+# =========================
+FINNHUB_API_KEY=your_finnhub_api_key
+
+# =========================
+# GNews 設定（新聞搜尋）
+# =========================
+GNEWS_API_KEY=your_gnews_api_key
+

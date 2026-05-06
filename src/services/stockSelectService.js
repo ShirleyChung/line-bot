@@ -1,5 +1,14 @@
 import { db } from "./firestore.js";
 import { fetchTwseLatestClose } from "./twseStockDayService.js";
+import { fetchUSStockLatest } from "./finnhubService.js";
+
+function detectMarket(symbol) {
+  const code = String(symbol).trim().toUpperCase();
+  if (/^[A-Z]+$/.test(code) && code.length >= 1 && code.length <= 5) {
+    return "US";
+  }
+  return "TW";
+}
 
 function normalizeSymbol(symbol) {
   return String(symbol).trim().toUpperCase().replace(".TW", "").replace(".TWO", "");
@@ -7,6 +16,7 @@ function normalizeSymbol(symbol) {
 
 export async function addWatchStock(lineUserId, symbol) {
   const code = normalizeSymbol(symbol);
+  const market = detectMarket(code);
 
   if (!lineUserId) {
     throw new Error("addWatchStock 缺少 lineUserId");
@@ -24,6 +34,7 @@ export async function addWatchStock(lineUserId, symbol) {
     await ref.set(
       {
         symbol: code,
+        market: market,
         updatedAt: new Date(),
       },
       { merge: true }
@@ -32,12 +43,14 @@ export async function addWatchStock(lineUserId, symbol) {
     return {
       ok: true,
       symbol: code,
+      market: market,
       message: `${code} 已經在你的自選股中。`,
     };
   }
 
   await ref.set({
     symbol: code,
+    market: market,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -45,6 +58,7 @@ export async function addWatchStock(lineUserId, symbol) {
   return {
     ok: true,
     symbol: code,
+    market: market,
     message: `已加入自選股：${code}`,
   };
 }
@@ -132,17 +146,23 @@ export async function getWatchPrices(lineUserId) {
   for (const stock of stocks) {
     console.log("[getWatchPrices] Processing stock:", stock.symbol);
     const symbol = normalizeSymbol(stock.symbol);
+    const market = stock.market || detectMarket(symbol);
 
     try {
-      const price = await fetchTwseLatestClose(symbol);
+      let price;
+      if (market === "US") {
+        price = await fetchUSStockLatest(symbol);
+      } else {
+        price = await fetchTwseLatestClose(symbol);
+      }
       prices.push(price);
     } catch (err) {
-      console.error("[getWatchPrices] TWSE fetch failed:", symbol, err);
+      console.error(`[getWatchPrices] ${market} fetch failed:`, symbol, err);
 
       prices.push({
         symbol,
         found: false,
-        source: "TWSE_STOCK_DAY",
+        source: market === "US" ? "FINNHUB" : "TWSE_STOCK_DAY",
         message: err instanceof Error ? err.message : String(err),
       });
     }
