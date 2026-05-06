@@ -20,7 +20,7 @@ export const env = {
   GNEWS_API_KEY: required("GNEWS_API_KEY"),
 
   // ===== Finnhub (US Stock) =====
-  FINNHUB_API_KEY: process.env.FINNHUB_API_KEY || "",
+  FINNHUB_API_KEY: required("FINNHUB_API_KEY"),
 
   // ===== LINE =====
   LINE_CHANNEL_SECRET: required("LINE_CHANNEL_SECRET"),
@@ -31,7 +31,7 @@ export const env = {
   PUBLISHED_SHEET_CSV_URL: required("PUBLISHED_SHEET_CSV_URL"),
 
   // ===== OpenAI =====
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENAI_API_KEY: required("OPENAI_API_KEY"),
   OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5.5",
   OPENAI_SYSTEM_PROMPT:
     process.env.OPENAI_SYSTEM_PROMPT ||
