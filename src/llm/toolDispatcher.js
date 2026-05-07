@@ -1,4 +1,5 @@
 import { createReminder, listReminders, deleteReminderByOwner } from "../services/reminderService.js";
+import { normalizeReminderData } from "../services/reminderContentService.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
 import { replyText } from "../line/reply.js";
@@ -130,7 +131,16 @@ export async function executeTool(name, args = {}, context = {}) {
     }
 
     case "create_reminder": {
-      if (!args.target || !args.action || !args.time) {
+      const reminderType = args.reminderType || "generic";
+      const derivedTarget = args.target || args.city || args.symbol || "提醒";
+      const derivedAction =
+        args.action ||
+        args.symbol ||
+        (reminderType === "weather" && args.city ? `${args.city}天氣` : "") ||
+        (reminderType === "watch_prices" ? "自選股股價" : "") ||
+        (reminderType === "today_link" ? "今日連結" : "");
+
+      if (!derivedTarget || !derivedAction || !args.time) {
         throw new Error("create_reminder 缺少必要參數");
       }
 
@@ -145,20 +155,33 @@ export async function executeTool(name, args = {}, context = {}) {
         throw new Error(`create_reminder 時間已過：${args.time}`);
       }
 
-      const reminderId = await createReminder({
+      const payload = {};
+      if (args.city) payload.city = args.city;
+      if (args.symbol) payload.symbol = args.symbol;
+      if (args.weatherTarget) payload.target = args.weatherTarget;
+
+      const reminderData = normalizeReminderData({
         owner,
-        target: args.target,
-        action: args.action,
+        target: derivedTarget,
+        action: derivedAction,
         time: reminderTime,
+        recurrence: args.recurrence || "none",
+        reminderType,
+        payload,
       });
+
+      const reminderId = await createReminder(reminderData);
 
       return {
         ok: true,
         tool: name,
         reminderId,
         owner,
-        target: args.target,
-        action: args.action,
+        target: reminderData.target,
+        action: reminderData.action,
+        recurrence: reminderData.recurrence,
+        reminderType: reminderData.reminderType,
+        payload: reminderData.payload,
         time: reminderTime.toISOString(),
       };
     }
@@ -181,6 +204,9 @@ export async function executeTool(name, args = {}, context = {}) {
           id: r.id,
           target: r.target,
           action: r.action,
+          recurrence: r.recurrence || "none",
+          reminderType: r.reminderType || "generic",
+          payload: r.payload || {},
           time: r.time?.toDate ? r.time.toDate().toISOString() : r.time,
         })),
       };

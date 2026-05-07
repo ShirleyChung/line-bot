@@ -13,7 +13,8 @@ import express from "express";
 import { env } from "./config/env.js";
 import { line, lineConfig, lineClient } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
-import { getDueReminders, markNotified, deleteReminder } from "./services/reminderService.js";
+import { getDueReminders, deleteReminder, rescheduleReminder } from "./services/reminderService.js";
+import { buildReminderMessage, getNextReminderTime } from "./services/reminderContentService.js";
 
 const app = express();
 
@@ -76,19 +77,36 @@ app.get("/cron/check-reminders", async (req, res) => {
         time: r.time?.toDate ? r.time.toDate().toISOString() : r.time,
       });
 
-      await lineClient.pushMessage({
-        to: targetId,
-        messages: [
-          {
-            type: "text",
-            text: `${r.action} 囉`,
-          },
-        ],
-      });
+      try {
+        let text;
+        try {
+          text = await buildReminderMessage(r);
+        } catch (err) {
+          console.error("[cron] build reminder message failed:", r.id, err);
+          text = `提醒執行失敗：${r.action || "提醒"}\n請稍後再試或重新設定提醒。`;
+        }
 
-      // 你若要省空間，可直接刪掉
-      await deleteReminder(r.id);
-      console.log("[cron] deleted reminder:", r.id);
+        await lineClient.pushMessage({
+          to: targetId,
+          messages: [
+            {
+              type: "text",
+              text,
+            },
+          ],
+        });
+
+        const nextTime = getNextReminderTime(r, now);
+        if (nextTime) {
+          await rescheduleReminder(r.id, nextTime);
+          console.log("[cron] rescheduled reminder:", r.id, nextTime.toISOString());
+        } else {
+          await deleteReminder(r.id);
+          console.log("[cron] deleted reminder:", r.id);
+        }
+      } catch (err) {
+        console.error("[cron] reminder failed:", r.id, err);
+      }
     }
 
     res.send("ok");

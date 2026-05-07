@@ -74,7 +74,7 @@ export async function routeMessageEvent(event) {
     }
 
     // 先攔截內建命令（使用移除 mention 後的文字）
-    if (isTodayLinkCommand(userText)) {
+    if (isTodayLinkCommand(userText) && !/(提醒|排程|每天|每日|固定)/.test(userText)) {
       return await handleTodayLink(event);
     }
 

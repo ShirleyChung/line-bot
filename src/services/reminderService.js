@@ -52,6 +52,22 @@ export async function markNotified(id) {
 }
 
 /**
+ * 重新排程提醒，主要給每日提醒使用
+ */
+export async function rescheduleReminder(id, nextTime) {
+  if (!(nextTime instanceof Date) || Number.isNaN(nextTime.getTime())) {
+    throw new Error("rescheduleReminder 的 nextTime 必須是有效的 Date");
+  }
+
+  await db.collection(COLLECTION).doc(id).update({
+    time: nextTime,
+    notified: false,
+    lastNotifiedAt: new Date(),
+    updatedAt: new Date(),
+  });
+}
+
+/**
  * 刪除提醒
  */
 export async function deleteReminder(id) {

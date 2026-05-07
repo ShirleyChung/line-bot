@@ -17,6 +17,10 @@ export async function handleWeatherMessage(event) {
   const text = event.message.text.trim();
   const userId = event.source?.userId;
 
+  if (/(提醒|排程|每天|每日|固定)/.test(text)) {
+    return false;
+  }
+
   const cityToSet = parseSetDefaultWeatherCity(text);
 
   if (cityToSet) {

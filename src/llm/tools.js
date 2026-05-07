@@ -63,18 +63,47 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項，例如提醒某人在某時間做某事",
+    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、自選股股價、今日連結。",
     parameters: {
       type: "object",
       properties: {
-        target: { type: "string" },
-        action: { type: "string" },
+        target: {
+          type: "string",
+          description: "提醒對象或主題。天氣提醒填城市，例如「臺北市」；股價提醒填股票代碼；今日連結可填「今日連結」。",
+        },
+        action: {
+          type: "string",
+          description: "提醒文字或查詢目標。股價提醒填股票代碼；今日連結填「今日連結」。",
+        },
         time: {
           type: "string",
           description: "ISO 8601 格式，例如 2026-05-01T06:00:00+08:00",
         },
+        recurrence: {
+          type: "string",
+          enum: ["none", "daily"],
+          description: "none 表示一次性提醒；daily 表示每天同一時間重複提醒。",
+        },
+        reminderType: {
+          type: "string",
+          enum: ["generic", "weather", "stock", "watch_prices", "today_link"],
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；使用者自選股用 watch_prices；每日課程連結用 today_link；一般文字用 generic。",
+        },
+        city: {
+          type: "string",
+          description: "天氣提醒的台灣縣市。非天氣提醒請填空字串。",
+        },
+        symbol: {
+          type: "string",
+          description: "股價提醒的股票代碼，例如 2330、NVDA。非股價提醒請填空字串。",
+        },
+        weatherTarget: {
+          type: "string",
+          enum: ["now", "tomorrow", ""],
+          description: "天氣查詢時段。通常每日早上提醒用 now；非天氣提醒填空字串。",
+        },
       },
-      required: ["target", "action", "time"],
+      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "weatherTarget"],
       additionalProperties: false,
     },
     strict: true,
