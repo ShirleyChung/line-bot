@@ -3,4 +3,7 @@ set LINE_CHANNEL_SECRET=asefawfasdf
 set LINE_CHANNEL_ACCESS_TOKEN=asfaw34fdefad
 set PUBLISHED_SHEET_CSV_URL=https://abc.com
 set OPENAI_API_KEY=q3fwefaf
+set FINNHUB_API_KEY=34qf423fweq34
+set GNEWS_API_KEY=2234twe
+set CWA_API_KEY=234twef
 node src\index.js

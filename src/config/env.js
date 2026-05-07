@@ -16,6 +16,9 @@ export const env = {
   // ===== 基本執行設定 =====
   PORT: Number(process.env.PORT || 8080),
 
+  // ===== 天氣 =====
+  CWA_API_KEY: required("CWA_API_KEY"),
+  
   // ===== NEWs =====
   GNEWS_API_KEY: required("GNEWS_API_KEY"),
 

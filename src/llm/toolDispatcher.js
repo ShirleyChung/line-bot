@@ -19,6 +19,11 @@ import { fetchUSStockLatest } from "../services/finnhubService.js";
 import { buildWatchPricesMessage } from "../utils/format.js";
 import { fetchNews } from "../services/newsService.js";
 import { buildNewsMessage } from "../utils/format.js";
+import {
+  formatWeatherReply,
+  getWeatherForUser,
+  setDefaultWeatherCity,
+} from '../services/weatherService.js';
 
 function detectMarket(symbol) {
   const code = String(symbol).trim().toUpperCase();
@@ -382,6 +387,37 @@ export async function executeTool(name, args = {}, context = {}) {
       return {
         type: "text",
         text: buildNewsMessage(news, query),
+      };
+    }
+    case 'get_weather': {
+      const userId = args.userId || context.userId || null;
+      const city = args.city || null;
+      const target = args.target || 'now';
+
+      const data = await getWeatherForUser({
+        city,
+        userId,
+        target,
+      });
+
+      return {
+        ok: data.ok,
+        type: 'weather',
+        data,
+        replyText: formatWeatherReply(data),
+      };
+    }
+    case 'set_default_weather_city': {
+      const userId = args.userId || context.userId || null;
+      const city = args.city;
+
+      const result = setDefaultWeatherCity(userId, city);
+
+      return {
+        ok: result.ok,
+        type: 'set_default_weather_city',
+        data: result,
+        replyText: result.message,
       };
     }
 

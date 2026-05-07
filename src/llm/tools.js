@@ -258,4 +258,47 @@ export const botTools = [
       additionalProperties: false,
     },
   },
+  {
+    "type": "function",
+    "name": "get_weather",
+    "description": "查詢台灣縣市的今明 36 小時天氣。適合回答使用者詢問天氣、溫度、降雨機率、會不會下雨等問題。若使用者未提供城市，可留空 city，系統會嘗試使用使用者的預設天氣地點。",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "city": {
+          "type": "string",
+          "description": "台灣縣市名稱，例如：台北、新北、桃園、新竹、台中、台南、高雄。若使用者沒有提供地點，可省略。"
+        },
+        "target": {
+          "type": "string",
+          "enum": ["now", "tomorrow", "later"],
+          "description": "查詢時間。now 表示最近時段，tomorrow 表示下一個預報時段，later 表示更後面的預報時段。"
+        },
+        "userId": {
+          "type": "string",
+          "description": "LINE 使用者 ID，用於讀取使用者預設天氣地點。"
+        }
+      },
+      "required": [],
+    }
+  },
+  {
+    "type": "function",
+    "name": "set_default_weather_city",
+    "description": "設定使用者的預設天氣地點。當使用者說「設定天氣地點 新北」、「以後幫我查台中天氣」時使用。",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "city": {
+          "type": "string",
+          "description": "台灣縣市名稱，例如：台北、新北、桃園、台中、高雄。"
+        },
+        "userId": {
+          "type": "string",
+          "description": "LINE 使用者 ID。"
+        }
+      },
+      "required": [],
+    }
+  },
 ];
