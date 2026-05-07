@@ -113,8 +113,50 @@ function extractStockNameFromTitle(title, symbol) {
 const twseStockDayCache = new Map();
 const TWSE_STOCK_DAY_CACHE_TTL_MS = 60 * 1000;
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const TWSE_HEADERS = {
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Referer": "https://www.twse.com.tw/zh/trading/historical/stock-day.html",
+  "Origin": "https://www.twse.com.tw",
+};
+
+async function fetchJsonWithText(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    redirect: "follow",
+  });
+
+  const text = await res.text();
+
+  console.log("[fetchJsonWithText] status =", res.status);
+  console.log("[fetchJsonWithText] content-type =", res.headers.get("content-type"));
+  console.log("[fetchJsonWithText] body first 300 =", text.slice(0, 300));
+
+  if (!res.ok) {
+    const err = new Error(
+      `HTTP ${res.status}, body=${text.slice(0, 300)}`
+    );
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    throw new Error(`回傳內容不是 JSON：${text.slice(0, 300)}`);
+  }
+}
+
 export async function fetchTwseStockDay(symbol, dateYmd = yyyymmddTaipei()) {
-  const code = String(symbol).trim();
+  const code = String(symbol).trim().toUpperCase();
 
   const cacheKey = `${code}:${dateYmd}`;
   const now = Date.now();
@@ -128,44 +170,64 @@ export async function fetchTwseStockDay(symbol, dateYmd = yyyymmddTaipei()) {
     "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY" +
     `?date=${encodeURIComponent(dateYmd)}` +
     `&stockNo=${encodeURIComponent(code)}` +
-    `&response=json`;
+    "&response=json";
 
   console.log("[fetchTwseStockDay] url =", url);
 
-  const res = await fetch(url, {
-    headers: {
-      "Accept": "application/json,text/plain,*/*",
-      "User-Agent": "Mozilla/5.0 CloudRun-LineBot/1.0",
-      "Referer": "https://www.twse.com.tw/zh/trading/historical/stock-day.html",
-    },
-  });
+  let lastErr = null;
 
-  const text = await res.text();
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      console.log("[fetchTwseStockDay] attempt =", attempt);
 
-  if (!res.ok) {
-    throw new Error(`TWSE STOCK_DAY failed: HTTP ${res.status}, body=${text.slice(0, 200)}`);
+      const json = await fetchJsonWithText(url, {
+        headers: TWSE_HEADERS,
+      });
+
+      console.log("[fetchTwseStockDay] json.stat =", json.stat);
+      console.log("[fetchTwseStockDay] json.title =", json.title);
+      console.log("[fetchTwseStockDay] data length =", Array.isArray(json.data) ? json.data.length : "not array");
+
+      twseStockDayCache.set(cacheKey, {
+        cachedAt: now,
+        data: json,
+      });
+
+      return json;
+    } catch (err) {
+      lastErr = err;
+
+      console.error("[fetchTwseStockDay] attempt failed:", attempt, err.message);
+
+      // TWSE WAF / 307 / 403 / HTML 異常，稍等再試
+      await sleep(300 * attempt);
+    }
   }
 
-  let json;
-  try {
-    json = JSON.parse(text);
-  } catch (err) {
-    console.error("[fetchTwseStockDay] JSON parse failed:", err);
-    throw new Error(`TWSE 回傳內容不是 JSON：${text.slice(0, 200)}`);
-  }
-
-  twseStockDayCache.set(cacheKey, {
-    cachedAt: now,
-    data: json,
-  });
-
-  return json;
+  throw lastErr;
 }
 
 export async function fetchTwseLatestClose(symbol, dateYmd = yyyymmddTaipei()) {
-  const code = String(symbol).trim();
+  console.log("[fetchTwseLatestClose] symbol =", symbol, "dateYmd =", dateYmd);
 
-  const json = await fetchTwseStockDay(code, dateYmd);
+  const code = String(symbol).trim().toUpperCase();
+
+  let json;
+
+  try {
+    json = await fetchTwseStockDay(code, dateYmd);
+  } catch (err) {
+    console.error("[fetchTwseLatestClose] TWSE fetch failed:", code, err);
+
+    return {
+      symbol: code,
+      found: false,
+      source: "TWSE_STOCK_DAY",
+      message:
+        "TWSE 查詢暫時失敗，可能被官網安全機制擋下，請稍後再試。",
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 
   if (!json || json.stat !== "OK") {
     return {
@@ -185,12 +247,11 @@ export async function fetchTwseLatestClose(symbol, dateYmd = yyyymmddTaipei()) {
       symbol: code,
       found: false,
       source: "TWSE_STOCK_DAY",
-      message: "查無資料，可能是非上市股票、停盤日、休市日，或該標的本月份尚無交易資料。",      raw: json,
+      message: "查無資料，可能是非上市股票、停盤日、休市日，或該標的本月份尚無交易資料。",
+      raw: json,
     };
   }
 
-  // STOCK_DAY 查的是某月「每日收盤行情」
-  // 所以最後一筆通常就是某月目前最新的一筆
   const latestRow = data[data.length - 1];
 
   return normalizeTwseStockDayRow(
