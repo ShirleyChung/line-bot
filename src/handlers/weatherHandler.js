@@ -1,3 +1,7 @@
+// src/handlers/weatherHandler.js
+
+import { replyText } from "../line/reply.js";
+
 import {
   isWeatherIntent,
   parseSetDefaultWeatherCity,
@@ -6,7 +10,7 @@ import {
   formatWeatherReply,
 } from "../services/weatherService.js";
 
-export async function handleWeatherMessage(event, client) {
+export async function handleWeatherMessage(event) {
   if (event.type !== "message") return false;
   if (event.message?.type !== "text") return false;
 
@@ -18,10 +22,7 @@ export async function handleWeatherMessage(event, client) {
   if (cityToSet) {
     const result = setDefaultWeatherCity(userId, cityToSet);
 
-    await client.replyMessage(event.replyToken, {
-      type: "text",
-      text: result.message,
-    });
+    await replyText(event.replyToken, result.message);
 
     return true;
   }
@@ -38,10 +39,7 @@ export async function handleWeatherMessage(event, client) {
     target,
   });
 
-  await client.replyMessage(event.replyToken, {
-    type: "text",
-    text: formatWeatherReply(data),
-  });
+  await replyText(event.replyToken, formatWeatherReply(data));
 
   return true;
 }

@@ -22,7 +22,6 @@ import {
   getLatestImageId,
 } from "../services/sessionStateService.js";
 import { handleWeatherMessage } from "../handlers/weatherHandler.js";
-import { lineClient } from "../line/client.js";
 
 /**
  * 路由 webhook event
@@ -41,7 +40,7 @@ export async function routeMessageEvent(event) {
     return null;
   }
   // 先嘗試天氣訊息處理，如果有命中就直接回覆，不進 LLM
-  const handledByWeather = await handleWeatherMessage(event, lineClient);
+  const handledByWeather = await handleWeatherMessage(event);
   if (handledByWeather) return;
 
 
