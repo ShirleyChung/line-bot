@@ -51,7 +51,7 @@ export function normalizeTelegramUpdate(update) {
   ];
 }
 
-async function sendTelegramText(chatId, text) {
+export async function sendTelegramText(chatId, text) {
   if (!env.TELEGRAM_BOT_TOKEN) {
     throw new Error("缺少 TELEGRAM_BOT_TOKEN，無法回覆 Telegram 訊息");
   }

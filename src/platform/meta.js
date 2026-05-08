@@ -71,7 +71,7 @@ export function normalizeMetaWebhook(body, platform) {
   return events;
 }
 
-async function sendMetaText(platform, recipientId, text) {
+export async function sendMetaText(platform, recipientId, text) {
   const config = PLATFORM_CONFIG[platform];
   const accessToken = env[config.tokenName];
 

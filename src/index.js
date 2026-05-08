@@ -13,8 +13,8 @@ import express from "express";
 import { env } from "./config/env.js";
 import { line, lineConfig, lineClient } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
-import { normalizeTelegramUpdate, verifyTelegramSecret } from "./platform/telegram.js";
-import { normalizeMetaWebhook, verifyMetaWebhook } from "./platform/meta.js";
+import { normalizeTelegramUpdate, sendTelegramText, verifyTelegramSecret } from "./platform/telegram.js";
+import { normalizeMetaWebhook, sendMetaText, verifyMetaWebhook } from "./platform/meta.js";
 import { getDueReminders, deleteReminder, rescheduleReminder } from "./services/reminderService.js";
 import { buildReminderMessage, getNextReminderTime } from "./services/reminderContentService.js";
 
@@ -110,6 +110,57 @@ function toLineTargetId(owner) {
   return owner.replace(/^user:/, "").replace(/^group:/, "").replace(/^room:/, "");
 }
 
+function toTelegramChatId(owner) {
+  if (!owner) return "";
+  return owner.replace(/^telegram:user:telegram:/, "");
+}
+
+function toMetaRecipientId(owner, platform) {
+  if (!owner) return "";
+  return owner.replace(new RegExp(`^${platform}:user:${platform}:`), "");
+}
+
+async function pushReminder(owner, text) {
+  if (owner?.startsWith("telegram:user:telegram:")) {
+    const chatId = toTelegramChatId(owner);
+    if (!chatId) {
+      throw new Error(`無法解析 Telegram chat id：${owner}`);
+    }
+
+    await sendTelegramText(chatId, text);
+    return { platform: "telegram", targetId: chatId };
+  }
+
+  for (const platform of ["facebook", "instagram"]) {
+    if (owner?.startsWith(`${platform}:user:${platform}:`)) {
+      const recipientId = toMetaRecipientId(owner, platform);
+      if (!recipientId) {
+        throw new Error(`無法解析 ${platform} recipient id：${owner}`);
+      }
+
+      await sendMetaText(platform, recipientId, text);
+      return { platform, targetId: recipientId };
+    }
+  }
+
+  const targetId = toLineTargetId(owner);
+  if (!targetId) {
+    throw new Error(`無法解析 LINE target id：${owner}`);
+  }
+
+  await lineClient.pushMessage({
+    to: targetId,
+    messages: [
+      {
+        type: "text",
+        text,
+      },
+    ],
+  });
+
+  return { platform: "line", targetId };
+}
+
 app.get("/cron/check-reminders", async (req, res) => {
   try {
     const now = new Date();
@@ -119,16 +170,14 @@ app.get("/cron/check-reminders", async (req, res) => {
     console.log("[cron] reminders =", reminders);
 
     for (const r of reminders) {
-      const targetId = toLineTargetId(r.owner);
-      if (!targetId) {
-        console.log("[cron] skip empty targetId:", r);
+      if (!r.owner) {
+        console.log("[cron] skip empty owner:", r);
         continue;
       }
 
       console.log("[cron] pushing reminder:", {
         id: r.id,
         owner: r.owner,
-        targetId,
         target: r.target,
         action: r.action,
         time: r.time?.toDate ? r.time.toDate().toISOString() : r.time,
@@ -143,14 +192,11 @@ app.get("/cron/check-reminders", async (req, res) => {
           text = `提醒執行失敗：${r.action || "提醒"}\n請稍後再試或重新設定提醒。`;
         }
 
-        await lineClient.pushMessage({
-          to: targetId,
-          messages: [
-            {
-              type: "text",
-              text,
-            },
-          ],
+        const pushResult = await pushReminder(r.owner, text);
+        console.log("[cron] reminder pushed:", {
+          id: r.id,
+          platform: pushResult.platform,
+          targetId: pushResult.targetId,
         });
 
         const nextTime = getNextReminderTime(r, now);
