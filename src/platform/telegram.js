@@ -1,10 +1,20 @@
 import { env } from "../config/env.js";
 
+/**
+ * 驗證 Telegram webhook secret。
+ * 如果沒有設定 TELEGRAM_WEBHOOK_SECRET，代表部署環境選擇不啟用這層檢查。
+ */
 export function verifyTelegramSecret(req) {
   if (!env.TELEGRAM_WEBHOOK_SECRET) return true;
   return req.get("X-Telegram-Bot-Api-Secret-Token") === env.TELEGRAM_WEBHOOK_SECRET;
 }
 
+/**
+ * 將 Telegram update 轉成專案內部共用的 message event 格式。
+ *
+ * 這樣 router 不需要知道外部平台原始 payload 的差異，
+ * 只要處理 type/source/message/replyText 這幾個共通欄位。
+ */
 export function normalizeTelegramUpdate(update) {
   const message = update.message || update.edited_message;
   if (!message) return [];

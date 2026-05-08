@@ -42,12 +42,14 @@ export async function askLlmWithTools(userText, context = {}) {
   const memory = await getUserMemory(sessionKey);
   let instructions = env.OPENAI_SYSTEM_PROMPT;
   if (memory) {
+    // 使用者記憶只作為系統提示補充，不直接改動原始 userText。
     instructions += `
   (以下是這位使用者的偏好與背景：
   ${JSON.stringify(memory, null, 2)}
   請依照這些偏好回覆。)`;
   }
   const now = new Date();
+  // 以台北時間提供給模型，讓「明天早上」「5 分鐘後」這類相對時間有穩定基準。
   const taipeiNow =
   new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Asia/Taipei",
@@ -66,6 +68,7 @@ export async function askLlmWithTools(userText, context = {}) {
   如果要呼叫 reminder 相關工具，時間一律輸出為 ISO 8601 格式，並包含 +08:00。)
   `;
   if (context.imageIds?.length) {
+  // 有圖片批次時主動告知模型可呼叫 OCR 工具，減少模型要求使用者重傳圖片的機率。
   instructions += `
   （系統資訊：使用者最近上傳過 ${context.imageIds.length} 張圖片，目前可供工具作為同一批圖片使用。
   如果使用者要求「從圖片取資料」、「OCR」、「讀取圖片內容」、「擷取圖片資料」、「處理這批圖片」，

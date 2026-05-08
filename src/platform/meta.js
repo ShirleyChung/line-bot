@@ -1,5 +1,9 @@
 import { env } from "../config/env.js";
 
+/**
+ * Facebook Messenger 與 Instagram Messaging 共用 Graph API 回覆流程，
+ * 差異只在 access token 與內部 source prefix。
+ */
 const PLATFORM_CONFIG = {
   facebook: {
     tokenName: "FACEBOOK_PAGE_ACCESS_TOKEN",
@@ -23,6 +27,10 @@ export function verifyMetaWebhook(req, res) {
   return res.sendStatus(403);
 }
 
+/**
+ * 將 Meta webhook payload 轉成內部共用 message event。
+ * 目前只支援文字訊息，非文字訊息會保留成 unknown，交由 router 忽略。
+ */
 export function normalizeMetaWebhook(body, platform) {
   const config = PLATFORM_CONFIG[platform];
   if (!config) return [];

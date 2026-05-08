@@ -36,6 +36,9 @@ function detectMarket(symbol) {
 }
 
 /**
+ * 工具執行器是 LLM function call 與實際 service 之間的轉接層。
+ * 這裡負責驗證參數、補齊 owner/session 等上下文，並把 service 結果整理成模型可讀格式。
+ *
  * 可設定允許 push 的目標 id 清單
  * 可於 Cloud Run 設定環境變數：
  * ALLOWED_PUSH_TARGETS=id1,id2,id3
@@ -113,6 +116,7 @@ export async function executeTool(name, args = {}, context = {}) {
 
       const images = [];
       for (const [index, imageId] of imageIds.entries()) {
+        // 每張圖依序下載、OCR、轉結構化資料，最後保留原始文字方便除錯或二次整理。
         const buffer = await fetchImageBuffer(imageId);
         const text = await ocrImage(buffer);
         const data = await parseOCRToJSON(text);
@@ -154,6 +158,7 @@ export async function executeTool(name, args = {}, context = {}) {
 
     case "create_reminder": {
       const reminderType = args.reminderType || "generic";
+      // LLM 可能依工具類型填 city/symbol/action，不同提醒在這裡收斂成共通 target/action。
       const derivedTarget = args.target || args.city || args.symbol || "提醒";
       const derivedAction =
         args.action ||
@@ -178,6 +183,7 @@ export async function executeTool(name, args = {}, context = {}) {
       }
 
       const payload = {};
+      // payload 保留各提醒類型需要的額外資料，之後 cron 產生提醒內容時會使用。
       if (args.city) payload.city = args.city;
       if (args.symbol) payload.symbol = args.symbol;
       if (args.weatherTarget) payload.target = args.weatherTarget;

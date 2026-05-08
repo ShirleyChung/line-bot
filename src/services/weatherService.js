@@ -84,6 +84,10 @@ const CITY_ALIASES = {
   連江縣: '連江縣',
 };
 
+/**
+ * 將使用者輸入的縣市名稱正規化成 CWA API 使用的正式名稱。
+ * 例如「台北」「臺北」都會變成「臺北市」。
+ */
 export function normalizeTaiwanCity(input) {
   const s = String(input || '')
     .trim()
@@ -109,6 +113,7 @@ export function isSupportedTaiwanCity(city) {
 export function extractWeatherCityFromText(text) {
   let s = String(text || '').trim();
 
+  // 這裡處理常見口語查詢，讓「幫我查一下台北會不會下雨」能留下城市名稱。
   s = s
     .replace(/^@\S+\s*/, '')
     .replace(/請問/g, '')
@@ -231,6 +236,10 @@ function normalizeRainValue(value) {
   return s.endsWith('%') ? s : `${s}%`;
 }
 
+/**
+ * 查詢中央氣象署 36 小時天氣預報。
+ * 回傳資料會被整理成穩定欄位，讓 handler / reminder 不需要理解 CWA 原始資料結構。
+ */
 export async function fetchCwa36hWeather(city, options = {}) {
   if (!CWA_API_KEY) {
     throw new Error('Missing CWA_API_KEY environment variable.');
@@ -355,6 +364,7 @@ export function formatWeatherReply(data) {
 export async function getWeatherForUser({ text, userId, city, target = 'now' }) {
   let finalCity = city ? normalizeTaiwanCity(city) : null;
 
+  // 城市來源優先序：明確參數 > 從文字解析 > 使用者預設地點。
   if (!finalCity && text) {
     finalCity = extractWeatherCityFromText(text);
   }

@@ -2,6 +2,10 @@
 import { db } from "./firestore.js";
 const COLLECTION = "session_state";
 
+/**
+ * 圖片批次以台北日期為界線。
+ * Cloud Run 的系統時區不一定是 Asia/Taipei，因此這裡明確指定時區。
+ */
 function getTaipeiDateKey(date = new Date()) {
   return new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Asia/Taipei",
@@ -23,6 +27,10 @@ function getImageIdsFromData(data) {
   return [];
 }
 
+/**
+ * 舊資料可能只有 latestImageAt，新的資料會有 imageBatchDate。
+ * 這個 helper 讓兩種格式都可以判斷是否仍屬於今天的圖片批次。
+ */
 function getStoredImageDateKey(data) {
   if (data?.imageBatchDate) {
     return data.imageBatchDate;
@@ -50,6 +58,7 @@ export async function addImageId(sessionKey, imageId) {
     const snapshot = await transaction.get(docRef);
     const data = snapshot.exists ? snapshot.data() : {};
     const storedDateKey = getStoredImageDateKey(data);
+    // 跨日後自動開新批次，避免今天的 OCR 要求誤用昨天上傳的圖片。
     const currentImageIds =
       storedDateKey === todayKey ? getImageIdsFromData(data) : [];
     const nextImageIds = currentImageIds.includes(imageId)
@@ -93,6 +102,7 @@ export async function getImageIds(sessionKey) {
 
   const data = doc.data();
   const storedDateKey = getStoredImageDateKey(data);
+  // 讀取時也做一次跨日清除，避免狀態只讀不寫時殘留舊圖片。
   if (storedDateKey && storedDateKey !== getTaipeiDateKey()) {
     await clearImageIds(sessionKey);
     return [];

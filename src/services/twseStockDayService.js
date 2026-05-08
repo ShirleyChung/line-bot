@@ -19,6 +19,7 @@ function yyyymmddTaipei(date = new Date()) {
 function parseTwseNumber(value) {
   if (value == null) return null;
 
+  // TWSE 數字欄位常帶逗號、X 或 --，先清掉再轉 Number。
   const s = String(value)
     .replace(/,/g, "")
     .replace(/X/g, "")
@@ -80,6 +81,7 @@ function getFieldIndex(fields, names) {
 }
 
 function normalizeTwseStockDayRow(fields, row, symbol, title = "") {
+  // TWSE 欄位名稱有時會調整順序，所以先用欄名找 index，避免依賴固定欄位位置。
   const dateIdx = getFieldIndex(fields, ["日期"]);
   const volumeIdx = getFieldIndex(fields, ["成交股數"]);
   const amountIdx = getFieldIndex(fields, ["成交金額"]);
@@ -261,6 +263,7 @@ function normalizeTwseBasicInfoRow(fields, row, close) {
   const dividendYield = dividendYieldIdx >= 0 ? parseTwseRatio(row[dividendYieldIdx]) : null;
   const peRatio = peIdx >= 0 ? parseTwseRatio(row[peIdx]) : null;
   const closePrice = Number(close);
+  // TWSE BWIBBU_d 沒有直接給 EPS，這裡用收盤價 / 本益比估算，並以 epsEstimated 標記。
   const eps = Number.isFinite(closePrice) && peRatio != null && peRatio > 0
     ? closePrice / peRatio
     : null;
@@ -353,6 +356,7 @@ export async function fetchTwseLatestClose(symbol, dateYmd = yyyymmddTaipei()) {
 
   try {
     const basicInfoDate = String(price.date || "").replace(/-/g, "") || dateYmd;
+    // 基本面資料是加值資訊，失敗時不影響主要股價回覆。
     price.fundamentals = await fetchTwseBasicInfo(code, price.close, basicInfoDate);
   } catch (err) {
     console.warn("[fetchTwseLatestClose] basic info failed:", code, err);

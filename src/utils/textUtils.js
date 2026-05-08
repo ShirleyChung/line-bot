@@ -103,9 +103,9 @@ export function stripMentionsFromText(event) {
     cursor = end;
   }
 
-  // �ɤW�̫�Ѿl����r
+  // 補上最後一個 mention 後方剩餘的文字
   result += text.slice(cursor);
 
-  // �����ɧ�h�l�ť�����
+  // mention 被移除後可能留下多餘空白，統一壓成單一空白
   return result.replace(/\s+/g, " ").trim();
 }

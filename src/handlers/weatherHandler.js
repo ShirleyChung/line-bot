@@ -17,6 +17,7 @@ export async function handleWeatherMessage(event) {
   const text = event.message.text.trim();
   const userId = event.source?.userId;
 
+  // 天氣提醒屬於 LLM tool 流程，這裡只處理立即查詢與預設地點設定。
   if (/(提醒|排程|每天|每日|固定)/.test(text)) {
     return false;
   }
@@ -35,6 +36,7 @@ export async function handleWeatherMessage(event) {
     return false;
   }
 
+  // 目前 CWA 36 小時預報只需要區分現在與明天兩種常用時段。
   const target = text.includes("明天") ? "tomorrow" : "now";
 
   const data = await getWeatherForUser({

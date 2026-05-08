@@ -6,6 +6,10 @@ const FINNHUB_BASE_URL = "https://finnhub.io/api/v1";
 const finnhubCache = new Map();
 const FINNHUB_CACHE_TTL_MS = 60 * 1000;
 
+/**
+ * Finnhub 查詢集中放在這個 service：
+ * 報價、公司名稱與基本面資料分開抓，最後再組成 bot 需要的統一價格格式。
+ */
 function getFinnhubApiKey() {
   const apiKey = env.FINNHUB_API_KEY;
 
@@ -142,6 +146,7 @@ export async function fetchUSStockLatest(symbol) {
   const code = normalizeUsSymbol(symbol);
 
   try {
+    // profile / metric 失敗不應影響主要報價；quote 才是判斷是否找到股票的關鍵。
     const [quote, profile, fundamentals] = await Promise.all([
       fetchFinnhubQuote(code),
       fetchFinnhubProfile(code).catch((err) => {

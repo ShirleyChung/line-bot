@@ -2,6 +2,11 @@ import { db } from "./firestore.js";
 import { fetchTwseLatestClose } from "./twseStockDayService.js";
 import { fetchUSStockLatest } from "./finnhubService.js";
 
+/**
+ * 簡化版市場判斷：
+ * - 純英文字母通常視為美股代碼
+ * - 其他格式預設走台股查詢
+ */
 function detectMarket(symbol) {
   const code = String(symbol).trim().toUpperCase();
   if (/^[A-Z]+$/.test(code) && code.length >= 1 && code.length <= 5) {
@@ -11,9 +16,14 @@ function detectMarket(symbol) {
 }
 
 function normalizeSymbol(symbol) {
+  // 使用者可能輸入 2330.TW / 2330.TWO，儲存時統一只保留股票代碼。
   return String(symbol).trim().toUpperCase().replace(".TW", "").replace(".TWO", "");
 }
 
+/**
+ * 將股票加入使用者自選股。
+ * 使用 Firestore subcollection 讓每個使用者的 watchlist 可以獨立查詢與排序。
+ */
 export async function addWatchStock(lineUserId, symbol) {
   const code = normalizeSymbol(symbol);
   const market = detectMarket(code);
@@ -159,6 +169,7 @@ export async function getWatchPrices(lineUserId) {
     } catch (err) {
       console.error(`[getWatchPrices] ${market} fetch failed:`, symbol, err);
 
+      // 單一股票查詢失敗時保留錯誤在結果中，避免整份自選股回覆被中斷。
       prices.push({
         symbol,
         found: false,

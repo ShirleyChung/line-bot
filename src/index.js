@@ -31,7 +31,7 @@ app.get("/", (req, res) => {
 /**
  * LINE webhook 入口
  * 這裡使用 LINE SDK middleware 驗證簽章。
- * LINE webhook / reply 的處理方式就是這種模式。:contentReference[oaicite:5]{index=5}
+ * 驗證通過後再把每個 event 丟給共用 router。
  */
 app.post("/webhook", line.middleware(lineConfig), async (req, res) => {
   try {
