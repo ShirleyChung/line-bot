@@ -71,6 +71,50 @@ function formatChange(value) {
   return "0";
 }
 
+function formatRatio(value) {
+  if (value == null || value === "") return "-";
+
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) {
+    return String(value);
+  }
+
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatFundamentalLines(fundamentals) {
+  if (!fundamentals) return [];
+
+  const hasAnyValue = [
+    fundamentals.eps,
+    fundamentals.dividendYield,
+    fundamentals.peRatio,
+    fundamentals.pbRatio,
+  ].some((value) => value != null && value !== "");
+
+  if (!hasAnyValue) return [];
+
+  const lines = [];
+  const epsLabel = fundamentals.epsEstimated ? "EPS(估)" : "EPS";
+
+  lines.push(`${epsLabel}：${formatRatio(fundamentals.eps)}`);
+  lines.push(`殖利率：${formatRatio(fundamentals.dividendYield)}%`);
+
+  if (fundamentals.peRatio != null || fundamentals.pbRatio != null) {
+    lines.push(`本益比/PB：${formatRatio(fundamentals.peRatio)} / ${formatRatio(fundamentals.pbRatio)}`);
+  }
+
+  if (fundamentals.fiscalPeriod) {
+    lines.push(`財報期：${fundamentals.fiscalPeriod}`);
+  }
+
+  return lines;
+}
+
 export function buildWatchPricesMessage(prices) {
   if (!prices || prices.length === 0) {
     return "你目前還沒有自選股。";
@@ -104,6 +148,7 @@ export function buildWatchPricesMessage(prices) {
 
       lines.push(`${name}：${symbol}`);
       lines.push(`價：${formatPrice(p.close)} ${formatChange(p.change)}`);
+      lines.push(...formatFundamentalLines(p.fundamentals));
       lines.push(`成交量：${formatNumber(p.volume)}`);
     }
 
@@ -131,6 +176,7 @@ export function buildWatchPricesMessage(prices) {
 
       lines.push(`${name} (${symbol})`);
       lines.push(`價：$${formatPrice(p.close)} ${formatChange(p.change)} (${formatChange(p.changePercent)}%)`);
+      lines.push(...formatFundamentalLines(p.fundamentals));
       
       if (p.high != null && p.low != null) {
         lines.push(`高/低：$${formatPrice(p.high)} / $${formatPrice(p.low)}`);

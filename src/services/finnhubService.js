@@ -92,15 +92,65 @@ export async function fetchFinnhubProfile(symbol) {
   );
 }
 
+export async function fetchFinnhubMetric(symbol) {
+  const code = normalizeUsSymbol(symbol);
+
+  return fetchFinnhubCached(`metric:${code}`, () =>
+    fetchFinnhubJson("/stock/metric", {
+      symbol: code,
+      metric: "all",
+    })
+  );
+}
+
+function pickFiniteNumber(source, keys) {
+  for (const key of keys) {
+    const value = source?.[key];
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function normalizeFinnhubFundamentals(metricResponse) {
+  const metric = metricResponse?.metric || {};
+
+  return {
+    eps: pickFiniteNumber(metric, [
+      "epsTTM",
+      "epsBasicExclExtraItemsTTM",
+      "epsNormalizedAnnual",
+      "epsInclExtraItemsTTM",
+    ]),
+    dividendYield: pickFiniteNumber(metric, [
+      "dividendYieldIndicatedAnnual",
+      "dividendYield5Y",
+    ]),
+    peRatio: pickFiniteNumber(metric, [
+      "peTTM",
+      "peBasicExclExtraTTM",
+    ]),
+    pbRatio: pickFiniteNumber(metric, [
+      "pbAnnual",
+      "pbQuarterly",
+    ]),
+    source: "Finnhub fundamentals",
+  };
+}
+
 export async function fetchUSStockLatest(symbol) {
   const code = normalizeUsSymbol(symbol);
 
   try {
-    const [quote, profile] = await Promise.all([
+    const [quote, profile, fundamentals] = await Promise.all([
       fetchFinnhubQuote(code),
       fetchFinnhubProfile(code).catch((err) => {
         console.warn("[fetchUSStockLatest] profile failed:", code, err);
         return {};
+      }),
+      fetchFinnhubMetric(code).then(normalizeFinnhubFundamentals).catch((err) => {
+        console.warn("[fetchUSStockLatest] metric failed:", code, err);
+        return null;
       }),
     ]);
 
@@ -134,6 +184,7 @@ export async function fetchUSStockLatest(symbol) {
       previousClose: quote.pc,
 
       volume: null,
+      fundamentals,
 
       source: "FINNHUB",
       priceType: "realtime_quote",

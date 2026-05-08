@@ -232,7 +232,7 @@ export const botTools = [
   {
     type: "function",
     name: "get_watch_prices",
-    description: "查詢使用者自選股的目前或最近股價（包含台股與美股）",
+    description: "查詢使用者自選股的目前或最近股價與基本資料（EPS、殖利率、本益比等；包含台股與美股）",
     parameters: {
       type: "object",
       properties: {},
@@ -242,7 +242,7 @@ export const botTools = [
   {
   type: "function",
     name: "get_stock_price",
-    description: "查詢單一股票的最近收盤或即時資訊，不需要加入自選股。支援台股股票/ETF（例如 2330、2454、00981A）與美股（例如 NVDA、QCOM、AAPL）。",
+    description: "查詢單一股票的最近收盤或即時資訊，並附基本資料（EPS、殖利率、本益比等），不需要加入自選股。支援台股股票/ETF（例如 2330、2454、00981A）與美股（例如 NVDA、QCOM、AAPL）。",
     parameters: {
       type: "object",
       properties: {

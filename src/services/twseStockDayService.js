@@ -45,6 +45,20 @@ function parseTwseSignNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseTwseRatio(value) {
+  if (value == null) return null;
+
+  const s = String(value)
+    .replace(/,/g, "")
+    .replace(/%/g, "")
+    .trim();
+
+  if (s === "" || s === "-" || s === "--" || s === "N/A") return null;
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 function convertRocDateToAd(rocDate) {
   // TWSE data 日期通常是這樣：115/05/05
   const parts = String(rocDate).split("/");
@@ -111,6 +125,7 @@ function extractStockNameFromTitle(title, symbol) {
 }
 
 const twseStockDayCache = new Map();
+const twseBasicInfoCache = new Map();
 const TWSE_STOCK_DAY_CACHE_TTL_MS = 60 * 1000;
 
 function sleep(ms) {
@@ -207,6 +222,81 @@ export async function fetchTwseStockDay(symbol, dateYmd = yyyymmddTaipei()) {
   throw lastErr;
 }
 
+async function fetchTwseDailyBasicInfo(dateYmd = yyyymmddTaipei()) {
+  const cacheKey = `basic:${dateYmd}`;
+  const now = Date.now();
+
+  const cached = twseBasicInfoCache.get(cacheKey);
+  if (cached && now - cached.cachedAt < TWSE_STOCK_DAY_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const url =
+    "https://www.twse.com.tw/rwd/zh/afterTrading/BWIBBU_d" +
+    `?date=${encodeURIComponent(dateYmd)}` +
+    "&selectType=ALL" +
+    "&response=json";
+
+  console.log("[fetchTwseDailyBasicInfo] url =", url);
+
+  const json = await fetchJsonWithText(url, {
+    headers: TWSE_HEADERS,
+  });
+
+  twseBasicInfoCache.set(cacheKey, {
+    cachedAt: now,
+    data: json,
+  });
+
+  return json;
+}
+
+function normalizeTwseBasicInfoRow(fields, row, close) {
+  const dividendYieldIdx = getFieldIndex(fields, ["殖利率(%)", "殖利率"]);
+  const dividendYearIdx = getFieldIndex(fields, ["股利年度"]);
+  const peIdx = getFieldIndex(fields, ["本益比"]);
+  const pbIdx = getFieldIndex(fields, ["股價淨值比"]);
+  const fiscalPeriodIdx = getFieldIndex(fields, ["財報年/季"]);
+
+  const dividendYield = dividendYieldIdx >= 0 ? parseTwseRatio(row[dividendYieldIdx]) : null;
+  const peRatio = peIdx >= 0 ? parseTwseRatio(row[peIdx]) : null;
+  const closePrice = Number(close);
+  const eps = Number.isFinite(closePrice) && peRatio != null && peRatio > 0
+    ? closePrice / peRatio
+    : null;
+
+  return {
+    eps,
+    epsEstimated: eps != null,
+    dividendYield,
+    dividendYear: dividendYearIdx >= 0 ? String(row[dividendYearIdx] || "").trim() : "",
+    peRatio,
+    pbRatio: pbIdx >= 0 ? parseTwseRatio(row[pbIdx]) : null,
+    fiscalPeriod: fiscalPeriodIdx >= 0 ? String(row[fiscalPeriodIdx] || "").trim() : "",
+    source: "TWSE BWIBBU_d",
+  };
+}
+
+async function fetchTwseBasicInfo(symbol, close, dateYmd = yyyymmddTaipei()) {
+  const code = String(symbol).trim().toUpperCase();
+  const json = await fetchTwseDailyBasicInfo(dateYmd);
+
+  if (!json || json.stat !== "OK") {
+    throw new Error(json?.stat || "TWSE 基本資料查詢失敗");
+  }
+
+  const fields = json.fields || [];
+  const codeIdx = getFieldIndex(fields, ["證券代號"]);
+  const data = Array.isArray(json.data) ? json.data : [];
+  const row = data.find((item) => String(item?.[codeIdx] || "").trim().toUpperCase() === code);
+
+  if (!row) {
+    return null;
+  }
+
+  return normalizeTwseBasicInfoRow(fields, row, close);
+}
+
 export async function fetchTwseLatestClose(symbol, dateYmd = yyyymmddTaipei()) {
   console.log("[fetchTwseLatestClose] symbol =", symbol, "dateYmd =", dateYmd);
 
@@ -254,10 +344,20 @@ export async function fetchTwseLatestClose(symbol, dateYmd = yyyymmddTaipei()) {
 
   const latestRow = data[data.length - 1];
 
-  return normalizeTwseStockDayRow(
+  const price = normalizeTwseStockDayRow(
     fields,
     latestRow,
     code,
     json.title || ""
   );
+
+  try {
+    const basicInfoDate = String(price.date || "").replace(/-/g, "") || dateYmd;
+    price.fundamentals = await fetchTwseBasicInfo(code, price.close, basicInfoDate);
+  } catch (err) {
+    console.warn("[fetchTwseLatestClose] basic info failed:", code, err);
+    price.fundamentals = null;
+  }
+
+  return price;
 }
