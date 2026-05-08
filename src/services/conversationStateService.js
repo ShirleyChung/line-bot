@@ -37,6 +37,10 @@ export function buildSessionKey(source) {
     return "unknown";
   }
 
+  if (source.platform && source.userId) {
+    return `${source.platform}:user:${source.userId}`;
+  }
+
   if (source.type === "user") {
     return `user:${source.userId}`;
   }

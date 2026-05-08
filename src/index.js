@@ -13,6 +13,8 @@ import express from "express";
 import { env } from "./config/env.js";
 import { line, lineConfig, lineClient } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
+import { normalizeTelegramUpdate, verifyTelegramSecret } from "./platform/telegram.js";
+import { normalizeMetaWebhook, verifyMetaWebhook } from "./platform/meta.js";
 import { getDueReminders, deleteReminder, rescheduleReminder } from "./services/reminderService.js";
 import { buildReminderMessage, getNextReminderTime } from "./services/reminderContentService.js";
 
@@ -42,6 +44,61 @@ app.post("/webhook", line.middleware(lineConfig), async (req, res) => {
   } catch (error) {
     console.error("Webhook error:", error);
     res.status(500).end();
+  }
+});
+
+/**
+ * Telegram webhook 入口
+ *
+ * 目前支援純文字訊息，會轉成內部共用 message event 再交給 router。
+ */
+app.post("/telegram/webhook", express.json(), async (req, res) => {
+  if (!verifyTelegramSecret(req)) {
+    return res.status(401).send("invalid telegram secret");
+  }
+
+  try {
+    const events = normalizeTelegramUpdate(req.body);
+    await Promise.all(events.map(routeMessageEvent));
+
+    res.status(200).send("ok");
+  } catch (error) {
+    console.error("Telegram webhook error:", error);
+    res.status(500).send("error");
+  }
+});
+
+/**
+ * Facebook Messenger webhook 驗證與訊息入口
+ */
+app.get("/facebook/webhook", verifyMetaWebhook);
+
+app.post("/facebook/webhook", express.json(), async (req, res) => {
+  try {
+    const events = normalizeMetaWebhook(req.body, "facebook");
+    await Promise.all(events.map(routeMessageEvent));
+
+    res.status(200).send("EVENT_RECEIVED");
+  } catch (error) {
+    console.error("Facebook webhook error:", error);
+    res.status(500).send("error");
+  }
+});
+
+/**
+ * Instagram Messaging webhook 驗證與訊息入口
+ */
+app.get("/instagram/webhook", verifyMetaWebhook);
+
+app.post("/instagram/webhook", express.json(), async (req, res) => {
+  try {
+    const events = normalizeMetaWebhook(req.body, "instagram");
+    await Promise.all(events.map(routeMessageEvent));
+
+    res.status(200).send("EVENT_RECEIVED");
+  } catch (error) {
+    console.error("Instagram webhook error:", error);
+    res.status(500).send("error");
   }
 });
 

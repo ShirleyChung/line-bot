@@ -2,7 +2,7 @@ import { createReminder, listReminders, deleteReminderByOwner } from "../service
 import { normalizeReminderData } from "../services/reminderContentService.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
-import { replyText } from "../line/reply.js";
+import { replyText } from "../platform/reply.js";
 import { lineClient } from "../line/client.js";
 
 import { fetchImageBuffer } from "../services/imageService.js";
@@ -278,7 +278,7 @@ export async function executeTool(name, args = {}, context = {}) {
       const url = await getTodayLinkFromSheet();
       const message = buildTodayLinkMessage(url, args.includeZoomInfo ?? true);
 
-      await replyText(context.replyToken, message);
+      await replyText(context.event || { replyToken: context.replyToken }, message);
 
       return {
         ok: true,

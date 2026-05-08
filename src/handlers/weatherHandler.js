@@ -1,6 +1,6 @@
 // src/handlers/weatherHandler.js
 
-import { replyText } from "../line/reply.js";
+import { replyText } from "../platform/reply.js";
 
 import {
   isWeatherIntent,
@@ -26,7 +26,7 @@ export async function handleWeatherMessage(event) {
   if (cityToSet) {
     const result = setDefaultWeatherCity(userId, cityToSet);
 
-    await replyText(event.replyToken, result.message);
+    await replyText(event, result.message);
 
     return true;
   }
@@ -43,7 +43,7 @@ export async function handleWeatherMessage(event) {
     target,
   });
 
-  await replyText(event.replyToken, formatWeatherReply(data));
+  await replyText(event, formatWeatherReply(data));
 
   return true;
 }

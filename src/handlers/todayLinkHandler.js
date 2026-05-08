@@ -7,7 +7,8 @@
  */
 
 import { get_today_link } from "../services/sheetLinkService.js";
-import { replyText, pushText } from "../line/reply.js";
+import { replyText as replyLineText, pushText } from "../line/reply.js";
+import { replyText } from "../platform/reply.js";
 
 /**
  * 處理今天連結命令
@@ -15,7 +16,7 @@ import { replyText, pushText } from "../line/reply.js";
  */
 export async function handleTodayLink(event) {
   const message = await get_today_link();
-  return replyText(event.replyToken, message);
+  return replyText(event, message);
 }
 
 /**
@@ -24,7 +25,7 @@ export async function handleTodayLink(event) {
  */
 export async function reply_today_link(replyToken) {
   const message = await get_today_link();
-  return replyText(replyToken, message);
+  return replyLineText(replyToken, message);
 }
 
 /**

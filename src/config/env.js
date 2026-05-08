@@ -29,6 +29,15 @@ export const env = {
   LINE_CHANNEL_SECRET: required("LINE_CHANNEL_SECRET"),
   LINE_CHANNEL_ACCESS_TOKEN: required("LINE_CHANNEL_ACCESS_TOKEN"),
 
+  // ===== Telegram =====
+  TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",
+  TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET || "",
+
+  // ===== Meta Messaging (Facebook Messenger / Instagram) =====
+  META_VERIFY_TOKEN: process.env.META_VERIFY_TOKEN || "",
+  FACEBOOK_PAGE_ACCESS_TOKEN: process.env.FACEBOOK_PAGE_ACCESS_TOKEN || "",
+  INSTAGRAM_ACCESS_TOKEN: process.env.INSTAGRAM_ACCESS_TOKEN || "",
+
   // ===== Google Sheets =====
   START_COLUMN: Number(process.env.START_COLUMN || 6),
   PUBLISHED_SHEET_CSV_URL: required("PUBLISHED_SHEET_CSV_URL"),

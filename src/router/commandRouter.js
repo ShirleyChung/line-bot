@@ -10,7 +10,7 @@
 
 import { handleTodayLink } from "../handlers/todayLinkHandler.js";
 import { handleLlmFallback } from "../handlers/llmHandler.js";
-import { replyText } from "../line/reply.js";
+import { replyText } from "../platform/reply.js";
 import {
   isTodayLinkCommand,
   isResetImageIdsCommand,
@@ -79,7 +79,7 @@ export async function routeMessageEvent(event) {
 
     if (isResetImageIdsCommand(userText)) {
       await clearImageIds(sessionKey);
-      return await replyText(event.replyToken, "已重置圖片記錄。");
+      return await replyText(event, "已重置圖片記錄。");
     }
 
     // 先攔截內建命令（使用移除 mention 後的文字）
@@ -92,6 +92,6 @@ export async function routeMessageEvent(event) {
     return await handleLlmFallback(event, userText || rawText, context);
   } catch (error) {
     console.error("routeMessageEvent error:", error);
-    return replyText(event.replyToken, "處理失敗，請稍後再試。");
+    return replyText(event, "處理失敗，請稍後再試。");
   }
 }
