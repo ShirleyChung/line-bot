@@ -22,6 +22,31 @@ export function isTodayLinkCommand(text) {
 }
 
 /**
+ * 判斷是否為重置圖片批次記錄命令。
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isResetImageIdsCommand(text) {
+  const normalized = text.replace(/\s+/g, "").toLowerCase();
+
+  return (
+    normalized.includes("重置圖片記錄") ||
+    normalized.includes("重設圖片記錄") ||
+    normalized.includes("清除圖片記錄") ||
+    normalized.includes("清空圖片記錄") ||
+    normalized.includes("重置圖片id") ||
+    normalized.includes("清除圖片id") ||
+    normalized === "重置圖片" ||
+    normalized === "重設圖片" ||
+    normalized === "清除圖片" ||
+    normalized === "清空圖片" ||
+    normalized === "resetimages" ||
+    normalized === "clearimages"
+  );
+}
+
+/**
  * 判斷這則訊息是否有 @ 到 bot 自己
  *
  * LINE 在群組 / room 的文字訊息中，如果有提及 bot，

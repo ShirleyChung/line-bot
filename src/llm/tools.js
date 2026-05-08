@@ -148,7 +148,7 @@ export const botTools = [
   {
     type: "function",
     name: "extract_image_data",
-    description: "從最近上傳的圖片中擷取文字與結構化資料。",
+    description: "從最近上傳的一批圖片中逐張擷取文字與結構化資料。",
     parameters: {
       type: "object",
       properties: {},

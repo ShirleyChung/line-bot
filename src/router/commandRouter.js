@@ -13,13 +13,15 @@ import { handleLlmFallback } from "../handlers/llmHandler.js";
 import { replyText } from "../line/reply.js";
 import {
   isTodayLinkCommand,
+  isResetImageIdsCommand,
   isMentionToBot,
   stripMentionsFromText,
 } from "../utils/textUtils.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import {
-  setLatestImageId,
-  getLatestImageId,
+  addImageId,
+  clearImageIds,
+  getImageIds,
 } from "../services/sessionStateService.js";
 import { handleWeatherMessage } from "../handlers/weatherHandler.js";
 
@@ -31,12 +33,12 @@ import { handleWeatherMessage } from "../handlers/weatherHandler.js";
 export async function routeMessageEvent(event) {
   const sessionKey = buildSessionKey(event.source);
 
-  // 收到圖片時，先記住這張圖片的 message id
-  if (event.message.type === "image") {
-    await setLatestImageId(sessionKey, event.message.id);
+  // 收到圖片時，先把這張圖片加入當日批次記錄
+  if (event.type === "message" && event.message?.type === "image") {
+    await addImageId(sessionKey, event.message.id);
   }
   // 只處理文字訊息
-  if (event.type !== "message" || event.message.type !== "text") {
+  if (event.type !== "message" || event.message?.type !== "text") {
     return null;
   }
   // 先嘗試天氣訊息處理，如果有命中就直接回覆，不進 LLM
@@ -49,11 +51,13 @@ export async function routeMessageEvent(event) {
   // 去掉 mention 後的文字（拿來做命令判斷）
   const userText = stripMentionsFromText(event);
 
-  const latestImageId = await getLatestImageId(sessionKey);
+  const imageIds = await getImageIds(sessionKey);
+  const latestImageId = imageIds.at(-1) || null;
   const context = {
     replyToken: event.replyToken,
     source: event.source,
     sessionKey,
+    imageIds,
     latestImageId,
   };
 
@@ -71,6 +75,11 @@ export async function routeMessageEvent(event) {
      */
     if ((sourceType === "group" || sourceType === "room") && !isMentionToBot(event)) {
       return null;
+    }
+
+    if (isResetImageIdsCommand(userText)) {
+      await clearImageIds(sessionKey);
+      return await replyText(event.replyToken, "已重置圖片記錄。");
     }
 
     // 先攔截內建命令（使用移除 mention 後的文字）

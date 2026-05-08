@@ -9,6 +9,7 @@ import { fetchImageBuffer } from "../services/imageService.js";
 import { ocrImage } from "../services/ocrService.js";
 import { parseOCRToJSON } from "../services/dataParserService.js";
 import { jsonToCSV } from "../services/csvService.js";
+import { clearImageIds } from "../services/sessionStateService.js";
 import {
   addWatchStock,
   removeWatchStock,
@@ -102,16 +103,37 @@ function rowsToCSV(fields, rows) {
 export async function executeTool(name, args = {}, context = {}) {
   switch (name) {
     case "extract_image_data": {
-      const imageId = args.imageId || context.latestImageId;
-      if (!imageId) {
+      const imageIds = Array.isArray(context.imageIds) && context.imageIds.length
+        ? context.imageIds
+        : [context.latestImageId].filter(Boolean);
+
+      if (!imageIds.length) {
         throw new Error("沒有可用的圖片");
       }
-      const buffer = await fetchImageBuffer(imageId);
-      const text = await ocrImage(buffer);
-      const json = await parseOCRToJSON(text);
+
+      const images = [];
+      for (const [index, imageId] of imageIds.entries()) {
+        const buffer = await fetchImageBuffer(imageId);
+        const text = await ocrImage(buffer);
+        const data = await parseOCRToJSON(text);
+
+        images.push({
+          index: index + 1,
+          imageId,
+          text,
+          data,
+        });
+      }
+
+      await clearImageIds(context.sessionKey || buildSessionKey(context.source));
+      context.imageIds = [];
+      context.latestImageId = null;
+
       return {
         ok: true,
-        data: json,
+        count: images.length,
+        data: images.length === 1 ? images[0].data : images.map((image) => image.data),
+        images,
       };
     }
 

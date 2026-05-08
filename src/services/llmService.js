@@ -65,10 +65,10 @@ export async function askLlmWithTools(userText, context = {}) {
   請以這個時間為基準進行推算。如果使用者提供的時間資訊已足夠，就不要再要求精確時間。
   如果要呼叫 reminder 相關工具，時間一律輸出為 ISO 8601 格式，並包含 +08:00。)
   `;
-  if (context.latestImageId) {
+  if (context.imageIds?.length) {
   instructions += `
-  （系統資訊：使用者最近上傳過一張圖片，目前可供工具使用。
-  如果使用者要求「從圖片取資料」、「OCR」、「讀取圖片內容」、「擷取圖片資料」，
+  （系統資訊：使用者最近上傳過 ${context.imageIds.length} 張圖片，目前可供工具作為同一批圖片使用。
+  如果使用者要求「從圖片取資料」、「OCR」、「讀取圖片內容」、「擷取圖片資料」、「處理這批圖片」，
   請優先呼叫 extract_image_data 工具，不要要求再次上傳圖片。）
   `;
   }
