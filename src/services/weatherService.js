@@ -4,8 +4,32 @@ import { db } from "./firestore.js";
 const CWA_API_KEY = env.CWA_API_KEY;
 const CWA_36H_ENDPOINT =
   'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001';
-const CWA_TOWNSHIP_ENDPOINT =
-  'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-089';
+const CWA_DATASTORE_BASE =
+  'https://opendata.cwa.gov.tw/api/v1/rest/datastore';
+const CWA_TOWNSHIP_DATASET_BY_CITY = {
+  宜蘭縣: 'F-D0047-003',
+  桃園市: 'F-D0047-007',
+  新竹縣: 'F-D0047-011',
+  苗栗縣: 'F-D0047-015',
+  彰化縣: 'F-D0047-019',
+  南投縣: 'F-D0047-023',
+  雲林縣: 'F-D0047-027',
+  嘉義縣: 'F-D0047-031',
+  屏東縣: 'F-D0047-035',
+  臺東縣: 'F-D0047-039',
+  花蓮縣: 'F-D0047-043',
+  澎湖縣: 'F-D0047-047',
+  基隆市: 'F-D0047-051',
+  新竹市: 'F-D0047-055',
+  嘉義市: 'F-D0047-059',
+  臺北市: 'F-D0047-063',
+  高雄市: 'F-D0047-067',
+  新北市: 'F-D0047-071',
+  臺中市: 'F-D0047-075',
+  臺南市: 'F-D0047-079',
+  連江縣: 'F-D0047-083',
+  金門縣: 'F-D0047-087',
+};
 
 const weatherCache = new Map();
 const WEATHER_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -126,7 +150,25 @@ const TOWNSHIP_ALIASES = {
   日月潭: { city: '南投縣', town: '魚池鄉' },
 };
 
-const TOWNSHIP_SUFFIXES = ['區', '鎮', '鄉', '市'];
+const TOWNSHIP_SUFFIXES = ['市', '區', '鎮', '鄉'];
+const SUPPORTED_CITY_NAMES = [...new Set(Object.values(CITY_ALIASES))]
+  .sort((a, b) => b.length - a.length);
+const TOWNSHIP_ELEMENT_ALIASES = {
+  平均溫度: 'T',
+  溫度: 'T',
+  最高溫度: 'MaxT',
+  最低溫度: 'MinT',
+  平均相對濕度: 'RH',
+  平均相對溼度: 'RH',
+  最高體感溫度: 'MaxAT',
+  最低體感溫度: 'MinAT',
+  最大舒適度指數: 'MaxCI',
+  最小舒適度指數: 'MinCI',
+  '12小時降雨機率': 'PoP12h',
+  '6小時降雨機率': 'PoP6h',
+  天氣現象: 'Wx',
+  天氣預報綜合描述: 'WeatherDescription',
+};
 
 function getDefaultWeatherRef(userId) {
   return db.collection('users').doc(userId);
@@ -175,6 +217,21 @@ export function normalizeTaiwanWeatherLocation(input) {
       label: `${TOWNSHIP_ALIASES[s].city}${TOWNSHIP_ALIASES[s].town}`,
       type: 'township',
     };
+  }
+
+  const fullLocationCity = SUPPORTED_CITY_NAMES.find((cityName) => (
+    s.startsWith(cityName) && s.length > cityName.length
+  ));
+  if (fullLocationCity) {
+    const town = s.slice(fullLocationCity.length);
+    if (town) {
+      return {
+        city: fullLocationCity,
+        town,
+        label: `${fullLocationCity}${town}`,
+        type: 'township',
+      };
+    }
   }
 
   const city = normalizeTaiwanCity(s);
@@ -343,8 +400,10 @@ export async function getDefaultWeatherCity(userId) {
 function getWeatherElementMap(location) {
   const map = {};
 
-  for (const element of location.weatherElement || []) {
-    map[element.elementName] = element.time || [];
+  for (const element of location.weatherElement || location.WeatherElement || []) {
+    const elementName = element.elementName || element.ElementName;
+    const canonicalName = TOWNSHIP_ELEMENT_ALIASES[elementName] || elementName;
+    map[canonicalName] = element.time || element.Time || [];
   }
 
   return map;
@@ -373,18 +432,35 @@ function normalizeRainValue(value) {
   return s.endsWith('%') ? s : `${s}%`;
 }
 
-function getElementValue(item) {
-  const value = item?.elementValue;
+function getElementValue(item, preferredKeys = []) {
+  const value = item?.elementValue || item?.ElementValue;
   if (Array.isArray(value)) {
     const first = value[0];
-    return first?.value ?? first?.elementValue ?? first?.parameterName ?? null;
+    for (const key of preferredKeys) {
+      if (first?.[key] !== undefined && first?.[key] !== null) return first[key];
+    }
+    return first?.value
+      ?? first?.elementValue
+      ?? first?.parameterName
+      ?? first?.Value
+      ?? first?.ElementValue
+      ?? first?.ParameterName
+      ?? Object.values(first || {})[0]
+      ?? null;
   }
-  return value?.value ?? value?.elementValue ?? value?.parameterName ?? value ?? null;
+  return value?.value
+    ?? value?.elementValue
+    ?? value?.parameterName
+    ?? value?.Value
+    ?? value?.ElementValue
+    ?? value?.ParameterName
+    ?? value
+    ?? null;
 }
 
-function getTownshipTimeValue(weatherElementMap, elementName, idx = 0) {
+function getTownshipTimeValue(weatherElementMap, elementName, idx = 0, preferredKeys = []) {
   const item = weatherElementMap[elementName]?.[idx];
-  return getElementValue(item);
+  return getElementValue(item, preferredKeys);
 }
 
 function getTownshipTime(weatherElementMap, elementNames, idx = 0) {
@@ -393,6 +469,77 @@ function getTownshipTime(weatherElementMap, elementNames, idx = 0) {
     if (item) return item;
   }
   return null;
+}
+
+function getLocationsGroups(json) {
+  return json.records?.locations || json.records?.Locations || [];
+}
+
+function getLocationsName(group) {
+  return group?.locationsName || group?.LocationsName || '';
+}
+
+function getTownshipName(location) {
+  return location?.locationName || location?.LocationName || '';
+}
+
+function getGroupLocations(group) {
+  return group?.location || group?.Location || [];
+}
+
+function findLocationInGroup(group, town) {
+  return getGroupLocations(group).find((item) => getTownshipName(item) === town) || null;
+}
+
+function getTownNameCandidates(town) {
+  if (TOWNSHIP_SUFFIXES.some((suffix) => town.endsWith(suffix))) {
+    return [town];
+  }
+
+  return [
+    ...TOWNSHIP_SUFFIXES.map((suffix) => `${town}${suffix}`),
+    town,
+  ];
+}
+
+function buildTownshipWeatherData({ json, dataset, group, location, target, idx }) {
+  const elementMap = getWeatherElementMap(location);
+  const time = getTownshipTime(elementMap, ['Wx', 'WeatherDescription', 'T', 'MinT'], idx);
+  const minT = getTownshipTimeValue(elementMap, 'MinT', idx, ['MinTemperature']) ?? getTownshipTimeValue(elementMap, 'T', idx, ['Temperature']);
+  const maxT = getTownshipTimeValue(elementMap, 'MaxT', idx, ['MaxTemperature']) ?? getTownshipTimeValue(elementMap, 'T', idx, ['Temperature']);
+  const weather = getTownshipTimeValue(elementMap, 'Wx', idx, ['Weather']);
+  const description = getTownshipTimeValue(elementMap, 'WeatherDescription', idx, ['WeatherDescription']);
+  const pop = getTownshipTimeValue(elementMap, 'PoP12h', idx, ['ProbabilityOfPrecipitation']) ?? getTownshipTimeValue(elementMap, 'PoP6h', idx, ['ProbabilityOfPrecipitation']);
+  const comfort = getTownshipTimeValue(elementMap, 'CI', idx, ['ComfortIndexDescription'])
+    ?? getTownshipTimeValue(elementMap, 'MinCI', idx, ['MinComfortIndexDescription'])
+    ?? getTownshipTimeValue(elementMap, 'MaxCI', idx, ['MaxComfortIndexDescription']);
+  const apparentT = getTownshipTimeValue(elementMap, 'AT', idx, ['ApparentTemperature'])
+    ?? getTownshipTimeValue(elementMap, 'MaxAT', idx, ['MaxApparentTemperature'])
+    ?? getTownshipTimeValue(elementMap, 'MinAT', idx, ['MinApparentTemperature']);
+  const relativeHumidity = getTownshipTimeValue(elementMap, 'RH', idx, ['RelativeHumidity']);
+  const city = getLocationsName(group);
+  const town = getTownshipName(location);
+
+  return {
+    ok: true,
+    source: 'CWA',
+    dataset,
+    city,
+    town,
+    locationName: `${city}${town}`,
+    target,
+    startTime: time?.startTime || time?.StartTime || time?.DataTime || null,
+    endTime: time?.endTime || time?.EndTime || null,
+    weather,
+    weatherDescription: description,
+    rainProbability: normalizeRainValue(pop),
+    minTemperatureC: minT,
+    maxTemperatureC: maxT,
+    apparentTemperatureC: apparentT,
+    relativeHumidity: normalizeRainValue(relativeHumidity),
+    comfort,
+    rawUpdatedAt: json.records?.datasetDescription || json.records?.DatasetDescription || null,
+  };
 }
 
 async function fetchCwaJson(url, cacheKey) {
@@ -508,22 +655,45 @@ export async function fetchCwaTownshipWeather(locationInput, options = {}) {
 
   const target = options.target || 'now';
   const idx = target === 'later' ? 2 : target === 'tomorrow' ? 1 : 0;
-  const url = new URL(CWA_TOWNSHIP_ENDPOINT);
-  url.searchParams.set('Authorization', CWA_API_KEY);
-  url.searchParams.set('format', 'JSON');
-  url.searchParams.set('locationName', location.town);
 
-  const cacheKey = `cwaTownship:${location.city || 'all'}:${location.town}:${target}`;
-  const json = await fetchCwaJson(url, cacheKey);
-  const groups = json.records?.locations || [];
-  const matchedGroup = groups.find((group) => (
-    !location.city || group.locationsName === location.city
-  )) || groups[0];
-  const matchedLocation = matchedGroup?.location?.find((item) => (
-    item.locationName === location.town
-  ));
+  const datasetEntries = location.city
+    ? [[location.city, CWA_TOWNSHIP_DATASET_BY_CITY[location.city]]].filter(([, dataset]) => dataset)
+    : Object.entries(CWA_TOWNSHIP_DATASET_BY_CITY);
+  const townCandidates = getTownNameCandidates(location.town);
+  const matches = [];
 
-  if (!matchedLocation) {
+  for (const [city, dataset] of datasetEntries) {
+    const url = new URL(`${CWA_DATASTORE_BASE}/${dataset}`);
+    url.searchParams.set('Authorization', CWA_API_KEY);
+    url.searchParams.set('format', 'JSON');
+
+    const cacheKey = `cwaTownship:${dataset}:${city}:all:${target}`;
+    const json = await fetchCwaJson(url, cacheKey);
+    const groups = getLocationsGroups(json);
+    const matchedGroup = groups.find((group) => getLocationsName(group) === city) || groups[0];
+
+    for (const town of townCandidates) {
+      const matchedLocation = findLocationInGroup(matchedGroup, town);
+
+      if (matchedGroup && matchedLocation) {
+        matches.push({ json, dataset, group: matchedGroup, location: matchedLocation });
+      }
+    }
+  }
+
+  if (matches.length > 1) {
+    const candidates = matches.map((match) => (
+      `${getLocationsName(match.group)}${getTownshipName(match.location)}`
+    ));
+    return {
+      ok: false,
+      reason: 'ambiguous_township',
+      city: location.label,
+      message: `「${location.label}」有多個符合地點：${candidates.join('、')}。請輸入完整縣市與鄉鎮市區，例如：臺北市中正區。`,
+    };
+  }
+
+  if (matches.length === 0) {
     if (location.city) {
       return fetchCwa36hWeather(location.city, options);
     }
@@ -536,37 +706,11 @@ export async function fetchCwaTownshipWeather(locationInput, options = {}) {
     };
   }
 
-  const elementMap = getWeatherElementMap(matchedLocation);
-  const time = getTownshipTime(elementMap, ['Wx', 'WeatherDescription', 'T', 'MinT'], idx);
-  const minT = getTownshipTimeValue(elementMap, 'MinT', idx) ?? getTownshipTimeValue(elementMap, 'T', idx);
-  const maxT = getTownshipTimeValue(elementMap, 'MaxT', idx) ?? getTownshipTimeValue(elementMap, 'T', idx);
-  const weather = getTownshipTimeValue(elementMap, 'Wx', idx);
-  const description = getTownshipTimeValue(elementMap, 'WeatherDescription', idx);
-  const pop = getTownshipTimeValue(elementMap, 'PoP12h', idx) ?? getTownshipTimeValue(elementMap, 'PoP6h', idx);
-  const comfort = getTownshipTimeValue(elementMap, 'CI', idx) ?? getTownshipTimeValue(elementMap, 'MinCI', idx);
-  const apparentT = getTownshipTimeValue(elementMap, 'AT', idx);
-  const relativeHumidity = getTownshipTimeValue(elementMap, 'RH', idx);
-
-  return {
-    ok: true,
-    source: 'CWA',
-    dataset: 'F-D0047-089',
-    city: matchedGroup?.locationsName || location.city || '',
-    town: matchedLocation.locationName,
-    locationName: `${matchedGroup?.locationsName || location.city || ''}${matchedLocation.locationName}`,
+  return buildTownshipWeatherData({
+    ...matches[0],
     target,
-    startTime: time?.startTime || null,
-    endTime: time?.endTime || null,
-    weather,
-    weatherDescription: description,
-    rainProbability: normalizeRainValue(pop),
-    minTemperatureC: minT,
-    maxTemperatureC: maxT,
-    apparentTemperatureC: apparentT,
-    relativeHumidity: normalizeRainValue(relativeHumidity),
-    comfort,
-    rawUpdatedAt: json.records?.datasetDescription || null,
-  };
+    idx,
+  });
 }
 
 export function formatWeatherReply(data) {
