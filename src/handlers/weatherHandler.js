@@ -25,7 +25,7 @@ export async function handleWeatherMessage(event) {
   const cityToSet = parseSetDefaultWeatherCity(text);
 
   if (cityToSet) {
-    const result = setDefaultWeatherCity(userId, cityToSet);
+    const result = await setDefaultWeatherCity(userId, cityToSet);
 
     await replyText(event, result.message);
 
@@ -44,6 +44,10 @@ export async function handleWeatherMessage(event) {
     userId,
     target,
   });
+
+  if (data?.reason === "need_city") {
+    return false;
+  }
 
   await replyText(event, formatWeatherReply(data));
 

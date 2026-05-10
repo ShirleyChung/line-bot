@@ -1,6 +1,6 @@
 import { get_today_link } from "./sheetLinkService.js";
 import { getWeatherForUser, formatWeatherReply } from "./weatherService.js";
-import { fetchTwseLatestClose } from "./twseStockDayService.js";
+import { fetchTaiwanStockLatest } from "./taiwanStockService.js";
 import { fetchUSStockLatest } from "./finnhubService.js";
 import { getWatchPrices } from "./stockSelectService.js";
 import { buildWatchPricesMessage } from "../utils/format.js";
@@ -69,7 +69,7 @@ async function buildStockReminderMessage(reminder) {
   const market = detectMarket(symbol);
   const price = market === "US"
     ? await fetchUSStockLatest(symbol)
-    : await fetchTwseLatestClose(symbol);
+    : await fetchTaiwanStockLatest(symbol);
 
   return `股價提醒\n${buildWatchPricesMessage([price])}`;
 }

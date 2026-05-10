@@ -61,7 +61,7 @@ export const env = {
 請呼叫 create_reminder 工具。
 請將時間轉成 ISO 8601 格式（包含 +08:00）。
 如果是「每天 / 每日」這類固定提醒，recurrence 請填 daily；一次性提醒填 none。
-如果使用者要排程天氣提醒，reminderType 填 weather，city 填台灣縣市。
+如果使用者要排程天氣提醒，reminderType 填 weather，city 填台灣縣市或鄉鎮市區，例如淡水、板橋、羅東、埔里。
 如果使用者要排程單一股票股價，reminderType 填 stock，symbol 填股票代碼。
 如果使用者要排程自選股股價，reminderType 填 watch_prices。
 如果使用者要排程今日連結或每日連結，reminderType 填 today_link。

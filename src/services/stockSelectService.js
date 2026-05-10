@@ -1,5 +1,5 @@
 import { db } from "./firestore.js";
-import { fetchTwseLatestClose } from "./twseStockDayService.js";
+import { fetchTaiwanStockLatest } from "./taiwanStockService.js";
 import { fetchUSStockLatest } from "./finnhubService.js";
 
 /**
@@ -163,7 +163,7 @@ export async function getWatchPrices(lineUserId) {
       if (market === "US") {
         price = await fetchUSStockLatest(symbol);
       } else {
-        price = await fetchTwseLatestClose(symbol);
+        price = await fetchTaiwanStockLatest(symbol);
       }
       prices.push(price);
     } catch (err) {
@@ -173,7 +173,7 @@ export async function getWatchPrices(lineUserId) {
       prices.push({
         symbol,
         found: false,
-        source: market === "US" ? "FINNHUB" : "TWSE_STOCK_DAY",
+        source: market === "US" ? "FINNHUB" : "TAIWAN_STOCK",
         message: err instanceof Error ? err.message : String(err),
       });
     }

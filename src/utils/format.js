@@ -121,6 +121,12 @@ export function buildWatchPricesMessage(prices) {
   }
 
   const twStocks = prices.filter(p => p.source === "TWSE_STOCK_DAY");
+  const tpexStocks = prices.filter(p => p.source === "TPEX_TRADING_STOCK");
+  const emergingStocks = prices.filter(p => (
+    p.source === "TPEX_EMERGING_LATEST" ||
+    p.source === "TPEX_EMERGING_HISTORICAL"
+  ));
+  const unknownTwStocks = prices.filter(p => p.source === "TAIWAN_STOCK");
   const usStocks = prices.filter(p => p.source === "FINNHUB");
 
   const lines = [];
@@ -128,7 +134,7 @@ export function buildWatchPricesMessage(prices) {
   lines.push("");
 
   if (twStocks.length > 0) {
-    lines.push("【台股】");
+    lines.push("【上市】");
     const firstDate = twStocks.find((p) => p.found && p.date)?.date;
     if (firstDate) {
       lines.push(`資料日期：${firstDate}`);
@@ -156,8 +162,88 @@ export function buildWatchPricesMessage(prices) {
     lines.push("資料來源：TWSE 個股日成交資訊");
   }
 
-  if (usStocks.length > 0) {
+  if (tpexStocks.length > 0) {
     if (twStocks.length > 0) {
+      lines.push("");
+    }
+    lines.push("【上櫃】");
+    const firstDate = tpexStocks.find((p) => p.found && p.date)?.date;
+    if (firstDate) {
+      lines.push(`資料日期：${firstDate}`);
+    }
+
+    for (const p of tpexStocks) {
+      lines.push("");
+
+      if (!p.found) {
+        lines.push(`${p.symbol || "未知代碼"}`);
+        lines.push(`查詢失敗：${p.message || "查無資料"}`);
+        continue;
+      }
+
+      const name = p.name || "未取得名稱";
+      const symbol = p.symbol || "";
+
+      lines.push(`${name}：${symbol}`);
+      lines.push(`價：${formatPrice(p.close)} ${formatChange(p.change)}`);
+      lines.push(...formatFundamentalLines(p.fundamentals));
+      lines.push(`成交量：${formatNumber(p.volume)}`);
+    }
+
+    lines.push("");
+    lines.push("資料來源：TPEx 個股日成交資訊");
+  }
+
+  if (emergingStocks.length > 0) {
+    if (twStocks.length > 0 || tpexStocks.length > 0) {
+      lines.push("");
+    }
+    lines.push("【興櫃】");
+    const firstDate = emergingStocks.find((p) => p.found && p.date)?.date;
+    if (firstDate) {
+      lines.push(`資料日期：${firstDate}`);
+    }
+
+    for (const p of emergingStocks) {
+      lines.push("");
+
+      if (!p.found) {
+        lines.push(`${p.symbol || "未知代碼"}`);
+        lines.push(`查詢失敗：${p.message || "查無資料"}`);
+        continue;
+      }
+
+      const name = p.name || "未取得名稱";
+      const symbol = p.symbol || "";
+
+      lines.push(`${name}：${symbol}`);
+      lines.push(`均價：${formatPrice(p.close)}`);
+      if (p.high != null && p.low != null) {
+        lines.push(`高/低：${formatPrice(p.high)} / ${formatPrice(p.low)}`);
+      }
+      lines.push(`成交量：${formatNumber(p.volume)}`);
+    }
+
+    lines.push("");
+    const hasLatest = emergingStocks.some((p) => p.source === "TPEX_EMERGING_LATEST");
+    lines.push(`資料來源：${hasLatest ? "TPEx 興櫃股票當日行情表" : "TPEx 興櫃個股歷史行情"}`);
+  }
+
+  if (unknownTwStocks.length > 0) {
+    if (twStocks.length > 0 || tpexStocks.length > 0 || emergingStocks.length > 0) {
+      lines.push("");
+    }
+    lines.push("【台股】");
+
+    for (const p of unknownTwStocks) {
+      lines.push("");
+      lines.push(`${p.symbol || "未知代碼"}`);
+      lines.push(`查詢失敗：${p.message || "查無資料"}`);
+    }
+  }
+
+  if (usStocks.length > 0) {
+    if (twStocks.length > 0 || tpexStocks.length > 0 || emergingStocks.length > 0 || unknownTwStocks.length > 0) {
       lines.push("");
     }
     lines.push("【美股】");

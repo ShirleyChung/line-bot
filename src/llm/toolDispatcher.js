@@ -16,7 +16,7 @@ import {
   listWatchStocks,
   getWatchPrices,
 } from "../services/stockSelectService.js";
-import { fetchTwseLatestClose } from "../services/twseStockDayService.js";
+import { fetchTaiwanStockLatest } from "../services/taiwanStockService.js";
 import { fetchUSStockLatest } from "../services/finnhubService.js";
 import { buildWatchPricesMessage } from "../utils/format.js";
 import { fetchNews } from "../services/newsService.js";
@@ -418,7 +418,7 @@ export async function executeTool(name, args = {}, context = {}) {
       if (market === "US") {
         price = await fetchUSStockLatest(symbol);
       } else {
-        price = await fetchTwseLatestClose(symbol);
+        price = await fetchTaiwanStockLatest(symbol);
       }
 
       const text = buildWatchPricesMessage([price]);
@@ -444,7 +444,7 @@ export async function executeTool(name, args = {}, context = {}) {
       };
     }
     case 'get_weather': {
-      const userId = args.userId || context.userId || null;
+      const userId = args.userId || context.userId || context.source?.userId || null;
       const city = args.city || null;
       const target = args.target || 'now';
 
@@ -462,10 +462,10 @@ export async function executeTool(name, args = {}, context = {}) {
       };
     }
     case 'set_default_weather_city': {
-      const userId = args.userId || context.userId || null;
+      const userId = args.userId || context.userId || context.source?.userId || null;
       const city = args.city;
 
-      const result = setDefaultWeatherCity(userId, city);
+      const result = await setDefaultWeatherCity(userId, city);
 
       return {
         ok: result.ok,
