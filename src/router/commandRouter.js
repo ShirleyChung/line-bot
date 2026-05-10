@@ -10,6 +10,10 @@
 
 import { handleTodayLink } from "../handlers/todayLinkHandler.js";
 import { handleLlmFallback } from "../handlers/llmHandler.js";
+import {
+  handleWebpageSummary,
+  shouldHandleWebpageSummary,
+} from "../handlers/webpageSummaryHandler.js";
 import { replyText } from "../platform/reply.js";
 import {
   isTodayLinkCommand,
@@ -85,6 +89,10 @@ export async function routeMessageEvent(event) {
     // 先攔截內建命令（使用移除 mention 後的文字）
     if (isTodayLinkCommand(userText) && !/(提醒|排程|每天|每日|固定)/.test(userText)) {
       return await handleTodayLink(event);
+    }
+
+    if (shouldHandleWebpageSummary(userText)) {
+      return await handleWebpageSummary(event, userText);
     }
 
     // 沒命中才進 LLM
