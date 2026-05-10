@@ -44,7 +44,8 @@ export const env = {
 
   // ===== OpenAI =====
   OPENAI_API_KEY: required("OPENAI_API_KEY"),
-  OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5.5",
+  OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5-mini",
+  OPENAI_MAX_OUTPUT_TOKENS: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 300),
   OPENAI_SYSTEM_PROMPT:
     process.env.OPENAI_SYSTEM_PROMPT ||
      `

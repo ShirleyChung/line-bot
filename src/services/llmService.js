@@ -77,6 +77,7 @@ export async function askLlmWithTools(userText, context = {}) {
   }
   let response = await client.responses.create({
     model: env.OPENAI_MODEL,
+    max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
     instructions: instructions,
     input: userText,
     previous_response_id: savedState?.lastResponseId || undefined,
@@ -133,6 +134,7 @@ export async function askLlmWithTools(userText, context = {}) {
     // 把工具執行結果再送回模型，讓模型產生下一步或最終回答
     response = await client.responses.create({
       model: env.OPENAI_MODEL,
+      max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
       previous_response_id: response.id,
       input: toolOutputs,
       tools: botTools,

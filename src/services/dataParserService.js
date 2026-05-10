@@ -12,6 +12,7 @@ const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 export async function parseOCRToJSON(text) {
   const resp = await client.responses.create({
     model: env.OPENAI_MODEL,
+    max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
     input: `
 請從以下 OCR 文字中提取結構化資料，輸出 JSON：
 

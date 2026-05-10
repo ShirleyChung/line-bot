@@ -289,6 +289,7 @@ export async function summarizeUrlsFromText(userText = "") {
 
   const response = await client.responses.create({
     model: env.OPENAI_MODEL,
+    max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
     instructions: [
       "你是網頁內容摘要助手。請用繁體中文回覆。",
       "根據提供的網頁文字摘要，不要編造網頁文字中沒有的資訊。",
