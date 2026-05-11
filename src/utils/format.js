@@ -295,8 +295,12 @@ export function buildNewsMessage(news, query = "") {
 
     lines.push(`• ${item.title}`);
 
-    if (item.source || date) {
-      lines.push(`  ${item.source}${item.source && date ? "｜" : ""}${date}`);
+    const source = item.provider
+      ? `${item.source || "新聞來源"} / ${item.provider}`
+      : item.source;
+
+    if (source || date) {
+      lines.push(`  ${source}${source && date ? "｜" : ""}${date}`);
     }
 
     if (item.description) {

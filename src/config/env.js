@@ -19,8 +19,10 @@ export const env = {
   // ===== 天氣 =====
   CWA_API_KEY: required("CWA_API_KEY"),
   
-  // ===== NEWs =====
-  GNEWS_API_KEY: required("GNEWS_API_KEY"),
+  // ===== News =====
+  FREENEWS_API_KEY: process.env.FREENEWS_API_KEY || "",
+  GNEWS_API_KEY: process.env.GNEWS_API_KEY || "",
+  BRAVE_SEARCH_API_KEY: process.env.BRAVE_SEARCH_API_KEY || "",
 
   // ===== Finnhub (US Stock) =====
   FINNHUB_API_KEY: required("FINNHUB_API_KEY"),
