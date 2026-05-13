@@ -1,5 +1,5 @@
 # 先編譯 SorReqOrd CLI parser。GUI feature 不在 bot 服務中啟用。
-FROM rust:1.82-slim AS sorlogparser-builder
+FROM rust:1.86-slim AS sorlogparser-builder
 
 WORKDIR /build/sorlogparser_rust
 COPY sorlogparser_rust/Cargo.toml sorlogparser_rust/Cargo.lock ./
