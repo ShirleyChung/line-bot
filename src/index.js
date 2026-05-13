@@ -13,12 +13,25 @@ import express from "express";
 import { env } from "./config/env.js";
 import { line, lineConfig, lineClient } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
+import { getSorLogResultFile } from "./services/sorLogService.js";
 import { normalizeTelegramUpdate, sendTelegramText, verifyTelegramSecret } from "./platform/telegram.js";
 import { normalizeMetaWebhook, sendMetaText, verifyMetaWebhook } from "./platform/meta.js";
 import { getDueReminders, deleteReminder, rescheduleReminder } from "./services/reminderService.js";
 import { buildReminderMessage, getNextReminderTime } from "./services/reminderContentService.js";
 
 const app = express();
+app.set("trust proxy", true);
+
+function getRequestBaseUrl(req) {
+  const protocol = req.get("x-forwarded-proto") || req.protocol || "https";
+  const host = req.get("x-forwarded-host") || req.get("host");
+  return host ? `${protocol}://${host}` : "";
+}
+
+function attachRequestBaseUrl(events, req) {
+  const requestBaseUrl = getRequestBaseUrl(req);
+  return events.map((event) => ({ ...event, requestBaseUrl }));
+}
 
 /**
  * 健康檢查
@@ -28,6 +41,20 @@ app.get("/", (req, res) => {
   res.status(200).send("ok");
 });
 
+app.get("/sor-log-results/:token", async (req, res) => {
+  try {
+    const result = await getSorLogResultFile(req.params.token);
+    if (!result) {
+      return res.status(404).send("result not found");
+    }
+
+    return res.download(result.filePath, result.fileName);
+  } catch (error) {
+    console.error("download sor log result error:", error);
+    return res.status(500).send("download failed");
+  }
+});
+
 /**
  * LINE webhook 入口
  * 這裡使用 LINE SDK middleware 驗證簽章。
@@ -35,7 +62,7 @@ app.get("/", (req, res) => {
  */
 app.post("/webhook", line.middleware(lineConfig), async (req, res) => {
   try {
-    const events = req.body.events || [];
+    const events = attachRequestBaseUrl(req.body.events || [], req);
 
     // 平行處理同一批事件
     await Promise.all(events.map(routeMessageEvent));
@@ -58,7 +85,7 @@ app.post("/telegram/webhook", express.json(), async (req, res) => {
   }
 
   try {
-    const events = normalizeTelegramUpdate(req.body);
+    const events = attachRequestBaseUrl(normalizeTelegramUpdate(req.body), req);
     await Promise.all(events.map(routeMessageEvent));
 
     res.status(200).send("ok");
@@ -75,7 +102,7 @@ app.get("/facebook/webhook", verifyMetaWebhook);
 
 app.post("/facebook/webhook", express.json(), async (req, res) => {
   try {
-    const events = normalizeMetaWebhook(req.body, "facebook");
+    const events = attachRequestBaseUrl(normalizeMetaWebhook(req.body, "facebook"), req);
     await Promise.all(events.map(routeMessageEvent));
 
     res.status(200).send("EVENT_RECEIVED");
@@ -92,7 +119,7 @@ app.get("/instagram/webhook", verifyMetaWebhook);
 
 app.post("/instagram/webhook", express.json(), async (req, res) => {
   try {
-    const events = normalizeMetaWebhook(req.body, "instagram");
+    const events = attachRequestBaseUrl(normalizeMetaWebhook(req.body, "instagram"), req);
     await Promise.all(events.map(routeMessageEvent));
 
     res.status(200).send("EVENT_RECEIVED");

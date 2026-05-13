@@ -116,7 +116,9 @@ export async function routeMessageEvent(event) {
 
     const sorLogQuery = parseSorLogQuery(userText);
     if (sorLogQuery) {
-      const text = await runSorLogQuery(sessionKey, sorLogQuery);
+      const text = await runSorLogQuery(sessionKey, sorLogQuery, {
+        baseUrl: event.requestBaseUrl,
+      });
       return await replyText(event, text);
     }
 

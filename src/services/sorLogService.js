@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile);
 const COLLECTION = "session_state";
 const MAX_LOG_BYTES = Number(process.env.SOR_LOG_MAX_BYTES || 50 * 1024 * 1024);
 const PARSER_TIMEOUT_MS = Number(process.env.SOR_LOG_PARSER_TIMEOUT_MS || 30_000);
-const RESPONSE_LIMIT = 4_700;
+const RESULT_DIR = path.join(os.tmpdir(), "line-bot-sorlogs", "results");
 
 const FIELD_TABLES = {
   SorRID: ["TwfNew", "TwfChg", "FrfNew", "FrfChg", "TwsNew", "TwsChg"],
@@ -170,14 +170,63 @@ export function parseSorLogQuery(text) {
 
 function formatParserOutput(output, conditionDescription) {
   const body = output.trim() || "parser 沒有輸出結果。";
-  const text = `查詢條件：${conditionDescription}\n\n${body}`;
-
-  if (text.length <= RESPONSE_LIMIT) return text;
-
-  return `${text.slice(0, RESPONSE_LIMIT)}\n\n...結果過長，已截斷。請改用更精確的條件查詢。`;
+  return `查詢條件：${conditionDescription}\n\n${body}\n`;
 }
 
-export async function runSorLogQuery(sessionKey, query) {
+function getResultBaseUrl(baseUrl) {
+  return String(baseUrl || process.env.PUBLIC_BASE_URL || process.env.SERVICE_BASE_URL || "").replace(/\/+$/, "");
+}
+
+function getResultFileName(conditionDescription) {
+  const condition = sanitizeFileName(conditionDescription).slice(0, 80) || "query";
+  return `sor_logparser_${condition}_${Date.now()}.txt`;
+}
+
+async function saveParserOutputFile(output, conditionDescription) {
+  await fsp.mkdir(RESULT_DIR, { recursive: true });
+
+  const token = crypto.randomBytes(24).toString("hex");
+  const downloadName = getResultFileName(conditionDescription);
+  const storedName = `${token}-${downloadName}`;
+  const filePath = path.join(RESULT_DIR, storedName);
+
+  await fsp.writeFile(filePath, output, "utf8");
+
+  return {
+    token,
+    filePath,
+    fileName: downloadName,
+    sizeBytes: Buffer.byteLength(output, "utf8"),
+  };
+}
+
+export async function getSorLogResultFile(token) {
+  const safeToken = String(token || "");
+  if (!/^[a-f0-9]{48}$/.test(safeToken)) return null;
+
+  let entries;
+  try {
+    entries = await fsp.readdir(RESULT_DIR);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+
+  const entry = entries.find((name) => name.startsWith(`${safeToken}-`));
+  if (!entry) return null;
+
+  const filePath = path.join(RESULT_DIR, entry);
+  const fileName = entry.slice(safeToken.length + 1);
+
+  try {
+    await fsp.access(filePath, fs.constants.R_OK);
+    return { filePath, fileName };
+  } catch {
+    return null;
+  }
+}
+
+export async function runSorLogQuery(sessionKey, query, options = {}) {
   const sorLog = await getLatestSorLog(sessionKey);
   if (!sorLog) {
     return "請先上傳 SorReqOrd.log，再輸入查詢條件，例如：SorRID 000001 或 TwfOrd:OrdNo 12345。";
@@ -197,7 +246,16 @@ export async function runSorLogQuery(sessionKey, query) {
       windowsHide: true,
     });
 
-    return formatParserOutput([stdout, stderr].filter(Boolean).join("\n"), query.description);
+    const output = formatParserOutput([stdout, stderr].filter(Boolean).join("\n"), query.description);
+    const result = await saveParserOutputFile(output, query.description);
+    const baseUrl = getResultBaseUrl(options.baseUrl);
+
+    if (!baseUrl) {
+      return `查詢完成，結果已存成檔案：${result.fileName}\n但目前缺少 PUBLIC_BASE_URL 或 request base URL，無法產生下載連結。`;
+    }
+
+    const downloadUrl = `${baseUrl}/sor-log-results/${result.token}`;
+    return `查詢完成，結果已存成檔案：${result.fileName}\n下載連結：${downloadUrl}`;
   } catch (error) {
     const detail = [error.stdout, error.stderr, error.message].filter(Boolean).join("\n").trim();
     console.error("sor_logparser failed:", { parserPath, args, detail });
