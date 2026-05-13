@@ -1,0 +1,3 @@
+[submodule "sorlogparser_rust"]
+	path = sorlogparser_rust
+	url = https://github.com/ShirleyChung/sorlogparser_rust.git

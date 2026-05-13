@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log
+.git
+**/.git
+.gitignore
+.DS_Store
+**/.DS_Store
+sorlogparser_rust/target

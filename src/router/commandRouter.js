@@ -28,6 +28,12 @@ import {
   getImageIds,
 } from "../services/sessionStateService.js";
 import { handleWeatherMessage } from "../handlers/weatherHandler.js";
+import {
+  isSorLogFileEvent,
+  parseSorLogQuery,
+  runSorLogQuery,
+  saveSorLogFile,
+} from "../services/sorLogService.js";
 
 /**
  * 路由 webhook event
@@ -40,6 +46,19 @@ export async function routeMessageEvent(event) {
   // 收到圖片時，先把這張圖片加入當日批次記錄
   if (event.type === "message" && event.message?.type === "image") {
     await addImageId(sessionKey, event.message.id);
+  }
+  // 收到 LINE 檔案時，如果是使用者上傳的 SorReqOrd.log，先保存供後續查詢使用。
+  if (isSorLogFileEvent(event)) {
+    try {
+      const savedLog = await saveSorLogFile(event, sessionKey);
+      return await replyText(
+        event,
+        `已收到 ${savedLog.fileName}。\n可以輸入查詢條件，例如：SorRID 000001 或 TwfOrd:OrdNo 12345。`
+      );
+    } catch (error) {
+      console.error("saveSorLogFile error:", error);
+      return await replyText(event, `儲存 SorReqOrd.log 失敗：${error.message}`);
+    }
   }
   // 只處理文字訊息
   if (event.type !== "message" || event.message?.type !== "text") {
@@ -93,6 +112,12 @@ export async function routeMessageEvent(event) {
 
     if (shouldHandleWebpageSummary(userText)) {
       return await handleWebpageSummary(event, userText);
+    }
+
+    const sorLogQuery = parseSorLogQuery(userText);
+    if (sorLogQuery) {
+      const text = await runSorLogQuery(sessionKey, sorLogQuery);
+      return await replyText(event, text);
     }
 
     // 沒命中才進 LLM

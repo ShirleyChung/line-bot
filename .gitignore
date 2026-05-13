@@ -3,6 +3,7 @@ node_modules/
 .env.*
 *.log
 .DS_Store
+sorlogparser_rust/target/
 r
 data
 package-lock.json
