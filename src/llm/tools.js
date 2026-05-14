@@ -63,7 +63,7 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、自選股股價、今日連結。",
+    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、自選股股價、今日連結、arXiv 最新論文摘要。",
     parameters: {
       type: "object",
       properties: {
@@ -86,8 +86,8 @@ export const botTools = [
         },
         reminderType: {
           type: "string",
-          enum: ["generic", "weather", "stock", "watch_prices", "today_link"],
-          description: "提醒內容類型。天氣用 weather；單一股票用 stock；使用者自選股用 watch_prices；每日課程連結用 today_link；一般文字用 generic。",
+          enum: ["generic", "weather", "stock", "watch_prices", "today_link", "arxiv_papers"],
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；一般文字用 generic。",
         },
         city: {
           type: "string",
@@ -102,8 +102,12 @@ export const botTools = [
           enum: ["now", "tomorrow", ""],
           description: "天氣查詢時段。通常每日早上提醒用 now；非天氣提醒填空字串。",
         },
+        paperCount: {
+          type: "number",
+          description: "arXiv 論文摘要要挑選的篇數，建議 5 到 8；非論文提醒填 0。",
+        },
       },
-      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "weatherTarget"],
+      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "weatherTarget", "paperCount"],
       additionalProperties: false,
     },
     strict: true,
@@ -238,6 +242,23 @@ export const botTools = [
       properties: {},
       additionalProperties: false
     }
+  },
+  {
+    type: "function",
+    name: "get_latest_arxiv_papers",
+    description: "抓取最新計算機科學與工程相關 arXiv 論文，篩選最值得看的 5 到 8 篇，並產生繁體中文短摘要。",
+    parameters: {
+      type: "object",
+      properties: {
+        max: {
+          type: "number",
+          description: "要挑選幾篇論文，範圍 5 到 8；未指定時填 6。",
+        },
+      },
+      required: ["max"],
+      additionalProperties: false,
+    },
+    strict: true,
   },
   {
   type: "function",

@@ -68,6 +68,7 @@ export const env = {
 如果使用者要排程單一股票股價，reminderType 填 stock，symbol 填股票代碼。
 如果使用者要排程自選股股價，reminderType 填 watch_prices。
 如果使用者要排程今日連結或每日連結，reminderType 填 today_link。
+如果使用者要排程最新計算機科學、工程、arXiv、論文摘要，reminderType 填 arxiv_papers，paperCount 通常填 6；若使用者指定 5～8 篇則依指定數量。
 範例：
 "明天6點" → 2026-05-01T06:00:00+08:00
 
@@ -88,5 +89,8 @@ export const env = {
   8. 股價資訊只作資訊整理，不提供買賣建議。
   9. 若使用者要求投資建議，請提醒這不是投資建議，可以協助整理資料與風險。
   10. 美股代碼通常是英文字母（例如 NVDA、QCOM、AAPL），台股代碼通常是數字（例如 2330、2454）。
+
+4.當使用者詢問「最新論文」「arXiv 論文」「計算機科學論文」「工程相關論文摘要」，
+請呼叫 get_latest_arxiv_papers。若使用者指定篇數，限制在 5 到 8 篇；未指定時用 6 篇。
 `
 };

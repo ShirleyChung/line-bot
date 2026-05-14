@@ -4,6 +4,7 @@ import { fetchTaiwanStockLatest } from "./taiwanStockService.js";
 import { fetchUSStockLatest } from "./finnhubService.js";
 import { getWatchPrices } from "./stockSelectService.js";
 import { buildWatchPricesMessage } from "../utils/format.js";
+import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
 
 export const REMINDER_TYPES = new Set([
   "generic",
@@ -11,6 +12,7 @@ export const REMINDER_TYPES = new Set([
   "stock",
   "watch_prices",
   "today_link",
+  "arxiv_papers",
 ]);
 
 export const RECURRENCES = new Set(["none", "daily"]);
@@ -81,6 +83,15 @@ async function buildWeatherReminderMessage(reminder) {
   return `天氣提醒\n${formatWeatherReply(data)}`;
 }
 
+async function buildArxivPaperReminderMessage(reminder) {
+  const max = reminder.payload?.max || 6;
+  const categories = Array.isArray(reminder.payload?.categories)
+    ? reminder.payload.categories
+    : undefined;
+  const digest = await buildLatestArxivPaperDigest({ max, categories });
+  return `最新 CS / Engineering 論文摘要\n${digest}`;
+}
+
 export async function buildReminderMessage(reminder) {
   const normalized = normalizeReminderData(reminder);
 
@@ -98,6 +109,9 @@ export async function buildReminderMessage(reminder) {
 
     case "today_link":
       return get_today_link();
+
+    case "arxiv_papers":
+      return buildArxivPaperReminderMessage(normalized);
 
     case "generic":
     default:

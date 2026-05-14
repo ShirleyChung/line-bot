@@ -20,6 +20,7 @@ import { fetchTaiwanStockLatest } from "../services/taiwanStockService.js";
 import { fetchUSStockLatest } from "../services/finnhubService.js";
 import { buildWatchPricesMessage } from "../utils/format.js";
 import { fetchNews } from "../services/newsService.js";
+import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
 import { buildNewsMessage } from "../utils/format.js";
 import {
   formatWeatherReply,
@@ -165,7 +166,8 @@ export async function executeTool(name, args = {}, context = {}) {
         args.symbol ||
         (reminderType === "weather" && args.city ? `${args.city}天氣` : "") ||
         (reminderType === "watch_prices" ? "自選股股價" : "") ||
-        (reminderType === "today_link" ? "今日連結" : "");
+        (reminderType === "today_link" ? "今日連結" : "") ||
+        (reminderType === "arxiv_papers" ? "最新 arXiv 論文摘要" : "");
 
       if (!derivedTarget || !derivedAction || !args.time) {
         throw new Error("create_reminder 缺少必要參數");
@@ -187,6 +189,9 @@ export async function executeTool(name, args = {}, context = {}) {
       if (args.city) payload.city = args.city;
       if (args.symbol) payload.symbol = args.symbol;
       if (args.weatherTarget) payload.target = args.weatherTarget;
+      if (reminderType === "arxiv_papers") {
+        payload.max = Math.min(Math.max(Number(args.paperCount) || 6, 5), 8);
+      }
 
       const reminderData = normalizeReminderData({
         owner,
@@ -430,6 +435,20 @@ export async function executeTool(name, args = {}, context = {}) {
         text,
       };
     }
+
+    case "get_latest_arxiv_papers": {
+      const text = await buildLatestArxivPaperDigest({
+        max: args.max || 6,
+      });
+
+      return {
+        ok: true,
+        tool: name,
+        type: "text",
+        text,
+      };
+    }
+
     case "searchNews": {
       const query = args.query;
       const news = await fetchNews({
