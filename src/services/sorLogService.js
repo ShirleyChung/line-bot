@@ -50,7 +50,11 @@ function getStateDoc(sessionKey) {
 }
 
 export function isSorLogFileEvent(event) {
-  return event?.type === "message" && event.message?.type === "file";
+  return (
+    event?.type === "message" &&
+    event.message?.type === "file" &&
+    String(event.message?.fileName || "").includes("SorReqOrd")
+  );
 }
 
 export async function saveSorLogFile(event, sessionKey) {
@@ -59,6 +63,10 @@ export async function saveSorLogFile(event, sessionKey) {
   }
 
   const fileName = sanitizeFileName(event.message.fileName);
+  if (!fileName.includes("SorReqOrd")) {
+    return null;
+  }
+
   const dir = path.join(os.tmpdir(), "line-bot-sorlogs", sessionDigest(sessionKey));
   const filePath = path.join(dir, `${Date.now()}-${event.message.id}-${fileName}`);
 

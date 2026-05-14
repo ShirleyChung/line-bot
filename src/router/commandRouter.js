@@ -51,6 +51,8 @@ export async function routeMessageEvent(event) {
   if (isSorLogFileEvent(event)) {
     try {
       const savedLog = await saveSorLogFile(event, sessionKey);
+      if (!savedLog) return null;
+
       return await replyText(
         event,
         `已收到 ${savedLog.fileName}。\n可以輸入查詢條件，例如：SorRID 000001 或 TwfOrd:OrdNo 12345。`
