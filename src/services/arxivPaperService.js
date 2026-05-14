@@ -18,6 +18,8 @@ const DEFAULT_CATEGORIES = [
   "eess.SY",
 ];
 const CACHE_TTL_MS = 30 * 60 * 1000;
+const MIN_DIGEST_OUTPUT_TOKENS = 3000;
+const RETRY_DIGEST_OUTPUT_TOKENS = 4500;
 const arxivCache = new Map();
 
 const openai = new OpenAI({
@@ -134,6 +136,54 @@ function buildPaperContext(papers) {
     .join("\n\n");
 }
 
+function digestTokenBudget(minimum = MIN_DIGEST_OUTPUT_TOKENS) {
+  return Math.max(Number(env.OPENAI_MAX_OUTPUT_TOKENS) || 0, minimum);
+}
+
+function extractResponseText(response) {
+  const outputText = response?.output_text?.trim();
+  if (outputText) return outputText;
+
+  const textParts = (response?.output || [])
+    .flatMap((item) => item.content || [])
+    .map((content) => content.text || "")
+    .filter(Boolean);
+
+  return textParts.join("\n").trim();
+}
+
+function buildFallbackDigest(papers, max) {
+  return papers
+    .slice(0, max)
+    .map((paper, index) => {
+      const summary = compactText(paper.abstract, 130);
+      return `${index + 1}. ${paper.title}；${summary}；${paper.url}`;
+    })
+    .concat("資料來源：arXiv，依 submittedDate 排序。")
+    .join("\n");
+}
+
+async function createDigestResponse({ papers, normalizedMax, maxOutputTokens }) {
+  return openai.responses.create({
+    model: env.OPENAI_MODEL,
+    max_output_tokens: maxOutputTokens,
+    instructions: [
+      "你是嚴謹的計算機科學研究助理。",
+      "請從候選 arXiv 論文中挑出最值得看的 5 到 8 篇。",
+      "偏好：新穎方法、強實驗、實用系統、重要基準、工程落地價值、AI/ML/系統/軟體工程/安全/人機互動相關性。",
+      "只能根據標題與 abstract 判斷，不要編造 abstract 沒有提到的貢獻。",
+      "請用繁體中文輸出，極簡短。",
+      "每篇格式：序號. 原標題；一句中文重點摘要；arXiv 連結。",
+      "最後加一行：資料來源：arXiv，依 submittedDate 排序。",
+    ].join("\n"),
+    input: [
+      `請挑選 ${normalizedMax} 篇。今天要整理的是最新計算機科學與工程相關論文。`,
+      "候選論文如下：",
+      buildPaperContext(papers),
+    ].join("\n\n"),
+  });
+}
+
 export async function buildLatestArxivPaperDigest({
   max = 6,
   categories,
@@ -160,27 +210,35 @@ export async function buildLatestArxivPaperDigest({
     return "arXiv 目前沒有抓到新的計算機科學與工程相關論文。";
   }
 
-  const response = await openai.responses.create({
-    model: env.OPENAI_MODEL,
-    max_output_tokens: Math.min(env.OPENAI_MAX_OUTPUT_TOKENS, 1200),
-    instructions: [
-      "你是嚴謹的計算機科學研究助理。",
-      "請從候選 arXiv 論文中挑出最值得看的 5 到 8 篇。",
-      "偏好：新穎方法、強實驗、實用系統、重要基準、工程落地價值、AI/ML/系統/軟體工程/安全/人機互動相關性。",
-      "只能根據標題與 abstract 判斷，不要編造 abstract 沒有提到的貢獻。",
-      "請用繁體中文輸出，極簡短。",
-      "每篇格式：序號. 原標題；一句中文重點摘要；arXiv 連結。",
-      "最後加一行：資料來源：arXiv，依 submittedDate 排序。",
-    ].join("\n"),
-    input: [
-      `請挑選 ${normalizedMax} 篇。今天要整理的是最新計算機科學與工程相關論文。`,
-      "候選論文如下：",
-      buildPaperContext(papers),
-    ].join("\n\n"),
+  let response = await createDigestResponse({
+    papers,
+    normalizedMax,
+    maxOutputTokens: digestTokenBudget(),
   });
+  let text = extractResponseText(response);
 
-  const text = response.output_text?.trim();
-  const result = text || "arXiv 論文摘要產生失敗，請稍後再試。";
+  if (!text && response?.status === "incomplete") {
+    console.warn("[arxivPaperService] OpenAI response incomplete, retrying", {
+      status: response.status,
+      incompleteDetails: response.incomplete_details,
+      maxOutputTokens: digestTokenBudget(RETRY_DIGEST_OUTPUT_TOKENS),
+    });
+    response = await createDigestResponse({
+      papers,
+      normalizedMax,
+      maxOutputTokens: digestTokenBudget(RETRY_DIGEST_OUTPUT_TOKENS),
+    });
+    text = extractResponseText(response);
+  }
+
+  if (!text) {
+    console.warn("[arxivPaperService] OpenAI returned empty digest, using fallback", {
+      status: response?.status,
+      incompleteDetails: response?.incomplete_details,
+    });
+  }
+
+  const result = text || buildFallbackDigest(papers, normalizedMax);
   setCached(key, result);
 
   return result;
