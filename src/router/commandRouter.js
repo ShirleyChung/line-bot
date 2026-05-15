@@ -28,6 +28,7 @@ import {
   getImageIds,
 } from "../services/sessionStateService.js";
 import { handleWeatherMessage } from "../handlers/weatherHandler.js";
+import { handleParkingMessage } from "../handlers/parkingHandler.js";
 import {
   isSorLogFileEvent,
   parseSorLogQuery,
@@ -111,6 +112,9 @@ export async function routeMessageEvent(event) {
     if (isTodayLinkCommand(userText) && !/(提醒|排程|每天|每日|固定)/.test(userText)) {
       return await handleTodayLink(event);
     }
+
+    const handledByParking = await handleParkingMessage(event, userText || rawText);
+    if (handledByParking) return;
 
     if (shouldHandleWebpageSummary(userText)) {
       return await handleWebpageSummary(event, userText);

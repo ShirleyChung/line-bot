@@ -117,6 +117,12 @@ export async function askLlmWithTools(userText, context = {}) {
         text: result.text,
       };
     }
+    if (call.name === "find_nearby_parking" && result?.replyText) {
+      return {
+        type: "text",
+        text: result.replyText,
+      };
+    }
     toolOutputs.push({
         type: "function_call_output",
         call_id: call.call_id,

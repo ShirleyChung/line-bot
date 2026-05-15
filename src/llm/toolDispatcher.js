@@ -27,6 +27,7 @@ import {
   getWeatherForUser,
   setDefaultWeatherCity,
 } from '../services/weatherService.js';
+import { findNearbyParking, formatDistance } from "../services/placesService.js";
 
 function detectMarket(symbol) {
   const code = String(symbol).trim().toUpperCase();
@@ -94,6 +95,38 @@ function rowsToCSV(fields, rows) {
     .join("\n");
 
   return `${header}\n${body}`;
+}
+
+function formatParkingToolReply(locationQuery, result) {
+  if (!result.ok) return result.message;
+
+  if (!result.parkingLots.length) {
+    return `「${locationQuery}」附近 ${result.radiusMeters} 公尺內查不到停車場。`;
+  }
+
+  const lines = [
+    `「${locationQuery}」附近停車場：`,
+    `定位：${result.origin.name}`,
+    "",
+  ];
+
+  for (const [index, place] of result.parkingLots.entries()) {
+    lines.push(
+      `${index + 1}. ${place.name}`,
+      `地址：${place.address}`,
+      `距離：約 ${formatDistance(place.distanceMeters)}`
+    );
+
+    if (place.googleMapsUri) {
+      lines.push(`地圖：${place.googleMapsUri}`);
+    }
+
+    if (index !== result.parkingLots.length - 1) {
+      lines.push("");
+    }
+  }
+
+  return lines.join("\n");
 }
 
 /**
@@ -446,6 +479,29 @@ export async function executeTool(name, args = {}, context = {}) {
         tool: name,
         type: "text",
         text,
+      };
+    }
+
+    case "find_nearby_parking": {
+      const locationQuery = String(args.locationQuery || "").trim();
+
+      if (!locationQuery) {
+        throw new Error("find_nearby_parking 缺少地點 locationQuery");
+      }
+
+      const result = await findNearbyParking(locationQuery, {
+        radiusMeters: Number(args.radiusMeters) || 1000,
+        limit: Number(args.limit) || 5,
+      });
+
+      return {
+        ok: result.ok,
+        tool: name,
+        locationQuery,
+        radiusMeters: result.radiusMeters,
+        origin: result.origin,
+        parkingLots: result.parkingLots,
+        replyText: formatParkingToolReply(locationQuery, result),
       };
     }
 

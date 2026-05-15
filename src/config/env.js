@@ -44,6 +44,9 @@ export const env = {
   START_COLUMN: Number(process.env.START_COLUMN || 6),
   PUBLISHED_SHEET_CSV_URL: required("PUBLISHED_SHEET_CSV_URL"),
 
+  // ===== Google Maps / Places =====
+  GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || "",
+
   // ===== OpenAI =====
   OPENAI_API_KEY: required("OPENAI_API_KEY"),
   OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5-mini",
@@ -92,5 +95,8 @@ export const env = {
 
 4.當使用者詢問「最新論文」「arXiv 論文」「計算機科學論文」「工程相關論文摘要」，
 請呼叫 get_latest_arxiv_papers。若使用者指定篇數，限制在 5 到 8 篇；未指定時用 6 篇。
+
+5.當使用者詢問某地點附近是否有停車場、好不好停車、附近哪裡可以停車時，
+請呼叫 find_nearby_parking。locationQuery 填使用者提到的地點名稱或地址；radiusMeters 通常填 1000；limit 通常填 5。
 `
 };

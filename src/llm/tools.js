@@ -261,6 +261,31 @@ export const botTools = [
     strict: true,
   },
   {
+    type: "function",
+    name: "find_nearby_parking",
+    description: "查詢某個地點附近的停車場，回傳停車場名稱、地址、距離與 Google Maps 連結。適合回答「某地附近是否有停車場」「好不好停車」「附近哪裡可以停車」。",
+    parameters: {
+      type: "object",
+      properties: {
+        locationQuery: {
+          type: "string",
+          description: "要查詢的地點名稱或地址，例如：台北101、信義威秀、台中火車站。",
+        },
+        radiusMeters: {
+          type: "number",
+          description: "查詢半徑，單位公尺。一般附近停車場填 1000。",
+        },
+        limit: {
+          type: "number",
+          description: "最多回傳幾個停車場。一般填 5。",
+        },
+      },
+      required: ["locationQuery", "radiusMeters", "limit"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
   type: "function",
     name: "get_stock_price",
     description: "查詢單一股票的最近收盤或即時資訊，並附基本資料（EPS、殖利率、本益比等），不需要加入自選股。支援台股股票/ETF（例如 2330、2454、00981A）與美股（例如 NVDA、QCOM、AAPL）。",
