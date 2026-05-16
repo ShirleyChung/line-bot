@@ -22,12 +22,23 @@ import { buildReminderMessage, getNextReminderTime } from "./services/reminderCo
 const app = express();
 app.set("trust proxy", true);
 
+/**
+ * 取得請求的基礎 URL
+ * @param {object} req - Express request 物件
+ * @returns {string} 基礎 URL，例如 https://example.com
+ */
 function getRequestBaseUrl(req) {
   const protocol = req.get("x-forwarded-proto") || req.protocol || "https";
   const host = req.get("x-forwarded-host") || req.get("host");
   return host ? `${protocol}://${host}` : "";
 }
 
+/**
+ * 為每個 event 附加請求基礎 URL
+ * @param {Array} events - webhook events 陣列
+ * @param {object} req - Express request 物件
+ * @returns {Array} 附加了 requestBaseUrl 的 events
+ */
 function attachRequestBaseUrl(events, req) {
   const requestBaseUrl = getRequestBaseUrl(req);
   return events.map((event) => ({ ...event, requestBaseUrl }));
@@ -132,21 +143,43 @@ app.post("/instagram/webhook", express.json(), async (req, res) => {
 /**
  * 提醒功能
  */
+/**
+ * 將 owner 字串轉換為 LINE target ID
+ * @param {string} owner - owner 字串，例如 user:Uxxxx
+ * @returns {string} LINE target ID
+ */
 function toLineTargetId(owner) {
   if (!owner) return "";
   return owner.replace(/^user:/, "").replace(/^group:/, "").replace(/^room:/, "");
 }
 
+/**
+ * 將 owner 字串轉換為 Telegram chat ID
+ * @param {string} owner - owner 字串，例如 telegram:user:telegram:123456
+ * @returns {string} Telegram chat ID
+ */
 function toTelegramChatId(owner) {
   if (!owner) return "";
   return owner.replace(/^telegram:user:telegram:/, "");
 }
 
+/**
+ * 將 owner 字串轉換為 Meta 平台（Facebook/Instagram）的 recipient ID
+ * @param {string} owner - owner 字串
+ * @param {string} platform - 平台名稱，facebook 或 instagram
+ * @returns {string} Meta recipient ID
+ */
 function toMetaRecipientId(owner, platform) {
   if (!owner) return "";
   return owner.replace(new RegExp(`^${platform}:user:${platform}:`), "");
 }
 
+/**
+ * 根據 owner 推送提醒訊息到對應平台
+ * @param {string} owner - owner 字串，包含平台與 ID 資訊
+ * @param {string} text - 要推送的訊息內容
+ * @returns {Promise<object>} 推送結果，包含 platform 和 targetId
+ */
 async function pushReminder(owner, text) {
   if (owner?.startsWith("telegram:user:telegram:")) {
     const chatId = toTelegramChatId(owner);

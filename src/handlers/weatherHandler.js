@@ -10,6 +10,11 @@ import {
   formatWeatherReply,
 } from "../services/weatherService.js";
 
+/**
+ * 處理天氣相關訊息
+ * @param {object} event - webhook event
+ * @returns {Promise<boolean>} 是否處理成功
+ */
 export async function handleWeatherMessage(event) {
   if (event.type !== "message") return false;
   if (event.message?.type !== "text") return false;

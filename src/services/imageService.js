@@ -3,6 +3,8 @@ import { lineBlobClient } from "../line/client.js";
 /**
  * 從 LINE messageId 下載使用者上傳的圖片內容。
  * LINE SDK 回傳的是 stream，這裡統一轉成 Buffer 給 OCR service 使用。
+ * @param {string} messageId - LINE message ID
+ * @returns {Promise<Buffer>} 圖片內容的 Buffer
  */
 export async function fetchImageBuffer(messageId) {
   const stream = await lineBlobClient.getMessageContent(messageId);

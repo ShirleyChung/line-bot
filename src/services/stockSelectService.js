@@ -6,6 +6,8 @@ import { fetchUSStockLatest } from "./finnhubService.js";
  * 簡化版市場判斷：
  * - 純英文字母通常視為美股代碼
  * - 其他格式預設走台股查詢
+ * @param {string} symbol - 股票代碼
+ * @returns {string} 市場代碼 "US" 或 "TW"
  */
 function detectMarket(symbol) {
   const code = String(symbol).trim().toUpperCase();
@@ -15,6 +17,11 @@ function detectMarket(symbol) {
   return "TW";
 }
 
+/**
+ * 正規化股票代碼，移除 .TW 與 .TWO 後綴
+ * @param {string} symbol - 股票代碼
+ * @returns {string} 正規化後的代碼
+ */
 function normalizeSymbol(symbol) {
   // 使用者可能輸入 2330.TW / 2330.TWO，儲存時統一只保留股票代碼。
   return String(symbol).trim().toUpperCase().replace(".TW", "").replace(".TWO", "");
@@ -23,6 +30,9 @@ function normalizeSymbol(symbol) {
 /**
  * 將股票加入使用者自選股。
  * 使用 Firestore subcollection 讓每個使用者的 watchlist 可以獨立查詢與排序。
+ * @param {string} lineUserId - LINE 使用者 ID
+ * @param {string} symbol - 股票代碼
+ * @returns {Promise<object>} 操作結果
  */
 export async function addWatchStock(lineUserId, symbol) {
   const code = normalizeSymbol(symbol);
@@ -73,6 +83,12 @@ export async function addWatchStock(lineUserId, symbol) {
   };
 }
 
+/**
+ * 從使用者自選股移除指定股票
+ * @param {string} lineUserId - LINE 使用者 ID
+ * @param {string} symbol - 股票代碼
+ * @returns {Promise<object>} 操作結果
+ */
 export async function removeWatchStock(lineUserId, symbol) {
   const code = normalizeSymbol(symbol);
 
@@ -99,6 +115,11 @@ export async function removeWatchStock(lineUserId, symbol) {
   };
 }
 
+/**
+ * 列出使用者的所有自選股
+ * @param {string} lineUserId - LINE 使用者 ID
+ * @returns {Promise<object>} 包含股票清單的結果物件
+ */
 export async function listWatchStocks(lineUserId) {
   const snap = await db
     .collection("users")
@@ -124,6 +145,11 @@ export async function listWatchStocks(lineUserId) {
   };
 }
 
+/**
+ * 取得使用者自選股的股價與基本資料
+ * @param {string} lineUserId - LINE 使用者 ID
+ * @returns {Promise<object>} 包含股價資訊的結果物件
+ */
 export async function getWatchPrices(lineUserId) {
   const list = await listWatchStocks(lineUserId);
 

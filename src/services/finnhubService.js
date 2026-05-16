@@ -9,6 +9,7 @@ const FINNHUB_CACHE_TTL_MS = 60 * 1000;
 /**
  * Finnhub 查詢集中放在這個 service：
  * 報價、公司名稱與基本面資料分開抓，最後再組成 bot 需要的統一價格格式。
+ * @returns {string} Finnhub API key
  */
 function getFinnhubApiKey() {
   const apiKey = env.FINNHUB_API_KEY;
@@ -20,10 +21,21 @@ function getFinnhubApiKey() {
   return apiKey;
 }
 
+/**
+ * 正規化美股代碼
+ * @param {string} symbol - 股票代碼
+ * @returns {string} 正規化後的代碼
+ */
 function normalizeUsSymbol(symbol) {
   return String(symbol || "").trim().toUpperCase();
 }
 
+/**
+ * 呼叫 Finnhub API
+ * @param {string} path - API 路徑
+ * @param {object} params - 查詢參數
+ * @returns {Promise<object>} API 回應
+ */
 async function fetchFinnhubJson(path, params = {}) {
   const apiKey = getFinnhubApiKey();
 
@@ -58,6 +70,12 @@ async function fetchFinnhubJson(path, params = {}) {
   }
 }
 
+/**
+ * 帶快取的 Finnhub 查詢
+ * @param {string} cacheKey - 快取鍵值
+ * @param {Function} fetcher - 資料擷取函式
+ * @returns {Promise<object>} API 回應
+ */
 async function fetchFinnhubCached(cacheKey, fetcher) {
   const now = Date.now();
 
@@ -76,6 +94,11 @@ async function fetchFinnhubCached(cacheKey, fetcher) {
   return data;
 }
 
+/**
+ * 查詢美股即時報價
+ * @param {string} symbol - 股票代碼
+ * @returns {Promise<object>} 報價資料
+ */
 export async function fetchFinnhubQuote(symbol) {
   const code = normalizeUsSymbol(symbol);
 
@@ -86,6 +109,11 @@ export async function fetchFinnhubQuote(symbol) {
   );
 }
 
+/**
+ * 查詢公司基本資料
+ * @param {string} symbol - 股票代碼
+ * @returns {Promise<object>} 公司資料
+ */
 export async function fetchFinnhubProfile(symbol) {
   const code = normalizeUsSymbol(symbol);
 
@@ -96,6 +124,11 @@ export async function fetchFinnhubProfile(symbol) {
   );
 }
 
+/**
+ * 查詢財務指標
+ * @param {string} symbol - 股票代碼
+ * @returns {Promise<object>} 財務指標資料
+ */
 export async function fetchFinnhubMetric(symbol) {
   const code = normalizeUsSymbol(symbol);
 
@@ -107,6 +140,12 @@ export async function fetchFinnhubMetric(symbol) {
   );
 }
 
+/**
+ * 從多個鍵值中挑選第一個有限數值
+ * @param {object} source - 來源物件
+ * @param {Array<string>} keys - 鍵值陣列
+ * @returns {number|null} 數值或 null
+ */
 function pickFiniteNumber(source, keys) {
   for (const key of keys) {
     const value = source?.[key];
@@ -116,6 +155,11 @@ function pickFiniteNumber(source, keys) {
   return null;
 }
 
+/**
+ * 正規化 Finnhub 基本面資料
+ * @param {object} metricResponse - Finnhub metric API 回應
+ * @returns {object} 正規化後的基本面資料
+ */
 function normalizeFinnhubFundamentals(metricResponse) {
   const metric = metricResponse?.metric || {};
 
@@ -142,6 +186,11 @@ function normalizeFinnhubFundamentals(metricResponse) {
   };
 }
 
+/**
+ * 查詢美股最新價格與基本資料
+ * @param {string} symbol - 股票代碼
+ * @returns {Promise<object>} 包含報價與基本資料的物件
+ */
 export async function fetchUSStockLatest(symbol) {
   const code = normalizeUsSymbol(symbol);
 

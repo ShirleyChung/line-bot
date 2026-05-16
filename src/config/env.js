@@ -4,6 +4,11 @@
  * 比較容易維護，也方便之後做驗證。
  */
 
+/**
+ * 驗證並取得必要的環境變數，若未設定則拋出錯誤
+ * @param {string} name - 環境變數名稱
+ * @returns {string} 環境變數值
+ */
 function required(name) {
   const value = process.env[name];
   if (!value) {

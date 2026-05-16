@@ -15,6 +15,12 @@ const PLATFORM_CONFIG = {
   },
 };
 
+/**
+ * 驗證 Meta (Facebook/Instagram) webhook
+ * @param {object} req - Express request 物件
+ * @param {object} res - Express response 物件
+ * @returns {object} Express response
+ */
 export function verifyMetaWebhook(req, res) {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -30,6 +36,9 @@ export function verifyMetaWebhook(req, res) {
 /**
  * 將 Meta webhook payload 轉成內部共用 message event。
  * 目前只支援文字訊息，非文字訊息會保留成 unknown，交由 router 忽略。
+ * @param {object} body - Meta webhook payload
+ * @param {string} platform - 平台名稱 (facebook 或 instagram)
+ * @returns {Array} 標準化的 event 陣列
  */
 export function normalizeMetaWebhook(body, platform) {
   const config = PLATFORM_CONFIG[platform];
@@ -71,6 +80,13 @@ export function normalizeMetaWebhook(body, platform) {
   return events;
 }
 
+/**
+ * 傳送文字訊息到 Meta 平台（Facebook/Instagram）
+ * @param {string} platform - 平台名稱 (facebook 或 instagram)
+ * @param {string} recipientId - 接收者 ID
+ * @param {string} text - 訊息內容
+ * @returns {Promise<object>} Meta Graph API 回應
+ */
 export async function sendMetaText(platform, recipientId, text) {
   const config = PLATFORM_CONFIG[platform];
   const accessToken = env[config.tokenName];

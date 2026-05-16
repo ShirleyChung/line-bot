@@ -5,6 +5,8 @@ const COLLECTION = "session_state";
 /**
  * 圖片批次以台北日期為界線。
  * Cloud Run 的系統時區不一定是 Asia/Taipei，因此這裡明確指定時區。
+ * @param {Date} date - 日期物件，預設為目前時間
+ * @returns {string} 日期字串，格式 YYYY-MM-DD
  */
 function getTaipeiDateKey(date = new Date()) {
   return new Intl.DateTimeFormat("sv-SE", {
@@ -15,6 +17,11 @@ function getTaipeiDateKey(date = new Date()) {
   }).format(date);
 }
 
+/**
+ * 從儲存的資料中取得圖片 ID 陣列
+ * @param {object} data - Firestore 文件資料
+ * @returns {Array<string>} 圖片 ID 陣列
+ */
 function getImageIdsFromData(data) {
   if (Array.isArray(data?.imageIds)) {
     return data.imageIds.filter(Boolean);
@@ -30,6 +37,8 @@ function getImageIdsFromData(data) {
 /**
  * 舊資料可能只有 latestImageAt，新的資料會有 imageBatchDate。
  * 這個 helper 讓兩種格式都可以判斷是否仍屬於今天的圖片批次。
+ * @param {object} data - Firestore 文件資料
+ * @returns {string|null} 日期字串或 null
  */
 function getStoredImageDateKey(data) {
   if (data?.imageBatchDate) {
@@ -48,6 +57,12 @@ function getStoredImageDateKey(data) {
   return null;
 }
 
+/**
+ * 新增圖片 ID 到當前批次
+ * @param {string} sessionKey - session 識別碼
+ * @param {string} imageId - 圖片 ID
+ * @returns {Promise<void>}
+ */
 export async function addImageId(sessionKey, imageId) {
   if (!sessionKey || !imageId) return;
 
@@ -78,10 +93,21 @@ export async function addImageId(sessionKey, imageId) {
   });
 }
 
+/**
+ * 設定最新的圖片 ID（呼叫 addImageId）
+ * @param {string} sessionKey - session 識別碼
+ * @param {string} imageId - 圖片 ID
+ * @returns {Promise<void>}
+ */
 export async function setLatestImageId(sessionKey, imageId) {
   await addImageId(sessionKey, imageId);
 }
 
+/**
+ * 清除圖片批次記錄
+ * @param {string} sessionKey - session 識別碼
+ * @returns {Promise<void>}
+ */
 export async function clearImageIds(sessionKey) {
   if (!sessionKey) return;
 
@@ -96,6 +122,11 @@ export async function clearImageIds(sessionKey) {
   );
 }
 
+/**
+ * 取得當前批次的圖片 ID 陣列
+ * @param {string} sessionKey - session 識別碼
+ * @returns {Promise<Array<string>>} 圖片 ID 陣列
+ */
 export async function getImageIds(sessionKey) {
   const doc = await db.collection(COLLECTION).doc(sessionKey).get();
   if (!doc.exists) return [];
@@ -111,6 +142,11 @@ export async function getImageIds(sessionKey) {
   return getImageIdsFromData(data);
 }
 
+/**
+ * 取得最新的圖片 ID
+ * @param {string} sessionKey - session 識別碼
+ * @returns {Promise<string|null>} 圖片 ID 或 null
+ */
 export async function getLatestImageId(sessionKey) {
   const imageIds = await getImageIds(sessionKey);
   return imageIds.at(-1) || null;

@@ -8,6 +8,8 @@ const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 /**
  * 將 OCR 純文字交給 LLM 整理成 JSON。
  * 這層只負責結構化，圖片下載與 OCR 由 imageService / ocrService 處理。
+ * @param {string} text - OCR 辨識的文字
+ * @returns {Promise<object>} 結構化的 JSON 物件
  */
 export async function parseOCRToJSON(text) {
   const resp = await client.responses.create({

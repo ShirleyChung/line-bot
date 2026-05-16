@@ -17,6 +17,11 @@ export const REMINDER_TYPES = new Set([
 
 export const RECURRENCES = new Set(["none", "daily"]);
 
+/**
+ * 偵測股票所屬市場
+ * @param {string} symbol - 股票代碼
+ * @returns {string} "US" 或 "TW"
+ */
 function detectMarket(symbol) {
   const code = String(symbol || "").trim().toUpperCase();
   if (/^[A-Z]+$/.test(code) && code.length >= 1 && code.length <= 5) {
@@ -25,16 +30,31 @@ function detectMarket(symbol) {
   return "TW";
 }
 
+/**
+ * 正規化提醒類型
+ * @param {string} type - 提醒類型
+ * @returns {string} 正規化後的類型
+ */
 function normalizeReminderType(type) {
   const value = String(type || "generic").trim();
   return REMINDER_TYPES.has(value) ? value : "generic";
 }
 
+/**
+ * 正規化重複週期
+ * @param {string} recurrence - 重複週期
+ * @returns {string} "none" 或 "daily"
+ */
 function normalizeRecurrence(recurrence) {
   const value = String(recurrence || "none").trim();
   return RECURRENCES.has(value) ? value : "none";
 }
 
+/**
+ * 正規化提醒資料
+ * @param {object} data - 提醒資料
+ * @returns {object} 正規化後的資料
+ */
 export function normalizeReminderData(data = {}) {
   const payload = data.payload && typeof data.payload === "object" ? data.payload : {};
 
@@ -46,6 +66,12 @@ export function normalizeReminderData(data = {}) {
   };
 }
 
+/**
+ * 計算下次提醒時間（用於每日提醒）
+ * @param {object} reminder - 提醒物件
+ * @param {Date} from - 計算起點時間
+ * @returns {Date|null} 下次提醒時間或 null
+ */
 export function getNextReminderTime(reminder, from = new Date()) {
   const recurrence = normalizeRecurrence(reminder?.recurrence);
   if (recurrence !== "daily") return null;
@@ -61,6 +87,11 @@ export function getNextReminderTime(reminder, from = new Date()) {
   return next;
 }
 
+/**
+ * 建構股價提醒訊息
+ * @param {object} reminder - 提醒物件
+ * @returns {Promise<string>} 提醒訊息
+ */
 async function buildStockReminderMessage(reminder) {
   const symbol = String(reminder.payload?.symbol || reminder.action || "").trim().toUpperCase();
 
@@ -76,6 +107,11 @@ async function buildStockReminderMessage(reminder) {
   return `股價提醒\n${buildWatchPricesMessage([price])}`;
 }
 
+/**
+ * 建構天氣提醒訊息
+ * @param {object} reminder - 提醒物件
+ * @returns {Promise<string>} 提醒訊息
+ */
 async function buildWeatherReminderMessage(reminder) {
   const city = reminder.payload?.city || reminder.target;
   const target = reminder.payload?.target || "now";
@@ -83,6 +119,11 @@ async function buildWeatherReminderMessage(reminder) {
   return `天氣提醒\n${formatWeatherReply(data)}`;
 }
 
+/**
+ * 建構 arXiv 論文提醒訊息
+ * @param {object} reminder - 提醒物件
+ * @returns {Promise<string>} 提醒訊息
+ */
 async function buildArxivPaperReminderMessage(reminder) {
   const max = reminder.payload?.max || 6;
   const categories = Array.isArray(reminder.payload?.categories)
@@ -92,6 +133,11 @@ async function buildArxivPaperReminderMessage(reminder) {
   return `最新 CS / Engineering 論文摘要\n${digest}`;
 }
 
+/**
+ * 根據提醒類型建構提醒訊息
+ * @param {object} reminder - 提醒物件
+ * @returns {Promise<string>} 提醒訊息
+ */
 export async function buildReminderMessage(reminder) {
   const normalized = normalizeReminderData(reminder);
 
