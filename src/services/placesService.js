@@ -2,6 +2,7 @@ import { env } from "../config/env.js";
 
 const GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json";
 const PLACES_NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby";
+const PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 const DEFAULT_RADIUS_METERS = 1000;
 const DEFAULT_LIMIT = 5;
 
@@ -95,6 +96,44 @@ async function searchNearbyParking({ lat, lng, radiusMeters, limit }) {
   return json.places || [];
 }
 
+async function searchNearbyByText({ locationQuery, facilityQuery, lat, lng, radiusMeters, limit }) {
+  const apiKey = getGoogleMapsApiKey();
+
+  const json = await fetchJson(PLACES_TEXT_SEARCH_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": [
+        "places.displayName",
+        "places.formattedAddress",
+        "places.location",
+        "places.businessStatus",
+        "places.googleMapsUri",
+        "places.rating",
+        "places.userRatingCount",
+      ].join(","),
+    },
+    body: JSON.stringify({
+      textQuery: `${locationQuery} 附近 ${facilityQuery}`,
+      maxResultCount: limit,
+      languageCode: "zh-TW",
+      regionCode: "TW",
+      locationBias: {
+        circle: {
+          center: {
+            latitude: lat,
+            longitude: lng,
+          },
+          radius: radiusMeters,
+        },
+      },
+    }),
+  });
+
+  return json.places || [];
+}
+
 function toRadians(value) {
   return (value * Math.PI) / 180;
 }
@@ -162,9 +201,68 @@ export async function findNearbyParking(locationQuery, options = {}) {
   };
 }
 
+export async function findNearbyFacilities(locationQuery, facilityQuery, options = {}) {
+  const radiusMeters = options.radiusMeters || DEFAULT_RADIUS_METERS;
+  const limit = options.limit || DEFAULT_LIMIT;
+  const facility = String(facilityQuery || "").trim();
+  const origin = await geocodePlace(locationQuery);
+
+  if (!facility) {
+    throw new Error("缺少要查詢的設施類型");
+  }
+
+  if (!origin) {
+    return {
+      ok: false,
+      reason: "location_not_found",
+      message: `找不到「${locationQuery}」的位置，請提供更完整的地點或地址。`,
+    };
+  }
+
+  const places = await searchNearbyByText({
+    locationQuery,
+    facilityQuery: facility,
+    lat: origin.lat,
+    lng: origin.lng,
+    radiusMeters,
+    limit,
+  });
+
+  const facilities = places
+    .map((place) => {
+      const placeLocation = place.location;
+      const lat = placeLocation?.latitude;
+      const lng = placeLocation?.longitude;
+      const distance =
+        Number.isFinite(lat) && Number.isFinite(lng)
+          ? distanceMeters(origin, { lat, lng })
+          : null;
+
+      return {
+        name: place.displayName?.text || `未命名${facility}`,
+        address: place.formattedAddress || "地址未提供",
+        distanceMeters: distance,
+        googleMapsUri: place.googleMapsUri || "",
+        businessStatus: place.businessStatus || "",
+        rating: Number.isFinite(place.rating) ? place.rating : null,
+        userRatingCount: Number.isFinite(place.userRatingCount) ? place.userRatingCount : null,
+      };
+    })
+    .filter((place) => place.businessStatus !== "CLOSED_PERMANENTLY")
+    .sort((a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity))
+    .slice(0, limit);
+
+  return {
+    ok: true,
+    origin,
+    radiusMeters,
+    facility,
+    facilities,
+  };
+}
+
 export function formatDistance(meters) {
   if (!Number.isFinite(meters)) return "距離未知";
   if (meters >= 1000) return `${(meters / 1000).toFixed(1)} 公里`;
   return `${Math.round(meters)} 公尺`;
 }
-

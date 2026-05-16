@@ -16,6 +16,11 @@ START_COLUMN=6
 GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"...","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"...","client_id":"..."}
 
 # =========================
+# Google Maps / Places 設定
+# =========================
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+
+# =========================
 # OpenAI 設定
 # =========================
 OPENAI_API_KEY=your_openai_api_key
@@ -31,4 +36,3 @@ FINNHUB_API_KEY=your_finnhub_api_key
 # GNews 設定（新聞搜尋）
 # =========================
 GNEWS_API_KEY=your_gnews_api_key
-

@@ -96,7 +96,12 @@ export const env = {
 4.當使用者詢問「最新論文」「arXiv 論文」「計算機科學論文」「工程相關論文摘要」，
 請呼叫 get_latest_arxiv_papers。若使用者指定篇數，限制在 5 到 8 篇；未指定時用 6 篇。
 
-5.當使用者詢問某地點附近是否有停車場、好不好停車、附近哪裡可以停車時，
+5.當使用者詢問「[地點]附近有什麼[設施]」、「[地點]附近的[設施]」、「找[地點]附近的[設施]」，
+或詢問某地附近的餐廳、咖啡廳、便利商店、加油站、景點、藥局等地點型資訊時，
+請呼叫 find_nearby_facilities。locationQuery 填使用者提到的地點名稱或地址；facilityQuery 填設施或店家類型；radiusMeters 通常填 1000；limit 通常填 5。
+範例："請問淡江大橋附近有什麼餐廳" → locationQuery="淡江大橋", facilityQuery="餐廳", radiusMeters=1000, limit=5。
+
+6.當使用者詢問某地點附近是否有停車場、好不好停車、附近哪裡可以停車時，
 請呼叫 find_nearby_parking。locationQuery 填使用者提到的地點名稱或地址；radiusMeters 通常填 1000；limit 通常填 5。
 `
 };

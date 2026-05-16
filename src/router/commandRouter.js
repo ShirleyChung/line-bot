@@ -28,7 +28,7 @@ import {
   getImageIds,
 } from "../services/sessionStateService.js";
 import { handleWeatherMessage } from "../handlers/weatherHandler.js";
-import { handleParkingMessage } from "../handlers/parkingHandler.js";
+import { handleNearbyFacilityMessage } from "../handlers/parkingHandler.js";
 import {
   isSorLogFileEvent,
   parseSorLogQuery,
@@ -113,8 +113,8 @@ export async function routeMessageEvent(event) {
       return await handleTodayLink(event);
     }
 
-    const handledByParking = await handleParkingMessage(event, userText || rawText);
-    if (handledByParking) return;
+    const handledByNearbyFacility = await handleNearbyFacilityMessage(event, userText || rawText);
+    if (handledByNearbyFacility) return;
 
     if (shouldHandleWebpageSummary(userText)) {
       return await handleWebpageSummary(event, userText);

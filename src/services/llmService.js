@@ -117,7 +117,7 @@ export async function askLlmWithTools(userText, context = {}) {
         text: result.text,
       };
     }
-    if (call.name === "find_nearby_parking" && result?.replyText) {
+    if (["find_nearby_parking", "find_nearby_facilities"].includes(call.name) && result?.replyText) {
       return {
         type: "text",
         text: result.replyText,

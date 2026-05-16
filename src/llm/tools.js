@@ -286,6 +286,35 @@ export const botTools = [
     strict: true,
   },
   {
+    type: "function",
+    name: "find_nearby_facilities",
+    description: "查詢某個地點附近的任意設施或店家類型，回傳名稱、地址、距離、評分與 Google Maps 連結。適合回答「[地點]附近有什麼[設施]」「[地點]附近的[設施]」「找[地點]附近的[設施]」。停車場也可使用，但停車場專問可沿用 find_nearby_parking。",
+    parameters: {
+      type: "object",
+      properties: {
+        locationQuery: {
+          type: "string",
+          description: "要查詢的地點名稱或地址，例如：淡江大橋、台北101、台中火車站。",
+        },
+        facilityQuery: {
+          type: "string",
+          description: "要查詢的設施、店家或地點類型，例如：餐廳、咖啡廳、便利商店、加油站、景點、藥局。",
+        },
+        radiusMeters: {
+          type: "number",
+          description: "查詢半徑，單位公尺。一般附近設施填 1000。",
+        },
+        limit: {
+          type: "number",
+          description: "最多回傳幾個結果。一般填 5。",
+        },
+      },
+      required: ["locationQuery", "facilityQuery", "radiusMeters", "limit"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
   type: "function",
     name: "get_stock_price",
     description: "查詢單一股票的最近收盤或即時資訊，並附基本資料（EPS、殖利率、本益比等），不需要加入自選股。支援台股股票/ETF（例如 2330、2454、00981A）與美股（例如 NVDA、QCOM、AAPL）。",

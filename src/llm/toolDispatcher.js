@@ -27,7 +27,11 @@ import {
   getWeatherForUser,
   setDefaultWeatherCity,
 } from '../services/weatherService.js';
-import { findNearbyParking, formatDistance } from "../services/placesService.js";
+import {
+  findNearbyFacilities,
+  findNearbyParking,
+  formatDistance,
+} from "../services/placesService.js";
 
 function detectMarket(symbol) {
   const code = String(symbol).trim().toUpperCase();
@@ -122,6 +126,43 @@ function formatParkingToolReply(locationQuery, result) {
     }
 
     if (index !== result.parkingLots.length - 1) {
+      lines.push("");
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function formatNearbyFacilityToolReply(locationQuery, facilityQuery, result) {
+  if (!result.ok) return result.message;
+
+  if (!result.facilities.length) {
+    return `「${locationQuery}」附近 ${result.radiusMeters} 公尺內查不到${facilityQuery}。`;
+  }
+
+  const lines = [
+    `「${locationQuery}」附近${facilityQuery}：`,
+    `定位：${result.origin.name}`,
+    "",
+  ];
+
+  for (const [index, place] of result.facilities.entries()) {
+    lines.push(
+      `${index + 1}. ${place.name}`,
+      `地址：${place.address}`,
+      `距離：約 ${formatDistance(place.distanceMeters)}`
+    );
+
+    if (place.rating) {
+      const count = place.userRatingCount ? `（${place.userRatingCount} 則）` : "";
+      lines.push(`評分：${place.rating}${count}`);
+    }
+
+    if (place.googleMapsUri) {
+      lines.push(`地圖：${place.googleMapsUri}`);
+    }
+
+    if (index !== result.facilities.length - 1) {
       lines.push("");
     }
   }
@@ -502,6 +543,35 @@ export async function executeTool(name, args = {}, context = {}) {
         origin: result.origin,
         parkingLots: result.parkingLots,
         replyText: formatParkingToolReply(locationQuery, result),
+      };
+    }
+
+    case "find_nearby_facilities": {
+      const locationQuery = String(args.locationQuery || "").trim();
+      const facilityQuery = String(args.facilityQuery || "").trim();
+
+      if (!locationQuery) {
+        throw new Error("find_nearby_facilities 缺少地點 locationQuery");
+      }
+
+      if (!facilityQuery) {
+        throw new Error("find_nearby_facilities 缺少設施 facilityQuery");
+      }
+
+      const result = await findNearbyFacilities(locationQuery, facilityQuery, {
+        radiusMeters: Number(args.radiusMeters) || 1000,
+        limit: Number(args.limit) || 5,
+      });
+
+      return {
+        ok: result.ok,
+        tool: name,
+        locationQuery,
+        facilityQuery,
+        radiusMeters: result.radiusMeters,
+        origin: result.origin,
+        facilities: result.facilities,
+        replyText: formatNearbyFacilityToolReply(locationQuery, facilityQuery, result),
       };
     }
 
