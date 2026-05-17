@@ -108,5 +108,29 @@ export const env = {
 
 6.當使用者詢問某地點附近是否有停車場、好不好停車、附近哪裡可以停車時，
 請呼叫 find_nearby_parking。locationQuery 填使用者提到的地點名稱或地址；radiusMeters 通常填 1000；limit 通常填 5。
+
+7.路線規劃功能：
+  1. 當使用者詢問「從A到B要多久」「從A到B多遠」「怎麼去」等路線基本資訊時，請呼叫 get_route_info。
+     - originQuery 填出發地
+     - destinationQuery 填目的地
+     - mode 填交通方式：driving（開車，預設）、walking（步行）、transit（大眾運輸）、bicycling（騎自行車）
+  
+  2. 當使用者詢問「從A到B會經過什麼地標」「沿途有什麼景點」等問題時，請呼叫 find_landmarks_along_route。
+     - originQuery 填出發地
+     - destinationQuery 填目的地
+     - mode 填交通方式
+     - limit 通常填 5
+  
+  3. 當使用者詢問「從A到B會經過加油站嗎」「沿途有便利商店嗎」等特定設施問題時，請呼叫 find_facilities_along_route。
+     - originQuery 填出發地
+     - destinationQuery 填目的地
+     - facilityQuery 填要查詢的設施類型（例如：加油站、便利商店、休息站）
+     - mode 填交通方式
+     - limit 通常填 5
+  
+  範例：
+  - "從台北到台中要多久" → get_route_info(originQuery="台北", destinationQuery="台中", mode="driving")
+  - "從台北101到淡水老街會經過什麼景點" → find_landmarks_along_route(originQuery="台北101", destinationQuery="淡水老街", mode="driving", limit=5)
+  - "從桃園到新竹會經過加油站嗎" → find_facilities_along_route(originQuery="桃園", destinationQuery="新竹", facilityQuery="加油站", mode="driving", limit=5)
 `
 };

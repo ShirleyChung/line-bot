@@ -8,7 +8,6 @@ import { lineClient } from "../line/client.js";
 import { fetchImageBuffer } from "../services/imageService.js";
 import { ocrImage } from "../services/ocrService.js";
 import { parseOCRToJSON } from "../services/dataParserService.js";
-import { jsonToCSV } from "../services/csvService.js";
 import { clearImageIds } from "../services/sessionStateService.js";
 import {
   addWatchStock,
@@ -31,6 +30,9 @@ import {
   findNearbyFacilities,
   findNearbyParking,
   formatDistance,
+  getRouteInfo,
+  findLandmarksAlongRoute,
+  findFacilitiesAlongRoute,
 } from "../services/placesService.js";
 
 function detectMarket(symbol) {
@@ -39,6 +41,25 @@ function detectMarket(symbol) {
     return "US";
   }
   return "TW";
+}
+
+const ROUTE_MODE_LABELS = {
+  driving: "開車",
+  walking: "步行",
+  transit: "大眾運輸",
+  bicycling: "騎自行車",
+};
+
+function normalizeRouteMode(mode, toolName) {
+  const value = String(mode || "driving").trim().toLowerCase();
+  if (!ROUTE_MODE_LABELS[value]) {
+    throw new Error(`${toolName} 不支援的交通方式：${mode}`);
+  }
+  return value;
+}
+
+function getRouteModeLabel(mode) {
+  return ROUTE_MODE_LABELS[mode] || mode;
 }
 
 /**
@@ -617,6 +638,216 @@ export async function executeTool(name, args = {}, context = {}) {
         type: 'set_default_weather_city',
         data: result,
         replyText: result.message,
+      };
+    }
+    
+    case "get_route_info": {
+      const originQuery = String(args.originQuery || "").trim();
+      const destinationQuery = String(args.destinationQuery || "").trim();
+      const mode = normalizeRouteMode(args.mode, "get_route_info");
+      
+      if (!originQuery) {
+        throw new Error("get_route_info 缺少出發地 originQuery");
+      }
+      
+      if (!destinationQuery) {
+        throw new Error("get_route_info 缺少目的地 destinationQuery");
+      }
+      
+      const result = await getRouteInfo(originQuery, destinationQuery, mode);
+      
+      if (!result.ok) {
+        return {
+          ok: false,
+          tool: name,
+          message: result.message,
+        };
+      }
+      
+      const modeText = getRouteModeLabel(mode);
+      
+      const replyText = [
+        `從「${result.origin.name}」到「${result.destination.name}」（${modeText}）：`,
+        ``,
+        `📍 距離：${result.distanceText}`,
+        `⏱️ 預估時間：${result.durationText}`,
+      ].join("\n");
+      
+      return {
+        ok: true,
+        tool: name,
+        origin: result.origin,
+        destination: result.destination,
+        distance: result.distance,
+        duration: result.duration,
+        distanceText: result.distanceText,
+        durationText: result.durationText,
+        mode,
+        replyText,
+      };
+    }
+    
+    case "find_landmarks_along_route": {
+      const originQuery = String(args.originQuery || "").trim();
+      const destinationQuery = String(args.destinationQuery || "").trim();
+      const mode = normalizeRouteMode(args.mode, "find_landmarks_along_route");
+      const limit = Number(args.limit) || 5;
+      
+      if (!originQuery) {
+        throw new Error("find_landmarks_along_route 缺少出發地 originQuery");
+      }
+      
+      if (!destinationQuery) {
+        throw new Error("find_landmarks_along_route 缺少目的地 destinationQuery");
+      }
+      
+      const result = await findLandmarksAlongRoute(originQuery, destinationQuery, {
+        mode,
+        limit,
+      });
+      
+      if (!result.ok) {
+        return {
+          ok: false,
+          tool: name,
+          message: result.message,
+        };
+      }
+      
+      const modeText = getRouteModeLabel(mode);
+      
+      const lines = [
+        `從「${result.origin.name}」到「${result.destination.name}」（${modeText}）：`,
+        `📍 距離：${result.distanceText}`,
+        `⏱️ 預估時間：${result.durationText}`,
+        ``,
+      ];
+      
+      if (!result.landmarks || result.landmarks.length === 0) {
+        lines.push("沿途未找到知名地標或景點。");
+      } else {
+        lines.push(`沿途地標/景點（共 ${result.landmarks.length} 個）：`);
+        lines.push("");
+        
+        for (const [index, landmark] of result.landmarks.entries()) {
+          lines.push(`${index + 1}. ${landmark.name}`);
+          lines.push(`   地址：${landmark.address}`);
+          
+          if (landmark.rating) {
+            const count = landmark.userRatingCount ? ` (${landmark.userRatingCount} 則評論)` : "";
+            lines.push(`   評分：${landmark.rating}${count}`);
+          }
+          
+          if (landmark.googleMapsUri) {
+            lines.push(`   地圖：${landmark.googleMapsUri}`);
+          }
+          
+          if (index !== result.landmarks.length - 1) {
+            lines.push("");
+          }
+        }
+      }
+      
+      return {
+        ok: true,
+        tool: name,
+        origin: result.origin,
+        destination: result.destination,
+        distance: result.distance,
+        duration: result.duration,
+        distanceText: result.distanceText,
+        durationText: result.durationText,
+        mode,
+        landmarks: result.landmarks,
+        replyText: lines.join("\n"),
+      };
+    }
+    
+    case "find_facilities_along_route": {
+      const originQuery = String(args.originQuery || "").trim();
+      const destinationQuery = String(args.destinationQuery || "").trim();
+      const facilityQuery = String(args.facilityQuery || "").trim();
+      const mode = normalizeRouteMode(args.mode, "find_facilities_along_route");
+      const limit = Number(args.limit) || 5;
+      
+      if (!originQuery) {
+        throw new Error("find_facilities_along_route 缺少出發地 originQuery");
+      }
+      
+      if (!destinationQuery) {
+        throw new Error("find_facilities_along_route 缺少目的地 destinationQuery");
+      }
+      
+      if (!facilityQuery) {
+        throw new Error("find_facilities_along_route 缺少設施 facilityQuery");
+      }
+      
+      const result = await findFacilitiesAlongRoute(
+        originQuery,
+        destinationQuery,
+        facilityQuery,
+        {
+          mode,
+          limit,
+        }
+      );
+      
+      if (!result.ok) {
+        return {
+          ok: false,
+          tool: name,
+          message: result.message,
+        };
+      }
+      
+      const modeText = getRouteModeLabel(mode);
+      
+      const lines = [
+        `從「${result.origin.name}」到「${result.destination.name}」（${modeText}）：`,
+        `📍 距離：${result.distanceText}`,
+        `⏱️ 預估時間：${result.durationText}`,
+        ``,
+      ];
+      
+      if (!result.facilities || result.facilities.length === 0) {
+        lines.push(`沿途未找到${facilityQuery}。`);
+      } else {
+        lines.push(`沿途${facilityQuery}（共 ${result.facilities.length} 個）：`);
+        lines.push("");
+        
+        for (const [index, facility] of result.facilities.entries()) {
+          lines.push(`${index + 1}. ${facility.name}`);
+          lines.push(`   地址：${facility.address}`);
+          
+          if (facility.rating) {
+            const count = facility.userRatingCount ? ` (${facility.userRatingCount} 則評論)` : "";
+            lines.push(`   評分：${facility.rating}${count}`);
+          }
+          
+          if (facility.googleMapsUri) {
+            lines.push(`   地圖：${facility.googleMapsUri}`);
+          }
+          
+          if (index !== result.facilities.length - 1) {
+            lines.push("");
+          }
+        }
+      }
+      
+      return {
+        ok: true,
+        tool: name,
+        origin: result.origin,
+        destination: result.destination,
+        distance: result.distance,
+        duration: result.duration,
+        distanceText: result.distanceText,
+        durationText: result.durationText,
+        mode,
+        facilityQuery,
+        facilities: result.facilities,
+        hasFacilities: result.hasFacilities,
+        replyText: lines.join("\n"),
       };
     }
 

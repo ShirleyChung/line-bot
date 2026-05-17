@@ -144,7 +144,7 @@ export const botTools = [
           description: "提醒動作，例如「吃藥」、「開會」",
         },
       },
-      required: ["id", "target", "action"],
+      required: [],
       additionalProperties: false,
     },
     strict: true,
@@ -383,7 +383,7 @@ export const botTools = [
           "description": "LINE 使用者 ID，用於讀取使用者預設天氣地點。"
         }
       },
-      "required": [],
+      "required": ["city"],
     }
   },
   {
@@ -404,5 +404,95 @@ export const botTools = [
       },
       "required": [],
     }
+  },
+  {
+    type: "function",
+    name: "get_route_info",
+    description: "查詢從 A 到 B 的路線資訊，包含預估時間、距離、建議路線。適合回答「從A到B要多久」「從A到B多遠」「怎麼去」等問題。",
+    parameters: {
+      type: "object",
+      properties: {
+        originQuery: {
+          type: "string",
+          description: "出發地名稱或地址，例如：台北101、信義威秀、台中火車站。",
+        },
+        destinationQuery: {
+          type: "string",
+          description: "目的地名稱或地址，例如：淡江大橋、板橋火車站。",
+        },
+        mode: {
+          type: "string",
+          enum: ["driving", "walking", "transit", "bicycling"],
+          description: "交通方式。driving=開車（預設），walking=步行，transit=大眾運輸，bicycling=騎自行車。",
+        },
+      },
+      required: ["originQuery", "destinationQuery", "mode"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "find_landmarks_along_route",
+    description: "查詢從 A 到 B 的路線沿途會經過什麼地標或景點。適合回答「從A到B會經過什麼地標」「沿途有什麼景點」等問題。",
+    parameters: {
+      type: "object",
+      properties: {
+        originQuery: {
+          type: "string",
+          description: "出發地名稱或地址，例如：台北101、信義威秀。",
+        },
+        destinationQuery: {
+          type: "string",
+          description: "目的地名稱或地址，例如：淡水老街、板橋火車站。",
+        },
+        mode: {
+          type: "string",
+          enum: ["driving", "walking", "transit", "bicycling"],
+          description: "交通方式。driving=開車（預設），walking=步行，transit=大眾運輸，bicycling=騎自行車。",
+        },
+        limit: {
+          type: "number",
+          description: "最多回傳幾個地標，一般填 5。",
+        },
+      },
+      required: ["originQuery", "destinationQuery", "mode", "limit"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "find_facilities_along_route",
+    description: "查詢從 A 到 B 的路線沿途是否有特定設施（例如加油站、便利商店、休息站等）。適合回答「從A到B會經過加油站嗎」「沿途有便利商店嗎」等問題。",
+    parameters: {
+      type: "object",
+      properties: {
+        originQuery: {
+          type: "string",
+          description: "出發地名稱或地址，例如：台北、桃園機場。",
+        },
+        destinationQuery: {
+          type: "string",
+          description: "目的地名稱或地址，例如：台中、高雄。",
+        },
+        facilityQuery: {
+          type: "string",
+          description: "要查詢的設施類型，例如：加油站、便利商店、休息站、餐廳、咖啡廳。",
+        },
+        mode: {
+          type: "string",
+          enum: ["driving", "walking", "transit", "bicycling"],
+          description: "交通方式。driving=開車（預設），walking=步行，transit=大眾運輸，bicycling=騎自行車。",
+        },
+        limit: {
+          type: "number",
+          description: "最多回傳幾個設施，一般填 5。",
+        },
+      },
+      required: ["originQuery", "destinationQuery", "facilityQuery", "mode", "limit"],
+      additionalProperties: false,
+    },
+    strict: true,
   },
 ];

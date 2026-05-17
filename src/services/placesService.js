@@ -3,8 +3,11 @@ import { env } from "../config/env.js";
 const GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json";
 const PLACES_NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby";
 const PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
+const DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json";
 const DEFAULT_RADIUS_METERS = 1000;
 const DEFAULT_LIMIT = 5;
+const DEFAULT_ROUTE_SEARCH_RADIUS = 2000;
+const ROUTE_SAMPLE_POINTS = 10;
 
 function getGoogleMapsApiKey() {
   const apiKey = env.GOOGLE_MAPS_API_KEY;
@@ -265,4 +268,261 @@ export function formatDistance(meters) {
   if (!Number.isFinite(meters)) return "距離未知";
   if (meters >= 1000) return `${(meters / 1000).toFixed(1)} 公里`;
   return `${Math.round(meters)} 公尺`;
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds)) return "時間未知";
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  if (hours > 0) {
+    return minutes > 0 ? `${hours} 小時 ${minutes} 分鐘` : `${hours} 小時`;
+  }
+  
+  return `${minutes} 分鐘`;
+}
+
+async function getDirections({ origin, destination, mode = "driving" }) {
+  const apiKey = getGoogleMapsApiKey();
+  const url = new URL(DIRECTIONS_URL);
+  
+  url.searchParams.set("origin", origin);
+  url.searchParams.set("destination", destination);
+  url.searchParams.set("mode", mode);
+  url.searchParams.set("language", "zh-TW");
+  url.searchParams.set("region", "tw");
+  url.searchParams.set("key", apiKey);
+  
+  const json = await fetchJson(url);
+  
+  if (json.status !== "OK" || !json.routes?.length) {
+    return null;
+  }
+  
+  return json.routes[0];
+}
+
+function decodePolyline(encoded) {
+  const points = [];
+  let index = 0;
+  const len = encoded.length;
+  let lat = 0;
+  let lng = 0;
+  
+  while (index < len) {
+    let b;
+    let shift = 0;
+    let result = 0;
+    
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    
+    const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lat += dlat;
+    
+    shift = 0;
+    result = 0;
+    
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    
+    const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lng += dlng;
+    
+    points.push({
+      lat: lat / 1e5,
+      lng: lng / 1e5,
+    });
+  }
+  
+  return points;
+}
+
+async function searchAlongRoute(routePoints, facilityQuery, limit = 5) {
+  if (!routePoints || routePoints.length === 0) return [];
+  
+  const apiKey = getGoogleMapsApiKey();
+  const sampleInterval = Math.max(1, Math.floor(routePoints.length / ROUTE_SAMPLE_POINTS));
+  const sampledPoints = routePoints.filter((_, index) => index % sampleInterval === 0);
+  
+  const allPlaces = [];
+  const seenPlaceIds = new Set();
+  
+  for (const point of sampledPoints) {
+    if (allPlaces.length >= limit) break;
+
+    const json = await fetchJson(PLACES_TEXT_SEARCH_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": [
+          "places.id",
+          "places.displayName",
+          "places.formattedAddress",
+          "places.location",
+          "places.businessStatus",
+          "places.googleMapsUri",
+          "places.rating",
+          "places.userRatingCount",
+          "places.types",
+        ].join(","),
+      },
+      body: JSON.stringify({
+        textQuery: facilityQuery,
+        maxResultCount: 5,
+        languageCode: "zh-TW",
+        regionCode: "TW",
+        locationBias: {
+          circle: {
+            center: {
+              latitude: point.lat,
+              longitude: point.lng,
+            },
+            radius: DEFAULT_ROUTE_SEARCH_RADIUS,
+          },
+        },
+      }),
+    });
+
+    const places = json.places || [];
+
+    for (const place of places) {
+      if (allPlaces.length >= limit) break;
+
+      if (place.id && !seenPlaceIds.has(place.id)) {
+        seenPlaceIds.add(place.id);
+
+        const placeLocation = place.location;
+        const lat = placeLocation?.latitude;
+        const lng = placeLocation?.longitude;
+
+        allPlaces.push({
+          name: place.displayName?.text || `未命名${facilityQuery}`,
+          address: place.formattedAddress || "地址未提供",
+          location: Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null,
+          googleMapsUri: place.googleMapsUri || "",
+          businessStatus: place.businessStatus || "",
+          rating: Number.isFinite(place.rating) ? place.rating : null,
+          userRatingCount: Number.isFinite(place.userRatingCount) ? place.userRatingCount : null,
+          types: place.types || [],
+        });
+      }
+    }
+  }
+  
+  return allPlaces.filter((place) => place.businessStatus !== "CLOSED_PERMANENTLY");
+}
+
+export async function getRouteInfo(originQuery, destinationQuery, mode = "driving") {
+  const origin = await geocodePlace(originQuery);
+  const destination = await geocodePlace(destinationQuery);
+  
+  if (!origin) {
+    return {
+      ok: false,
+      reason: "origin_not_found",
+      message: `找不到出發地「${originQuery}」的位置，請提供更完整的地點或地址。`,
+    };
+  }
+  
+  if (!destination) {
+    return {
+      ok: false,
+      reason: "destination_not_found",
+      message: `找不到目的地「${destinationQuery}」的位置，請提供更完整的地點或地址。`,
+    };
+  }
+  
+  const route = await getDirections({
+    origin: originQuery,
+    destination: destinationQuery,
+    mode,
+  });
+  
+  if (!route) {
+    return {
+      ok: false,
+      reason: "route_not_found",
+      message: `無法規劃從「${originQuery}」到「${destinationQuery}」的路線。`,
+    };
+  }
+  
+  const leg = route.legs?.[0];
+  
+  if (!leg) {
+    return {
+      ok: false,
+      reason: "route_data_incomplete",
+      message: "路線資料不完整。",
+    };
+  }
+  
+  const polyline = route.overview_polyline?.points;
+  const routePoints = polyline ? decodePolyline(polyline) : [];
+  
+  return {
+    ok: true,
+    origin: {
+      name: origin.name,
+      lat: origin.lat,
+      lng: origin.lng,
+    },
+    destination: {
+      name: destination.name,
+      lat: destination.lat,
+      lng: destination.lng,
+    },
+    distance: leg.distance?.value || 0,
+    duration: leg.duration?.value || 0,
+    distanceText: leg.distance?.text || formatDistance(leg.distance?.value),
+    durationText: leg.duration?.text || formatDuration(leg.duration?.value),
+    routePoints,
+    mode,
+  };
+}
+
+export async function findLandmarksAlongRoute(originQuery, destinationQuery, options = {}) {
+  const mode = options.mode || "driving";
+  const limit = options.limit || DEFAULT_LIMIT;
+  
+  const routeInfo = await getRouteInfo(originQuery, destinationQuery, mode);
+  
+  if (!routeInfo.ok) {
+    return routeInfo;
+  }
+  
+  const landmarks = await searchAlongRoute(routeInfo.routePoints, "景點 地標", limit);
+  
+  return {
+    ...routeInfo,
+    landmarks,
+  };
+}
+
+export async function findFacilitiesAlongRoute(originQuery, destinationQuery, facilityQuery, options = {}) {
+  const mode = options.mode || "driving";
+  const limit = options.limit || DEFAULT_LIMIT;
+  
+  const routeInfo = await getRouteInfo(originQuery, destinationQuery, mode);
+  
+  if (!routeInfo.ok) {
+    return routeInfo;
+  }
+  
+  const facilities = await searchAlongRoute(routeInfo.routePoints, facilityQuery, limit);
+  
+  return {
+    ...routeInfo,
+    facilityQuery,
+    facilities,
+    hasFacilities: facilities.length > 0,
+  };
 }
