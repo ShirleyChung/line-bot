@@ -14,6 +14,10 @@ const execFileAsync = promisify(execFile);
 const COLLECTION = "session_state";
 const MAX_LOG_BYTES = Number(process.env.SOR_LOG_MAX_BYTES || 50 * 1024 * 1024);
 const PARSER_TIMEOUT_MS = Number(process.env.SOR_LOG_PARSER_TIMEOUT_MS || 30_000);
+const DIRECT_REPLY_MAX_LINES = Math.max(
+  1,
+  Number.parseInt(process.env.SOR_LOG_DIRECT_REPLY_MAX_LINES || "20", 10) || 20
+);
 const RESULT_DIR = path.join(os.tmpdir(), "line-bot-sorlogs", "results");
 
 const FIELD_TABLES = {
@@ -181,6 +185,18 @@ function formatParserOutput(output, conditionDescription) {
   return `查詢條件：${conditionDescription}\n\n${body}\n`;
 }
 
+function countOutputLines(output) {
+  const normalized = String(output || "").replace(/\r\n/g, "\n");
+  if (!normalized) return 0;
+
+  const lines = normalized.split("\n");
+  while (lines.length && lines.at(-1) === "") {
+    lines.pop();
+  }
+
+  return lines.length;
+}
+
 function getResultBaseUrl(baseUrl) {
   return String(baseUrl || process.env.PUBLIC_BASE_URL || process.env.SERVICE_BASE_URL || "").replace(/\/+$/, "");
 }
@@ -254,7 +270,12 @@ export async function runSorLogQuery(sessionKey, query, options = {}) {
       windowsHide: true,
     });
 
-    const output = formatParserOutput([stdout, stderr].filter(Boolean).join("\n"), query.description);
+    const parserOutput = [stdout, stderr].filter(Boolean).join("\n");
+    const output = formatParserOutput(parserOutput, query.description);
+    if (countOutputLines(parserOutput) < DIRECT_REPLY_MAX_LINES) {
+      return output;
+    }
+
     const result = await saveParserOutputFile(output, query.description);
     const baseUrl = getResultBaseUrl(options.baseUrl);
 
