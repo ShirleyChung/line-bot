@@ -132,19 +132,19 @@ export const botTools = [
       type: "object",
       properties: {
         id: {
-          type: "string",
+          type: ["string", "null"],
           description: "提醒的 id，若提供則直接刪除該筆",
         },
         target: {
-          type: "string",
+          type: ["string", "null"],
           description: "提醒對象，例如「媽媽」、「自己」",
         },
         action: {
-          type: "string",
+          type: ["string", "null"],
           description: "提醒動作，例如「吃藥」、「開會」",
         },
       },
-      required: [],
+      required: ["id", "target", "action"],
       additionalProperties: false,
     },
     strict: true,
