@@ -127,6 +127,7 @@ export const env = {
      - facilityQuery 填要查詢的設施類型（例如：加油站、便利商店、休息站）
      - mode 填交通方式
      - limit 通常填 5
+     若資訊不足時，以時間最短，距離最短的路線為基準來回答，不用再提示使用者, 但提供路線規劃的參考資訊。
   
   範例：
   - "從台北到台中要多久" → get_route_info(originQuery="台北", destinationQuery="台中", mode="driving")
