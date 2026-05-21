@@ -407,6 +407,69 @@ export const botTools = [
   },
   {
     type: "function",
+    name: "get_recovery_bible_verses",
+    description: "查詢恢復本聖經經文。支援經節格式（例如：創 1:1、約 3:16-18）或關鍵字搜尋（例如：參孫）。",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "經節或關鍵字，例如：創 1:1、約 3:16-18、參孫。",
+        },
+        maxResults: {
+          type: "number",
+          description: "關鍵字搜尋最多回傳幾筆，建議 3 到 8。",
+        },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "get_recovery_bible_notes",
+    description: "查詢恢復本聖經註解。可查指定經節（例如：創 1:1）或關鍵字，也可留空沿用上一個聖經查詢。",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "經節或關鍵字；若要承接上一輪可留空。",
+        },
+        maxResults: {
+          type: "number",
+          description: "最多回傳幾筆註解，建議 1 到 6。",
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "get_life_study_excerpt",
+    description: "從水流職事站查詢生命讀經，依章節或關鍵字擷取最接近的一段內容。",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "經節或查詢句子，例如：士 15:18 生命讀經；可留空沿用上一輪。",
+        },
+        keyword: {
+          type: "string",
+          description: "額外關鍵字，例如：參孫、拿細耳人。",
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
     name: "get_route_info",
     description: "查詢從 A 到 B 的路線資訊，包含預估時間、距離、建議路線。適合回答「從A到B要多久」「從A到B多遠」「怎麼去」等問題。",
     parameters: {

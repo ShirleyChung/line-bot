@@ -108,22 +108,58 @@ export async function askLlmWithTools(userText, context = {}) {
     const toolOutputs = [];
 
     for (const call of functionCalls) {
-      const args = JSON.parse(call.arguments || "{}");
-      const result = await executeTool(call.name, args, context);
+      let args = {};
+      try {
+        args = JSON.parse(call.arguments || "{}");
+      } catch (error) {
+        return {
+          type: "text",
+          text: `工具參數格式錯誤：${error?.message || String(error)}`,
+          toolUsed: true,
+        };
+      }
+
+      let result;
+      try {
+        result = await executeTool(call.name, args, context);
+      } catch (error) {
+        return {
+          type: "text",
+          text: error?.message || String(error) || "工具執行失敗",
+          toolUsed: true,
+        };
+      }
+
+      if (result?.ok === false || result?.error) {
+        return {
+          type: "text",
+          text: result?.replyText || result?.message || result?.error || "工具執行失敗",
+          toolUsed: true,
+        };
+      }
       // 已經格式化好的 LINE 文字，直接回覆，不再交給 LLM 重排
-    if (["get_watch_prices", "get_stock_price", "get_latest_arxiv_papers"].includes(call.name) && result?.text) {
-      return {
-        type: "text",
-        text: result.text,
-      };
-    }
-    if (["find_nearby_parking", "find_nearby_facilities"].includes(call.name) && result?.replyText) {
-      return {
-        type: "text",
-        text: result.replyText,
-      };
-    }
-    toolOutputs.push({
+      if (["get_watch_prices", "get_stock_price", "get_latest_arxiv_papers"].includes(call.name) && result?.text) {
+        return {
+          type: "text",
+          text: result.text,
+        };
+      }
+      if (
+        [
+          "find_nearby_parking",
+          "find_nearby_facilities",
+          "get_recovery_bible_verses",
+          "get_recovery_bible_notes",
+          "get_life_study_excerpt",
+        ].includes(call.name) &&
+        result?.replyText
+      ) {
+        return {
+          type: "text",
+          text: result.replyText,
+        };
+      }
+      toolOutputs.push({
         type: "function_call_output",
         call_id: call.call_id,
         output: JSON.stringify(result),

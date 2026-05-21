@@ -151,3 +151,42 @@ export async function getLatestImageId(sessionKey) {
   const imageIds = await getImageIds(sessionKey);
   return imageIds.at(-1) || null;
 }
+
+/**
+ * 記錄最近一次聖經查詢上下文，供「再查註解 / 生命讀經」類追問使用
+ * @param {string} sessionKey - session 識別碼
+ * @param {object} context - 聖經查詢上下文
+ * @returns {Promise<void>}
+ */
+export async function setLastBibleContext(sessionKey, context = {}) {
+  if (!sessionKey) return;
+
+  const payload = {
+    ...(context.query ? { query: String(context.query).trim() } : {}),
+    ...(context.reference ? { reference: String(context.reference).trim() } : {}),
+    ...(context.keyword ? { keyword: String(context.keyword).trim() } : {}),
+    ...(context.mode ? { mode: String(context.mode).trim() } : {}),
+    updatedAt: new Date(),
+  };
+
+  await db.collection(COLLECTION).doc(sessionKey).set(
+    {
+      lastBibleContext: payload,
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * 取得最近一次聖經查詢上下文
+ * @param {string} sessionKey - session 識別碼
+ * @returns {Promise<object|null>}
+ */
+export async function getLastBibleContext(sessionKey) {
+  if (!sessionKey) return null;
+
+  const doc = await db.collection(COLLECTION).doc(sessionKey).get();
+  if (!doc.exists) return null;
+
+  return doc.data()?.lastBibleContext || null;
+}

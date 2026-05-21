@@ -8,7 +8,11 @@ import { lineClient } from "../line/client.js";
 import { fetchImageBuffer } from "../services/imageService.js";
 import { ocrImage } from "../services/ocrService.js";
 import { parseOCRToJSON } from "../services/dataParserService.js";
-import { clearImageIds } from "../services/sessionStateService.js";
+import {
+  clearImageIds,
+  getLastBibleContext,
+  setLastBibleContext,
+} from "../services/sessionStateService.js";
 import {
   addWatchStock,
   removeWatchStock,
@@ -34,6 +38,11 @@ import {
   findLandmarksAlongRoute,
   findFacilitiesAlongRoute,
 } from "../services/placesService.js";
+import {
+  queryLifeStudyExcerpt,
+  queryRecoveryBibleNotes,
+  queryRecoveryBibleVerses,
+} from "../services/recoveryBibleService.js";
 
 function detectMarket(symbol) {
   const code = String(symbol).trim().toUpperCase();
@@ -593,6 +602,99 @@ export async function executeTool(name, args = {}, context = {}) {
         origin: result.origin,
         facilities: result.facilities,
         replyText: formatNearbyFacilityToolReply(locationQuery, facilityQuery, result),
+      };
+    }
+
+    case "get_recovery_bible_verses": {
+      const sessionKey = context.sessionKey || buildSessionKey(context.source);
+      const hasSessionContext = sessionKey && sessionKey !== "unknown";
+      const query = String(args.query || "").trim();
+
+      if (!query) {
+        throw new Error("get_recovery_bible_verses 缺少查詢內容 query");
+      }
+
+      const result = await queryRecoveryBibleVerses(query, {
+        maxResults: Number(args.maxResults) || 5,
+      });
+
+      if (hasSessionContext) {
+        await setLastBibleContext(sessionKey, {
+          query,
+          reference: result.reference?.displayRef || "",
+          keyword: result.keyword || "",
+          mode: result.mode || "verse",
+        });
+      }
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
+      };
+    }
+
+    case "get_recovery_bible_notes": {
+      const sessionKey = context.sessionKey || buildSessionKey(context.source);
+      const hasSessionContext = sessionKey && sessionKey !== "unknown";
+      const lastContext = hasSessionContext ? await getLastBibleContext(sessionKey) : null;
+      const fallbackQuery = lastContext?.reference || lastContext?.query || "";
+      const query = String(args.query || fallbackQuery || "").trim();
+
+      if (!query) {
+        throw new Error("get_recovery_bible_notes 缺少查詢內容，請提供經節或先查詢聖經經文");
+      }
+
+      const result = await queryRecoveryBibleNotes(query, {
+        maxResults: Number(args.maxResults) || 4,
+      });
+
+      if (hasSessionContext) {
+        await setLastBibleContext(sessionKey, {
+          query: lastContext?.query || query,
+          reference: result.reference?.displayRef || lastContext?.reference || "",
+          keyword: result.keyword || lastContext?.keyword || "",
+          mode: "note",
+        });
+      }
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
+      };
+    }
+
+    case "get_life_study_excerpt": {
+      const sessionKey = context.sessionKey || buildSessionKey(context.source);
+      const hasSessionContext = sessionKey && sessionKey !== "unknown";
+      const lastContext = hasSessionContext ? await getLastBibleContext(sessionKey) : null;
+      const fallbackQuery = lastContext?.reference || lastContext?.query || "";
+      const query = String(args.query || fallbackQuery || "").trim();
+      const keyword = String(args.keyword || lastContext?.keyword || "").trim();
+
+      if (!query && !keyword) {
+        throw new Error("get_life_study_excerpt 缺少查詢內容，請提供經節或關鍵字");
+      }
+
+      const result = await queryLifeStudyExcerpt({
+        query,
+        keyword,
+      });
+
+      if (hasSessionContext) {
+        await setLastBibleContext(sessionKey, {
+          query: query || lastContext?.query || "",
+          reference: result.chapter && result.bookNo ? `${result.bookName} ${result.chapter}章` : (lastContext?.reference || ""),
+          keyword: keyword || lastContext?.keyword || "",
+          mode: "life_study",
+        });
+      }
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
       };
     }
 

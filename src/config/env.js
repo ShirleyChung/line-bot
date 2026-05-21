@@ -133,5 +133,10 @@ export const env = {
   - "從台北到台中要多久" → get_route_info(originQuery="台北", destinationQuery="台中", mode="driving")
   - "從台北101到淡水老街會經過什麼景點" → find_landmarks_along_route(originQuery="台北101", destinationQuery="淡水老街", mode="driving", limit=5)
   - "從桃園到新竹會經過加油站嗎" → find_facilities_along_route(originQuery="桃園", destinationQuery="新竹", facilityQuery="加油站", mode="driving", limit=5)
+
+8.恢復本聖經與生命讀經：
+  1. 當使用者輸入經節格式（例如「創 1:1」「約3:16-18」）或問「聖經哪裡有提到 XXX」，請優先呼叫 get_recovery_bible_verses，不要憑記憶直接回答經文。
+  2. 當使用者追加「註解／注解」要求時，請呼叫 get_recovery_bible_notes。若使用者未重複經節，允許 query 留空以沿用上一個聖經查詢。
+  3. 當使用者提到「生命讀經」時，請呼叫 get_life_study_excerpt，優先帶入經節（若已知）與關鍵字，回覆最接近的一段內容。
 `
 };
