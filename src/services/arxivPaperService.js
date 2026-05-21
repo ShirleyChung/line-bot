@@ -3,6 +3,7 @@ import { env } from "../config/env.js";
 
 const ARXIV_API_URL = "https://export.arxiv.org/api/query";
 const DEFAULT_CATEGORIES = [
+  "cs.PL",
   "cs.AI",
   "cs.LG",
   "cs.CL",
@@ -17,6 +18,7 @@ const DEFAULT_CATEGORIES = [
   "cs.NE",
   "eess.SY",
 ];
+const PRIORITY_CATEGORIES = new Set(["cs.PL"]);
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const MIN_DIGEST_OUTPUT_TOKENS = 3000;
 const RETRY_DIGEST_OUTPUT_TOKENS = 4500;
@@ -71,6 +73,14 @@ function firstTag(entry, tagName) {
   return decodeXml(compactText(match?.[1] || "", 3000));
 }
 
+function parseEntryCategories(entry) {
+  const terms = [];
+  for (const match of entry.matchAll(/<category\b[^>]*\bterm="([^"]+)"/gi)) {
+    terms.push(match[1]);
+  }
+  return [...new Set(terms)];
+}
+
 function parseArxivFeed(xml) {
   const entries = [];
   const matches = xml.matchAll(/<entry\b[^>]*>([\s\S]*?)<\/entry>/gi);
@@ -87,10 +97,23 @@ function parseArxivFeed(xml) {
       title,
       abstract: summary,
       url,
+      categories: parseEntryCategories(entry),
     });
   }
 
   return entries;
+}
+
+function isPriorityPaper(paper) {
+  return (paper.categories || []).some((category) => PRIORITY_CATEGORIES.has(category));
+}
+
+function sortPapersByPriority(papers) {
+  return [...papers].sort((a, b) => {
+    const priorityDiff = Number(isPriorityPaper(b)) - Number(isPriorityPaper(a));
+    if (priorityDiff !== 0) return priorityDiff;
+    return 0;
+  });
 }
 
 function buildSearchQuery(categories) {
@@ -126,9 +149,12 @@ async function fetchArxivEntries({ categories, fetchCount }) {
 function buildPaperContext(papers) {
   return papers
     .map((paper, index) => {
+      const categories = (paper.categories || []).join(", ");
+      const priorityTag = isPriorityPaper(paper) ? " [PRIORITY: Programming Languages]" : "";
       return [
-        `#${index + 1}`,
+        `#${index + 1}${priorityTag}`,
         `Title: ${paper.title}`,
+        `Categories: ${categories || "(unknown)"}`,
         `URL: ${paper.url}`,
         `Abstract: ${compactText(paper.abstract, 650)}`,
       ].join("\n");
@@ -170,7 +196,8 @@ async function createDigestResponse({ papers, normalizedMax, maxOutputTokens }) 
     instructions: [
       "你是嚴謹的計算機科學研究助理。",
       "請從候選 arXiv 論文中挑出最值得看的 5 到 8 篇。",
-      "偏好：新穎方法、強實驗、實用系統、重要基準、工程落地價值、AI/ML/系統/軟體工程/安全/人機互動相關性。",
+      "最優先：程式語言（cs.PL）相關論文，例如型別系統、編譯器、程式分析、形式語義、程式驗證、合成、DSL。標記 [PRIORITY: Programming Languages] 的論文只要品質達標就應入選，至少保留 1～2 篇。",
+      "次要偏好：新穎方法、強實驗、實用系統、重要基準、工程落地價值、AI/ML/系統/軟體工程/安全/人機互動相關性。",
       "只能根據標題與 abstract 判斷，不要編造 abstract 沒有提到的貢獻。",
       "請用繁體中文輸出，極簡短。",
       "每篇格式：序號. 原標題；一句中文重點摘要；arXiv 連結。",
@@ -201,14 +228,16 @@ export async function buildLatestArxivPaperDigest({
 
   if (cached) return cached;
 
-  const papers = await fetchArxivEntries({
+  const rawPapers = await fetchArxivEntries({
     categories: normalizedCategories,
     fetchCount: normalizedFetchCount,
   });
 
-  if (!papers.length) {
+  if (!rawPapers.length) {
     return "arXiv 目前沒有抓到新的計算機科學與工程相關論文。";
   }
+
+  const papers = sortPapersByPriority(rawPapers);
 
   let response = await createDigestResponse({
     papers,
