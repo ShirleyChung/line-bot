@@ -446,6 +446,15 @@ function buildVerseReplyText(reference, verses) {
   return lines.join("\n");
 }
 
+function buildRandomVerseReply(reference, verseText, sourceUrl) {
+  return [
+    `今日經節 ${reference.displayRef}`,
+    `${reference.displayRef} ${verseText}`,
+    "",
+    `來源：${sourceUrl}`,
+  ].join("\n");
+}
+
 function buildKeywordVerseReply(keyword, rows) {
   const lines = [`恢復本經文搜尋「${keyword}」前 ${rows.length} 筆：`];
   for (const [index, row] of rows.entries()) {
@@ -567,6 +576,52 @@ function buildLifeStudyExcerpt(text, focusTokens = [], maxLength = 220) {
 
 function uniqueValues(values = []) {
   return [...new Set(values.filter(Boolean))];
+}
+
+export async function getRandomRecoveryBibleVerse(options = {}) {
+  const maxAttempts = Math.min(Math.max(Math.floor(Number(options.maxAttempts) || 12), 1), 30);
+  let lastError = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const randomBook = BOOKS[Math.floor(Math.random() * BOOKS.length)];
+    const maxChapter = BIBLE_CHAPTER_COUNTS[randomBook.no] || 1;
+    const chapter = Math.floor(Math.random() * maxChapter) + 1;
+
+    try {
+      const chapterHtml = await fetchChapterPage(randomBook.no, chapter, 1);
+      const verses = parseChapterVerses(chapterHtml, chapter).filter((item) => item.text);
+      if (!verses.length) continue;
+
+      const verse = verses[Math.floor(Math.random() * verses.length)];
+      const displayRef = `${randomBook.shortName}${chapter}:${verse.verse}`;
+      const sourceUrl = buildRecoveryUrl("read_01.php", {
+        KB: `${randomBook.no}_${chapter}_${verse.verse}`,
+      });
+
+      return {
+        ok: true,
+        mode: "random",
+        reference: {
+          book: BOOK_BY_NO.get(randomBook.no) || randomBook,
+          chapter,
+          verseStart: verse.verse,
+          verseEnd: verse.verse,
+          displayRef,
+        },
+        verse,
+        sourceUrl,
+        replyText: buildRandomVerseReply({ displayRef }, verse.text, sourceUrl),
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) {
+    throw new Error(`隨機挑選經節失敗：${lastError.message}`);
+  }
+
+  throw new Error("暫時找不到可用的隨機經節，請稍後再試");
 }
 
 export async function queryRecoveryBibleVerses(query, options = {}) {

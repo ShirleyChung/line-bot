@@ -9,6 +9,7 @@
  */
 
 import { handleTodayLink } from "../handlers/todayLinkHandler.js";
+import { handleTodayBibleVerse } from "../handlers/bibleVerseHandler.js";
 import { handleLlmFallback } from "../handlers/llmHandler.js";
 import {
   handleWebpageSummary,
@@ -17,6 +18,7 @@ import {
 import { replyText } from "../platform/reply.js";
 import {
   isTodayLinkCommand,
+  isTodayBibleVerseCommand,
   isResetImageIdsCommand,
   isMentionToBot,
   stripMentionsFromText,
@@ -111,6 +113,10 @@ export async function routeMessageEvent(event) {
     // 先攔截內建命令（使用移除 mention 後的文字）
     if (isTodayLinkCommand(userText) && !/(提醒|排程|每天|每日|固定)/.test(userText)) {
       return await handleTodayLink(event);
+    }
+
+    if (isTodayBibleVerseCommand(userText) && !/(提醒|排程|每天|每日|固定)/.test(userText)) {
+      return await handleTodayBibleVerse(event);
     }
 
     const handledByNearbyFacility = await handleNearbyFacilityMessage(event, userText || rawText);

@@ -63,17 +63,17 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、自選股股價、今日連結、arXiv 最新論文摘要。",
+    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、自選股股價、今日連結、arXiv 最新論文摘要、每日經節。",
     parameters: {
       type: "object",
       properties: {
         target: {
           type: "string",
-          description: "提醒對象或主題。天氣提醒填城市，例如「臺北市」；股價提醒填股票代碼；今日連結可填「今日連結」。",
+          description: "提醒對象或主題。天氣提醒填城市，例如「臺北市」；股價提醒填股票代碼；今日連結可填「今日連結」；經節提醒可填「聖經」。",
         },
         action: {
           type: "string",
-          description: "提醒文字或查詢目標。股價提醒填股票代碼；今日連結填「今日連結」。",
+          description: "提醒文字或查詢目標。股價提醒填股票代碼；今日連結填「今日連結」；經節提醒可填「隨機聖經經節」。",
         },
         time: {
           type: "string",
@@ -86,8 +86,8 @@ export const botTools = [
         },
         reminderType: {
           type: "string",
-          enum: ["generic", "weather", "stock", "watch_prices", "today_link", "arxiv_papers"],
-          description: "提醒內容類型。天氣用 weather；單一股票用 stock；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；一般文字用 generic。",
+          enum: ["generic", "weather", "stock", "watch_prices", "today_link", "arxiv_papers", "bible_verse"],
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；每日隨機經節用 bible_verse；一般文字用 generic。",
         },
         city: {
           type: "string",
@@ -404,6 +404,18 @@ export const botTools = [
       },
       "required": [],
     }
+  },
+  {
+    type: "function",
+    name: "get_random_bible_verse",
+    description: "隨機挑選一節恢復本聖經經文，適合回答「今天經節」「今日經文」「來一節聖經」等請求。",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    strict: true,
   },
   {
     type: "function",

@@ -22,6 +22,43 @@ export function isTodayLinkCommand(text) {
 }
 
 /**
+ * 判斷是否為「今天經節 / 今日經文」類命令
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isTodayBibleVerseCommand(text) {
+  const normalized = text.replace(/\s+/g, "").toLowerCase();
+
+  return (
+    normalized === "今天經節" ||
+    normalized === "今日經節" ||
+    normalized === "今天經文" ||
+    normalized === "今日經文" ||
+    normalized === "每日經節" ||
+    normalized === "每日經文" ||
+    normalized === "隨機經節" ||
+    normalized === "隨機經文" ||
+    normalized.includes("今天經節") ||
+    normalized.includes("今日經節") ||
+    normalized.includes("今天經文") ||
+    normalized.includes("今日經文") ||
+    normalized.includes("讀一節聖經") ||
+    normalized.includes("讀一點聖經") ||
+    normalized.includes("給我經節") ||
+    normalized.includes("來點經節") ||
+    (
+      normalized.includes("隨機") &&
+      (normalized.includes("聖經") || normalized.includes("經節") || normalized.includes("經文"))
+    ) ||
+    (
+      (normalized.includes("來一節") || normalized.includes("給我一節")) &&
+      (normalized.includes("聖經") || normalized.includes("經節") || normalized.includes("經文"))
+    )
+  );
+}
+
+/**
  * 判斷是否為重置圖片批次記錄命令。
  *
  * @param {string} text

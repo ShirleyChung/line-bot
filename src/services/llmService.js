@@ -148,6 +148,7 @@ export async function askLlmWithTools(userText, context = {}) {
         [
           "find_nearby_parking",
           "find_nearby_facilities",
+          "get_random_bible_verse",
           "get_recovery_bible_verses",
           "get_recovery_bible_notes",
           "get_life_study_excerpt",

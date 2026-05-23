@@ -39,6 +39,7 @@ import {
   findFacilitiesAlongRoute,
 } from "../services/placesService.js";
 import {
+  getRandomRecoveryBibleVerse,
   queryLifeStudyExcerpt,
   queryRecoveryBibleNotes,
   queryRecoveryBibleVerses,
@@ -264,14 +265,19 @@ export async function executeTool(name, args = {}, context = {}) {
     case "create_reminder": {
       const reminderType = args.reminderType || "generic";
       // LLM 可能依工具類型填 city/symbol/action，不同提醒在這裡收斂成共通 target/action。
-      const derivedTarget = args.target || args.city || args.symbol || "提醒";
+      const derivedTarget =
+        args.target ||
+        args.city ||
+        args.symbol ||
+        (reminderType === "bible_verse" ? "聖經" : "提醒");
       const derivedAction =
         args.action ||
         args.symbol ||
         (reminderType === "weather" && args.city ? `${args.city}天氣` : "") ||
         (reminderType === "watch_prices" ? "自選股股價" : "") ||
         (reminderType === "today_link" ? "今日連結" : "") ||
-        (reminderType === "arxiv_papers" ? "最新 arXiv 論文摘要" : "");
+        (reminderType === "arxiv_papers" ? "最新 arXiv 論文摘要" : "") ||
+        (reminderType === "bible_verse" ? "隨機聖經經節" : "");
 
       if (!derivedTarget || !derivedAction || !args.time) {
         throw new Error("create_reminder 缺少必要參數");
@@ -624,6 +630,27 @@ export async function executeTool(name, args = {}, context = {}) {
           reference: result.reference?.displayRef || "",
           keyword: result.keyword || "",
           mode: result.mode || "verse",
+        });
+      }
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
+      };
+    }
+
+    case "get_random_bible_verse": {
+      const sessionKey = context.sessionKey || buildSessionKey(context.source);
+      const hasSessionContext = sessionKey && sessionKey !== "unknown";
+      const result = await getRandomRecoveryBibleVerse();
+
+      if (hasSessionContext) {
+        await setLastBibleContext(sessionKey, {
+          query: result.reference?.displayRef || "",
+          reference: result.reference?.displayRef || "",
+          keyword: "",
+          mode: "random_verse",
         });
       }
 

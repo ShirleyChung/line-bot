@@ -5,6 +5,7 @@ import { fetchUSStockLatest } from "./finnhubService.js";
 import { getWatchPrices } from "./stockSelectService.js";
 import { buildWatchPricesMessage } from "../utils/format.js";
 import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
+import { getRandomRecoveryBibleVerse } from "./recoveryBibleService.js";
 
 export const REMINDER_TYPES = new Set([
   "generic",
@@ -13,6 +14,7 @@ export const REMINDER_TYPES = new Set([
   "watch_prices",
   "today_link",
   "arxiv_papers",
+  "bible_verse",
 ]);
 
 export const RECURRENCES = new Set(["none", "daily"]);
@@ -133,6 +135,11 @@ async function buildArxivPaperReminderMessage(reminder) {
   return `最新 CS / Engineering 論文摘要\n${digest}`;
 }
 
+async function buildBibleVerseReminderMessage() {
+  const result = await getRandomRecoveryBibleVerse();
+  return `聖經提醒\n${result.replyText}`;
+}
+
 /**
  * 根據提醒類型建構提醒訊息
  * @param {object} reminder - 提醒物件
@@ -158,6 +165,9 @@ export async function buildReminderMessage(reminder) {
 
     case "arxiv_papers":
       return buildArxivPaperReminderMessage(normalized);
+
+    case "bible_verse":
+      return buildBibleVerseReminderMessage();
 
     case "generic":
     default:
