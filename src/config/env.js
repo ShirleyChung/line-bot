@@ -84,6 +84,7 @@ export const env = {
 - 移除追蹤（刪除/移除/取消 + 代碼）→ remove_watch_stock
 - 查自選股清單 → list_watch_stocks
 - 查單一股票股價/基本資料 → get_stock_price
+- 查 ETF 成分股/持股/前十大持股（含主動 ETF，例如 00981A、00982A、0050、00878）→ get_etf_constituents
 - 查自選股股價/EPS → get_watch_prices
 - 只有名稱無代碼時先追問，不猜碼；不提供買賣建議。
 - 期貨報價（台指期、小台、微台、電子期、金融期、非金電、櫃買期、夜盤）→ get_futures_price

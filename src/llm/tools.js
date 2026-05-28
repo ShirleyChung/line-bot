@@ -333,6 +333,23 @@ export const botTools = [
   },
   {
     type: "function",
+    name: "get_etf_constituents",
+    description: "查詢台股 ETF（含主動式 ETF，例如 00981A、00982A、0050、00878）的前十大成分股與權重。非 ETF（如 2330、2454 等個股）會直接回覆「不是ETF」。",
+    parameters: {
+      type: "object",
+      properties: {
+        symbol: {
+          type: "string",
+          description: "台股 ETF 代碼，例如 00981A、00982A、0050、00878。"
+        }
+      },
+      required: ["symbol"],
+      additionalProperties: false
+    },
+    strict: true
+  },
+  {
+    type: "function",
     name: "get_futures_price",
     description: "查詢台股期貨報價（含夜盤），會自動回傳最近一段交易資料。支援大台指期(TX)、小型台指(MTX)、微型台指(TMF)、電子期(TE)、金融期(TF)、非金電(XIF)、櫃買期(GTF)。",
     parameters: {

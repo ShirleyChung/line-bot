@@ -23,6 +23,10 @@ import { fetchTaiwanStockLatest } from "../services/taiwanStockService.js";
 import { fetchUSStockLatest } from "../services/finnhubService.js";
 import { fetchYahooFuturesQuote } from "../services/yahooFuturesService.js";
 import { resolveFuturesSymbol } from "../services/futuresSymbolService.js";
+import {
+  fetchYahooEtfHoldings,
+  buildEtfHoldingsMessage,
+} from "../services/etfHoldingsService.js";
 import { buildWatchPricesMessage, buildFuturesQuoteMessage } from "../utils/format.js";
 import { fetchNews } from "../services/newsService.js";
 import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
@@ -544,6 +548,24 @@ export async function executeTool(name, args = {}, context = {}) {
         ok: true,
         tool: name,
         price,
+        text,
+      };
+    }
+
+    case "get_etf_constituents": {
+      const symbol = String(args.symbol || "").trim().toUpperCase();
+
+      if (!symbol) {
+        throw new Error("get_etf_constituents 缺少股票代碼 symbol");
+      }
+
+      const result = await fetchYahooEtfHoldings(symbol);
+      const text = buildEtfHoldingsMessage(result);
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
         text,
       };
     }
