@@ -79,6 +79,33 @@ function getRouteModeLabel(mode) {
   return ROUTE_MODE_LABELS[mode] || mode;
 }
 
+function detectFuturesCommodity(args = {}) {
+  const candidates = [args.commodity, args.target, args.action]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (resolveFuturesSymbol(candidate, args.contract).ok) {
+      return candidate;
+    }
+  }
+
+  return "";
+}
+
+function inferReminderType(args = {}) {
+  const requestedType = String(args.reminderType || "").trim();
+  if (requestedType && requestedType !== "generic") {
+    return requestedType;
+  }
+
+  if (args.city) return "weather";
+  if (args.symbol) return "stock";
+  if (detectFuturesCommodity(args)) return "futures";
+
+  return requestedType || "generic";
+}
+
 const QUERY_TOOL_NAMES = new Set([
   "get_today_link",
   "get_watch_prices",
@@ -300,20 +327,24 @@ export async function executeTool(name, args = {}, context = {}) {
     }
 
     case "create_reminder": {
-      const reminderType = args.reminderType || "generic";
+      const reminderType = inferReminderType(args);
+      const reminderCommodity = detectFuturesCommodity(args);
       // LLM 可能依工具類型填 city/symbol/action，不同提醒在這裡收斂成共通 target/action。
       const derivedTarget =
         args.target ||
         args.city ||
+        reminderCommodity ||
         args.symbol ||
         (reminderType === "bible_verse" ? "聖經" : "提醒");
       const derivedAction =
         args.action ||
+        reminderCommodity ||
         args.symbol ||
         (reminderType === "weather" && args.city ? `${args.city}天氣` : "") ||
         (reminderType === "watch_prices" ? "自選股股價" : "") ||
         (reminderType === "today_link" ? "今日連結" : "") ||
         (reminderType === "arxiv_papers" ? "最新 arXiv 論文摘要" : "") ||
+        (reminderType === "futures" && reminderCommodity ? `${reminderCommodity}${args.contract ? ` ${args.contract}` : ""}行情` : "") ||
         (reminderType === "bible_verse" ? "隨機聖經經節" : "");
 
       if (!derivedTarget || !derivedAction || !args.time) {
@@ -335,6 +366,8 @@ export async function executeTool(name, args = {}, context = {}) {
       // payload 保留各提醒類型需要的額外資料，之後 cron 產生提醒內容時會使用。
       if (args.city) payload.city = args.city;
       if (args.symbol) payload.symbol = args.symbol;
+      if (reminderCommodity) payload.commodity = reminderCommodity;
+      if (args.contract) payload.contract = args.contract;
       if (args.weatherTarget) payload.target = args.weatherTarget;
       if (reminderType === "arxiv_papers") {
         payload.max = Math.min(Math.max(Number(args.paperCount) || 6, 5), 8);

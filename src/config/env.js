@@ -70,10 +70,13 @@ export const env = {
 - reminderType 對應：
   - weather：天氣提醒（city 填台灣地名）
   - stock：單一股票（symbol）
+  - futures：台指期/大台/小台/微台/電子期/金融期/非金電/櫃買期等期貨行情提醒（commodity / contract）
   - watch_prices：自選股股價
   - today_link：今日/每日連結
   - arxiv_papers：論文提醒（paperCount 預設 6，限制 5-8）
   - bible_verse：每日經節/讀聖經提醒
+- 若使用者要的是「到時查當下行情再通知」，例如「每天早上 6 點通知我大台指行情」，要建立查詢型提醒（stock 或 futures），不要建立 generic 文字提醒。
+- futures 提醒時：commodity 直接填使用者用詞或代碼（如 大台指 / 台指期 / TXF / 小台 / TXFF6）；若有指定近月/次月/月份，再填 contract，否則留空。
 
 2) 圖片
 - 擷取圖片資料 → extract_image_data

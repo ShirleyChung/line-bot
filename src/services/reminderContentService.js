@@ -3,7 +3,9 @@ import { getWeatherForUser, formatWeatherReply } from "./weatherService.js";
 import { fetchTaiwanStockLatest } from "./taiwanStockService.js";
 import { fetchUSStockLatest } from "./finnhubService.js";
 import { getWatchPrices } from "./stockSelectService.js";
-import { buildWatchPricesMessage } from "../utils/format.js";
+import { buildWatchPricesMessage, buildFuturesQuoteMessage } from "../utils/format.js";
+import { fetchYahooFuturesQuote } from "./yahooFuturesService.js";
+import { resolveFuturesSymbol } from "./futuresSymbolService.js";
 import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
 import { getRandomRecoveryBibleVerse } from "./recoveryBibleService.js";
 
@@ -11,6 +13,7 @@ export const REMINDER_TYPES = new Set([
   "generic",
   "weather",
   "stock",
+  "futures",
   "watch_prices",
   "today_link",
   "arxiv_papers",
@@ -110,6 +113,28 @@ async function buildStockReminderMessage(reminder) {
 }
 
 /**
+ * 建構期貨提醒訊息
+ * @param {object} reminder - 提醒物件
+ * @returns {Promise<string>} 提醒訊息
+ */
+async function buildFuturesReminderMessage(reminder) {
+  const commodity = String(reminder.payload?.commodity || reminder.target || reminder.action || "").trim();
+  const contract = String(reminder.payload?.contract || "").trim();
+
+  if (!commodity) {
+    return "期貨提醒設定缺少商品資訊。";
+  }
+
+  const resolved = resolveFuturesSymbol(commodity, contract);
+  if (!resolved.ok) {
+    return `期貨提醒\n${resolved.message}`;
+  }
+
+  const quote = await fetchYahooFuturesQuote(resolved.symbol);
+  return `期貨提醒\n${buildFuturesQuoteMessage(quote, { commodity, contract })}`;
+}
+
+/**
  * 建構天氣提醒訊息
  * @param {object} reminder - 提醒物件
  * @returns {Promise<string>} 提醒訊息
@@ -154,6 +179,9 @@ export async function buildReminderMessage(reminder) {
 
     case "stock":
       return buildStockReminderMessage(normalized);
+
+    case "futures":
+      return buildFuturesReminderMessage(normalized);
 
     case "watch_prices": {
       const result = await getWatchPrices(normalized.owner);

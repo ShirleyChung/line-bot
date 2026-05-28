@@ -63,17 +63,17 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、自選股股價、今日連結、arXiv 最新論文摘要、每日經節。",
+    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、每日經節。",
     parameters: {
       type: "object",
       properties: {
         target: {
           type: "string",
-          description: "提醒對象或主題。天氣提醒填城市，例如「臺北市」；股價提醒填股票代碼；今日連結可填「今日連結」；經節提醒可填「聖經」。",
+          description: "提醒對象或主題。天氣提醒填城市，例如「臺北市」；股價提醒填股票代碼；期貨提醒可填「大台指」這類商品名稱；今日連結可填「今日連結」；經節提醒可填「聖經」。",
         },
         action: {
           type: "string",
-          description: "提醒文字或查詢目標。股價提醒填股票代碼；今日連結填「今日連結」；經節提醒可填「隨機聖經經節」。",
+          description: "提醒文字或查詢目標。股價提醒填股票代碼；期貨提醒可填「大台指行情」；今日連結填「今日連結」；經節提醒可填「隨機聖經經節」。",
         },
         time: {
           type: "string",
@@ -86,8 +86,8 @@ export const botTools = [
         },
         reminderType: {
           type: "string",
-          enum: ["generic", "weather", "stock", "watch_prices", "today_link", "arxiv_papers", "bible_verse"],
-          description: "提醒內容類型。天氣用 weather；單一股票用 stock；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；每日隨機經節用 bible_verse；一般文字用 generic。",
+          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "bible_verse"],
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；每日隨機經節用 bible_verse；一般文字用 generic。",
         },
         city: {
           type: "string",
@@ -96,6 +96,14 @@ export const botTools = [
         symbol: {
           type: "string",
           description: "股價提醒的股票代碼，例如 2330、NVDA。非股價提醒請填空字串。",
+        },
+        commodity: {
+          type: "string",
+          description: "期貨提醒的商品名稱或代碼，例如 大台指、台指期、TXF、小台、TXFF6。非期貨提醒請填空字串。",
+        },
+        contract: {
+          type: "string",
+          description: "期貨提醒的契約月份，可填 近月、次月、YYYYMM，或留空讓系統用預設契約。非期貨提醒請填空字串。",
         },
         weatherTarget: {
           type: "string",
@@ -107,7 +115,7 @@ export const botTools = [
           description: "arXiv 論文摘要要挑選的篇數，建議 5 到 8；非論文提醒填 0。",
         },
       },
-      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "weatherTarget", "paperCount"],
+      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount"],
       additionalProperties: false,
     },
     strict: true,
