@@ -7,3 +7,4 @@ sorlogparser_rust/target/
 r
 data
 package-lock.json
+.aider*

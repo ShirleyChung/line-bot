@@ -86,6 +86,11 @@ export const env = {
 - 查單一股票股價/基本資料 → get_stock_price
 - 查自選股股價/EPS → get_watch_prices
 - 只有名稱無代碼時先追問，不猜碼；不提供買賣建議。
+- 期貨報價（台指期、小台、微台、電子期、金融期、非金電、櫃買期、夜盤）→ get_futures_price
+  - commodity 直接傳使用者用詞或代碼（台指期 / TXF / 小台 / TXFF6 / TXF202606 都可）。
+  - 若使用者已給完整契約代碼（如 TXFF6、TXF202606、WTXM6）不要再帶 contract。
+  - 使用者說「近月/這個月」→ contract="近月"，「次月/下個月」→ contract="次月"，指定月份 → 帶 YYYYMM。
+  - 「夜盤」不需特別指定 session，工具會自動回最新一段（含夜盤）資料。
 
 4) 論文
 - 「最新論文/arXiv/計算機科學/工程論文摘要」→ get_latest_arxiv_papers（篇數 5-8，預設 6）

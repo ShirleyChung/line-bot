@@ -317,7 +317,7 @@ export const botTools = [
   {
   type: "function",
     name: "get_stock_price",
-    description: "查詢單一股票的最近收盤或即時資訊，並附基本資料（EPS、殖利率、本益比等），不需要加入自選股。支援台股股票/ETF（例如 2330、2454、00981A）與美股（例如 NVDA、QCOM、AAPL）。",
+    description: "查詢單一股票的最近收盤或即時資訊，並附基本資料（EPS、殖利率、本益比等），不需要加入自選股。支援台股股票/ETF（例如 2330、2454、00981A）與美股（例如 NVDA、QCOM、AAPL）。期貨請改用 get_futures_price。",
     parameters: {
       type: "object",
       properties: {
@@ -330,6 +330,27 @@ export const botTools = [
       additionalProperties: false
       },
     strict: true
+  },
+  {
+    type: "function",
+    name: "get_futures_price",
+    description: "查詢台股期貨報價（含夜盤），會自動回傳最近一段交易資料。支援大台指期(TX)、小型台指(MTX)、微型台指(TMF)、電子期(TE)、金融期(TF)、非金電(XIF)、櫃買期(GTF)。",
+    parameters: {
+      type: "object",
+      properties: {
+        commodity: {
+          type: "string",
+          description: "商品名稱或代碼。可填中文（台指期、小台、微台、電子期、金融期、非金電、櫃買期），或 TAIFEX 代碼（TXF、MXF、TMF、TE、TF），也可直接填完整契約代碼（TXFF6、TXF202606、WTXM6 等）。"
+        },
+        contract: {
+          type: "string",
+          description: "（選填）契約月份。可填「近月」、「次月」、YYYYMM（如 202606）、YYMM（如 2606），或月份字母+年末碼（如 M6）。若 commodity 已包含完整契約代碼則省略，未指定時預設近月。"
+        }
+      },
+      required: ["commodity"],
+      additionalProperties: false
+    },
+    strict: false
   },
   {
     type: "function",

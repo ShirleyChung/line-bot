@@ -276,6 +276,59 @@ export function buildWatchPricesMessage(prices) {
   return lines.join("\n").trim();
 }
 
+export function buildFuturesQuoteMessage(quote, request = {}) {
+  if (!quote) {
+    return "查無期貨報價。";
+  }
+
+  if (!quote.found) {
+    const label = request.commodity
+      ? `${request.commodity}${request.contract ? ` ${request.contract}` : ""}`
+      : quote.symbol || "期貨";
+    return `查詢失敗：${label}\n${quote.message || "查無資料"}`;
+  }
+
+  const lines = [];
+  lines.push("【期貨報價】");
+  lines.push("");
+
+  const titleParts = [quote.name || quote.symbol];
+  if (quote.symbol && quote.symbol !== quote.name) {
+    titleParts.push(`(${quote.symbol})`);
+  }
+  lines.push(titleParts.join(" "));
+
+  if (quote.time) {
+    const sessionTag = quote.session ? `｜${quote.session}` : "";
+    lines.push(`資料時間：${quote.time}${sessionTag}`);
+  }
+
+  const change = formatChange(quote.change);
+  const pct = quote.changePercent ? ` (${quote.changePercent})` : "";
+  lines.push(`價：${formatPrice(quote.close)} ${change}${pct}`);
+
+  if (quote.open != null || quote.high != null || quote.low != null) {
+    lines.push(`開/高/低：${formatPrice(quote.open)} / ${formatPrice(quote.high)} / ${formatPrice(quote.low)}`);
+  }
+
+  if (quote.previousClose != null) {
+    lines.push(`前日收：${formatPrice(quote.previousClose)}`);
+  }
+
+  if (quote.volume != null) {
+    lines.push(`成交量：${formatNumber(quote.volume)} 口`);
+  }
+
+  if (quote.openInterest != null) {
+    lines.push(`未平倉：${formatNumber(quote.openInterest)} 口`);
+  }
+
+  lines.push("");
+  lines.push("資料來源：Yahoo 奇摩股市");
+
+  return lines.join("\n").trim();
+}
+
 export function buildNewsMessage(news, query = "") {
   const items = Array.isArray(news) ? news : [];
 

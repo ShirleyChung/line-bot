@@ -21,7 +21,9 @@ import {
 } from "../services/stockSelectService.js";
 import { fetchTaiwanStockLatest } from "../services/taiwanStockService.js";
 import { fetchUSStockLatest } from "../services/finnhubService.js";
-import { buildWatchPricesMessage } from "../utils/format.js";
+import { fetchYahooFuturesQuote } from "../services/yahooFuturesService.js";
+import { resolveFuturesSymbol } from "../services/futuresSymbolService.js";
+import { buildWatchPricesMessage, buildFuturesQuoteMessage } from "../utils/format.js";
 import { fetchNews } from "../services/newsService.js";
 import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
 import { buildNewsMessage } from "../utils/format.js";
@@ -542,6 +544,32 @@ export async function executeTool(name, args = {}, context = {}) {
         ok: true,
         tool: name,
         price,
+        text,
+      };
+    }
+
+    case "get_futures_price": {
+      const resolved = resolveFuturesSymbol(args.commodity, args.contract);
+      if (!resolved.ok) {
+        return {
+          ok: true,
+          tool: name,
+          text: resolved.message,
+        };
+      }
+
+      const quote = await fetchYahooFuturesQuote(resolved.symbol);
+      // 不論成功失敗，都讓 buildFuturesQuoteMessage 直接組好回覆字串給使用者
+      const text = buildFuturesQuoteMessage(quote, {
+        commodity: args.commodity,
+        contract: args.contract,
+      });
+
+      return {
+        ok: true,
+        tool: name,
+        yahooSymbol: resolved.symbol,
+        quote,
         text,
       };
     }
