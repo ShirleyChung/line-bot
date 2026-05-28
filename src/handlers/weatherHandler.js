@@ -50,10 +50,8 @@ export async function handleWeatherMessage(event) {
     target,
   });
 
-  if (data?.reason === "need_city") {
-    return false;
-  }
-
+  // 沒指定地點且沒有預設地點時，直接由 handler 給提示，
+  // 不再退回 LLM 反覆詢問地點。
   await replyText(event, formatWeatherReply(data));
 
   return true;

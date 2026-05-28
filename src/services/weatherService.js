@@ -296,13 +296,23 @@ export function extractWeatherCityFromText(text) {
     .replace(/會不會下雨/g, '')
     .replace(/會下雨嗎/g, '')
     .replace(/下雨嗎/g, '')
+    .replace(/怎麼樣/g, '')
+    .replace(/怎樣/g, '')
+    .replace(/如何/g, '')
+    .replace(/呢/g, '')
+    .replace(/嗎/g, '')
     .replace(/[？?！!。,.，]/g, '')
     .trim();
 
   if (!s) return null;
 
+  // 只有確實解析成台灣縣市 / 鄉鎮市區時才回傳，
+  // 避免「如何」「怎麼樣」之類殘留字被當成地名，蓋掉預設地點的 fallback。
   const location = normalizeTaiwanWeatherLocation(s);
-  return location?.label || null;
+  if (location?.type === 'city' || location?.type === 'township') {
+    return location.label;
+  }
+  return null;
 }
 
 export function isWeatherIntent(text) {
