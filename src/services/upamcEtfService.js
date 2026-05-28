@@ -9,6 +9,7 @@ import zlib from "node:zlib";
 const BASE = "https://www.ezmoney.com.tw";
 const INIT_PATH = "/ETF";
 const PCF_PATH = "/ETF/Fund/AssetExcelNPOI";
+const UNIT_MARKET_RATIO_PATH = "/ETF/Transaction/UnitMarketRatio";
 
 const COMMON_HEADERS = {
   "User-Agent":
@@ -36,6 +37,9 @@ export function isUpamcEtf(symbol) {
   return Object.prototype.hasOwnProperty.call(UPAMC_CODE_MAP, code);
 }
 
+const UPAMC_PREMIUM_CACHE_TTL_MS = 60 * 1000;
+const upamcPremiumCache = new Map();
+
 // 取 __nxquid cookie。第一次打 /ETF 會回 302 + Set-Cookie，照單收下即可。
 async function fetchNxquidCookie() {
   const res = await fetch(BASE + INIT_PATH, {
@@ -49,6 +53,22 @@ async function fetchNxquidCookie() {
     throw new Error(`統一投信 cookie 取得失敗（HTTP ${res.status}）`);
   }
   return `__nxquid=${m[1]}`;
+}
+
+function getSetCookieHeaders(res) {
+  if (typeof res.headers.getSetCookie === "function") {
+    return res.headers.getSetCookie();
+  }
+  const one = res.headers.get("set-cookie");
+  return one ? [one] : [];
+}
+
+function pickCookie(setCookies, name) {
+  for (const raw of setCookies || []) {
+    const m = String(raw).match(new RegExp(`(?:^|\\s)${name}=([^;]+)`));
+    if (m) return `${name}=${m[1]}`;
+  }
+  return null;
 }
 
 async function downloadPcfXlsx(fundCode) {
@@ -223,6 +243,134 @@ function extractDate(rows, sharedStrings) {
     if (m) return rocToAd(m[1]);
   }
   return null;
+}
+
+function parseUnitMarketRatioResponse(text) {
+  const payload = JSON.parse(text);
+  const parts = String(payload || "").split("|");
+
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const positive = parts[0] ? JSON.parse(parts[0]) : [];
+  const negative = parts[1] ? JSON.parse(parts[1]) : [];
+  const points = [...positive, ...negative];
+
+  if (!Array.isArray(points) || points.length === 0) {
+    return null;
+  }
+
+  let latest = null;
+  for (const p of points) {
+    if (!Array.isArray(p) || p.length < 2) continue;
+    const ts = Number(p[0]);
+    const value = Number(p[1]);
+    if (!Number.isFinite(ts) || !Number.isFinite(value)) continue;
+    if (!latest || ts > latest.ts) {
+      latest = { ts, value };
+    }
+  }
+
+  return latest ? latest.value : null;
+}
+
+export async function fetchUpamcEtfPremium(symbol) {
+  const code = String(symbol || "").trim().toUpperCase();
+  const fundCode = UPAMC_CODE_MAP[code];
+
+  if (!fundCode) {
+    throw new Error(`統一投信無此 ETF：${code}`);
+  }
+
+  const now = Date.now();
+  const cached = upamcPremiumCache.get(code);
+  if (cached && now - cached.cachedAt < UPAMC_PREMIUM_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const nxquid = await fetchNxquidCookie();
+  const pageUrl = `${BASE}${UNIT_MARKET_RATIO_PATH}?fundCode=${encodeURIComponent(fundCode)}&agree=y`;
+  const pageRes = await fetch(pageUrl, {
+    method: "GET",
+    headers: {
+      ...COMMON_HEADERS,
+      Cookie: nxquid,
+    },
+    redirect: "follow",
+  });
+
+  const pageText = await pageRes.text();
+
+  if (!pageRes.ok) {
+    throw new Error(`統一投信折溢價頁面讀取失敗 HTTP ${pageRes.status}`);
+  }
+
+  const tokenMatch = pageText.match(
+    /name="__RequestVerificationToken"\s+type="hidden"\s+value="([^"]+)"/
+  );
+  if (!tokenMatch) {
+    throw new Error("統一投信折溢價頁面缺少驗證資訊");
+  }
+
+  const csrfHidden = tokenMatch[1];
+  const setCookies = getSetCookieHeaders(pageRes);
+  const aspSession = pickCookie(setCookies, "ASP.NET_SessionId");
+  const csrfCookie = pickCookie(setCookies, "__RequestVerificationToken");
+
+  if (!aspSession || !csrfCookie) {
+    throw new Error("統一投信折溢價頁面缺少必要 cookie");
+  }
+
+  const postRes = await fetch(`${BASE}${UNIT_MARKET_RATIO_PATH}`, {
+    method: "POST",
+    headers: {
+      ...COMMON_HEADERS,
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      Origin: BASE,
+      Referer: pageUrl,
+      __RequestVerificationToken: csrfHidden,
+      Cookie: `${nxquid}; ${aspSession}; ${csrfCookie}`,
+    },
+    body: `Fund=${encodeURIComponent(fundCode)}`,
+    redirect: "follow",
+  });
+
+  const postText = await postRes.text();
+
+  if (!postRes.ok) {
+    throw new Error(`統一投信折溢價查詢失敗 HTTP ${postRes.status}`);
+  }
+
+  const premiumPercent = parseUnitMarketRatioResponse(postText);
+  if (premiumPercent == null) {
+    const missing = {
+      symbol: code,
+      found: false,
+      source: "UPAMC_EZMONEY_UNIT_MARKET_RATIO",
+      message: "查無統一投信折溢價資料。",
+    };
+    upamcPremiumCache.set(code, {
+      cachedAt: now,
+      data: missing,
+    });
+    return missing;
+  }
+
+  const result = {
+    symbol: code,
+    found: true,
+    source: "UPAMC_EZMONEY_UNIT_MARKET_RATIO",
+    premiumPercent,
+  };
+
+  upamcPremiumCache.set(code, {
+    cachedAt: now,
+    data: result,
+  });
+
+  return result;
 }
 
 export async function fetchUpamcEtfHoldings(symbol) {

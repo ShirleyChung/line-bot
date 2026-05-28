@@ -79,6 +79,35 @@ function getRouteModeLabel(mode) {
   return ROUTE_MODE_LABELS[mode] || mode;
 }
 
+const QUERY_TOOL_NAMES = new Set([
+  "get_today_link",
+  "get_watch_prices",
+  "get_stock_price",
+  "get_etf_constituents",
+  "get_futures_price",
+  "get_latest_arxiv_papers",
+  "find_nearby_parking",
+  "find_nearby_facilities",
+  "get_recovery_bible_verses",
+  "get_random_bible_verse",
+  "get_recovery_bible_notes",
+  "get_life_study_excerpt",
+  "web_search",
+  "searchNews",
+  "get_weather",
+  "get_route_info",
+  "find_landmarks_along_route",
+  "find_facilities_along_route",
+]);
+
+function buildQueryFailureMessage(error) {
+  const detail = String(error?.message || error || "").trim();
+  if (!detail) {
+    return "查詢失敗，請稍後再試。";
+  }
+  return `查詢失敗：${detail.slice(0, 500)}`;
+}
+
 /**
  * 工具執行器是 LLM function call 與實際 service 之間的轉接層。
  * 這裡負責驗證參數、補齊 owner/session 等上下文，並把 service 結果整理成模型可讀格式。
@@ -217,7 +246,8 @@ function formatNearbyFacilityToolReply(locationQuery, facilityQuery, result) {
  * @returns {Promise<object>}
  */
 export async function executeTool(name, args = {}, context = {}) {
-  switch (name) {
+  try {
+    switch (name) {
     case "extract_image_data": {
       const imageIds = Array.isArray(context.imageIds) && context.imageIds.length
         ? context.imageIds
@@ -1052,7 +1082,19 @@ export async function executeTool(name, args = {}, context = {}) {
       };
     }
 
-    default:
-      throw new Error(`未知的工具名稱：${name}`);
+      default:
+        throw new Error(`未知的工具名稱：${name}`);
+    }
+  } catch (error) {
+    if (QUERY_TOOL_NAMES.has(name)) {
+      const message = buildQueryFailureMessage(error);
+      return {
+        ok: false,
+        tool: name,
+        message,
+        replyText: message,
+      };
+    }
+    throw error;
   }
 }

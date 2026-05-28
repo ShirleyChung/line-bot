@@ -154,6 +154,9 @@ export function buildWatchPricesMessage(prices) {
 
       lines.push(`${name}：${symbol}`);
       lines.push(`價：${formatPrice(p.close)} ${formatChange(p.change)}`);
+      if (p.etfPremiumPercent != null) {
+        lines.push(`ETF折溢價：${formatChange(p.etfPremiumPercent)}%`);
+      }
       lines.push(...formatFundamentalLines(p.fundamentals));
       lines.push(`成交量：${formatNumber(p.volume)}`);
     }
@@ -186,6 +189,9 @@ export function buildWatchPricesMessage(prices) {
 
       lines.push(`${name}：${symbol}`);
       lines.push(`價：${formatPrice(p.close)} ${formatChange(p.change)}`);
+      if (p.etfPremiumPercent != null) {
+        lines.push(`ETF折溢價：${formatChange(p.etfPremiumPercent)}%`);
+      }
       lines.push(...formatFundamentalLines(p.fundamentals));
       lines.push(`成交量：${formatNumber(p.volume)}`);
     }
@@ -218,6 +224,9 @@ export function buildWatchPricesMessage(prices) {
 
       lines.push(`${name}：${symbol}`);
       lines.push(`均價：${formatPrice(p.close)}`);
+      if (p.etfPremiumPercent != null) {
+        lines.push(`ETF折溢價：${formatChange(p.etfPremiumPercent)}%`);
+      }
       if (p.high != null && p.low != null) {
         lines.push(`高/低：${formatPrice(p.high)} / ${formatPrice(p.low)}`);
       }

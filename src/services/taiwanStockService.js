@@ -3,9 +3,39 @@ import {
   fetchTpexEmergingLatestAverage,
   fetchTpexListedLatestClose,
 } from "./tpexStockService.js";
+import { fetchTaiwanEtfPremium } from "./yahooEtfPremiumService.js";
 
 function isFound(price) {
   return Boolean(price && price.found);
+}
+
+function shouldTryEtfPremium(symbol) {
+  const code = String(symbol || "").trim().toUpperCase();
+  return /^00\d{2,4}[A-Z]?$/.test(code);
+}
+
+async function withEtfPremium(price) {
+  if (!isFound(price)) {
+    return price;
+  }
+
+  if (!shouldTryEtfPremium(price.symbol)) {
+    return price;
+  }
+
+  try {
+    const premium = await fetchTaiwanEtfPremium(price.symbol);
+    if (premium.found && premium.premiumPercent != null) {
+      return {
+        ...price,
+        etfPremiumPercent: premium.premiumPercent,
+      };
+    }
+  } catch (err) {
+    console.warn("[fetchTaiwanStockLatest] ETF 折溢價查詢失敗：", price.symbol, err);
+  }
+
+  return price;
 }
 
 export async function fetchTaiwanStockLatest(symbol, dateYmd) {
@@ -15,10 +45,10 @@ export async function fetchTaiwanStockLatest(symbol, dateYmd) {
   const twse = await fetchTwseLatestClose(code, dateYmd);
   attempts.push(twse);
   if (isFound(twse)) {
-    return {
+    return withEtfPremium({
       ...twse,
       market: "TWSE",
-    };
+    });
   }
 
   let tpexListed;
@@ -34,7 +64,7 @@ export async function fetchTaiwanStockLatest(symbol, dateYmd) {
   }
   attempts.push(tpexListed);
   if (isFound(tpexListed)) {
-    return tpexListed;
+    return withEtfPremium(tpexListed);
   }
 
   let tpexEmerging;
@@ -50,7 +80,7 @@ export async function fetchTaiwanStockLatest(symbol, dateYmd) {
   }
   attempts.push(tpexEmerging);
   if (isFound(tpexEmerging)) {
-    return tpexEmerging;
+    return withEtfPremium(tpexEmerging);
   }
 
   return {
