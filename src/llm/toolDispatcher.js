@@ -24,7 +24,7 @@ import { fetchUSStockLatest } from "../services/finnhubService.js";
 import { fetchYahooFuturesQuote } from "../services/yahooFuturesService.js";
 import { resolveFuturesSymbol } from "../services/futuresSymbolService.js";
 import {
-  fetchYahooEtfHoldings,
+  fetchEtfHoldings,
   buildEtfHoldingsMessage,
 } from "../services/etfHoldingsService.js";
 import { buildWatchPricesMessage, buildFuturesQuoteMessage } from "../utils/format.js";
@@ -559,7 +559,7 @@ export async function executeTool(name, args = {}, context = {}) {
         throw new Error("get_etf_constituents 缺少股票代碼 symbol");
       }
 
-      const result = await fetchYahooEtfHoldings(symbol);
+      const result = await fetchEtfHoldings(symbol);
       const text = buildEtfHoldingsMessage(result);
 
       return {

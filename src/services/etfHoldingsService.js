@@ -1,6 +1,9 @@
 // services/etfHoldingsService.js
-// 透過 Yahoo 股市抓 ETF（含主動式 ETF）的前十大成分股。
+// 抓 ETF（含主動式 ETF）前十大成分股。
+// 優先走發行投信的官方 PCF（資料較新，T-1），失敗或不在表內時 fallback 到 Yahoo（前十大，但通常落後 1–2 個月）。
 // 對非 ETF 的個股，Yahoo 會把 /holding 重新導向回行情頁，藉此判別是否為 ETF。
+
+import { isUpamcEtf, fetchUpamcEtfHoldings } from "./upamcEtfService.js";
 
 const YAHOO_TW_HOLDING_URL = "https://tw.stock.yahoo.com/quote/";
 
@@ -94,5 +97,26 @@ export function buildEtfHoldingsMessage(result) {
   for (const h of result.holdings) {
     lines.push(`${h.rank}. ${h.name} ${h.ratio}`);
   }
+  if (result.source === "UPAMC" && result.totalHoldings > result.holdings.length) {
+    lines.push(`（共 ${result.totalHoldings} 檔，資料來源：統一投信）`);
+  }
   return lines.join("\n");
+}
+
+// 主要進入點：依代碼路由到對應投信 fetcher，失敗則退回 Yahoo。
+export async function fetchEtfHoldings(symbol) {
+  const code = String(symbol || "").trim().toUpperCase();
+  if (!code) {
+    throw new Error("缺少股票代碼");
+  }
+
+  if (isUpamcEtf(code)) {
+    try {
+      return await fetchUpamcEtfHoldings(code);
+    } catch (err) {
+      console.warn("[fetchEtfHoldings] UPAMC 失敗，改用 Yahoo：", err?.message || err);
+    }
+  }
+
+  return fetchYahooEtfHoldings(code);
 }
