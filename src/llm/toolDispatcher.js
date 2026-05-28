@@ -1,5 +1,5 @@
 import { createReminder, listReminders, deleteReminderByOwner } from "../services/reminderService.js";
-import { normalizeReminderData } from "../services/reminderContentService.js";
+import { getNextReminderTime, normalizeReminderData } from "../services/reminderContentService.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
 import { replyText } from "../platform/reply.js";
@@ -358,7 +358,13 @@ export async function executeTool(name, args = {}, context = {}) {
         throw new Error(`create_reminder 時間格式錯誤：${args.time}`);
       }
 
-      if (reminderTime <= new Date()) {
+      const now = new Date();
+      const normalizedReminderTime =
+        args.recurrence === "daily" && reminderTime <= now
+          ? getNextReminderTime({ time: reminderTime, recurrence: "daily" }, now)
+          : reminderTime;
+
+      if (!normalizedReminderTime || normalizedReminderTime <= now) {
         throw new Error(`create_reminder 時間已過：${args.time}`);
       }
 
@@ -377,7 +383,7 @@ export async function executeTool(name, args = {}, context = {}) {
         owner,
         target: derivedTarget,
         action: derivedAction,
-        time: reminderTime,
+        time: normalizedReminderTime,
         recurrence: args.recurrence || "none",
         reminderType,
         payload,
@@ -395,7 +401,7 @@ export async function executeTool(name, args = {}, context = {}) {
         recurrence: reminderData.recurrence,
         reminderType: reminderData.reminderType,
         payload: reminderData.payload,
-        time: reminderTime.toISOString(),
+        time: normalizedReminderTime.toISOString(),
       };
     }
 

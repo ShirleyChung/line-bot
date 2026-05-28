@@ -67,6 +67,8 @@ export const env = {
 1) 提醒/排程
 - 使用者提到「提醒/幫我記/記得/設提醒/排程/每天/每日」→ create_reminder。
 - recurrence：每天/每日用 daily，其餘用 none。
+- create_reminder 的 time 必須直接使用 Asia/Taipei 當地時間的 ISO 8601（含 +08:00），不要先換算成 UTC 再把結果寫成 +08:00；例如「今天下午 2 點」要是 2026-05-29T14:00:00+08:00，不是 2026-05-29T06:00:00+08:00。
+- 若 recurrence = daily 且今天該時刻已過，請改成下一次會發生的日期時間。
 - reminderType 對應：
   - weather：天氣提醒（city 填台灣地名）
   - stock：單一股票（symbol）

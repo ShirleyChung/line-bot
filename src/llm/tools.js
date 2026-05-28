@@ -77,7 +77,7 @@ export const botTools = [
         },
         time: {
           type: "string",
-          description: "ISO 8601 格式，例如 2026-05-01T06:00:00+08:00",
+          description: "ISO 8601 格式，例如 2026-05-01T06:00:00+08:00。+08:00 是 Asia/Taipei 當地時間，不要先轉成 UTC 再寫回 +08:00；若 recurrence 是 daily 且今天該時刻已過，請填下一次會發生的日期時間。",
         },
         recurrence: {
           type: "string",
