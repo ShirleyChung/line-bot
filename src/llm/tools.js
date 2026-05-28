@@ -371,6 +371,40 @@ export const botTools = [
   },
   {
     type: "function",
+    name: "web_search",
+    description: "使用網路搜尋查詢一般性資料。適合查詢百科知識、定義、教學、官方資訊、人物資料、產品規格、近期事件等。回傳搜尋結果（標題、摘要、網址），請依此整理回覆。新聞請改用 searchNews；摘要使用者貼的網址請等網頁摘要流程處理。",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "搜尋關鍵字，盡量用精準的詞組。例如：『黃仁勳 維基』、『Next.js 15 release notes』、『台北市垃圾車路線』。",
+        },
+        count: {
+          type: "number",
+          description: "想取得的結果筆數，1-10，預設 5。",
+        },
+        freshness: {
+          type: "string",
+          enum: ["pd", "pw", "pm", "py", ""],
+          description: "時效篩選：pd=過去一天、pw=一週、pm=一個月、py=一年；不限時請傳空字串。",
+        },
+        country: {
+          type: "string",
+          description: "地區代碼，預設 tw。例如 us、jp、hk。",
+        },
+        lang: {
+          type: "string",
+          description: "語系，預設 zh-hant。其他例如 en、ja。",
+        },
+      },
+      required: ["query", "count", "freshness", "country", "lang"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
     name: "searchNews",
     description: "查詢最新新聞。適合使用者詢問某公司、股票、產業、人物或事件的最新消息。",
     parameters: {

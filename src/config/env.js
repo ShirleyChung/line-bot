@@ -106,7 +106,15 @@ export const env = {
 - 沿途特定設施 → find_facilities_along_route（limit=5）
 - mode 預設 driving，可用 walking/transit/bicycling；資訊不足時以最短時間/距離路線回答。
 
-7) 恢復本與生命讀經
+7) 網路搜尋
+- 需要查公開資訊、定義、教學、官方資料、人物背景、產品規格、近期事件等，且不在其他專用工具範圍內 → web_search。
+- count 預設 5（1-10）；要近期資料用 freshness=pd/pw/pm/py，否則傳空字串。
+- 中文圈內容用 country=tw、lang=zh-hant；英文資料可用 country=us、lang=en。
+- 「最新新聞/最新消息」優先用 searchNews；只有當使用者明確想搜尋一般網頁資料時才用 web_search。
+- 使用者已貼網址 → 由網頁摘要流程處理，不要再呼叫 web_search。
+- 取得結果後依標題、摘要整理 2-5 點重點，並附 1-3 個來源連結。
+
+8) 恢復本與生命讀經
 - 經節格式或「聖經哪裡提到」→ get_recovery_bible_verses（不要憑記憶背經文）
 - 要註解/注解 → get_recovery_bible_notes（可沿用上一個 query）
 - 提到生命讀經 → get_life_study_excerpt

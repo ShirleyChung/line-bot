@@ -29,6 +29,7 @@ import {
 } from "../services/etfHoldingsService.js";
 import { buildWatchPricesMessage, buildFuturesQuoteMessage } from "../utils/format.js";
 import { fetchNews } from "../services/newsService.js";
+import { searchWeb } from "../services/webSearchService.js";
 import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
 import { buildNewsMessage } from "../utils/format.js";
 import {
@@ -767,6 +768,27 @@ export async function executeTool(name, args = {}, context = {}) {
           mode: "life_study",
         });
       }
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
+      };
+    }
+
+    case "web_search": {
+      const query = String(args.query || "").trim();
+      if (!query) {
+        throw new Error("web_search 缺少查詢字串 query");
+      }
+
+      const result = await searchWeb({
+        query,
+        count: Number(args.count) || 5,
+        freshness: args.freshness || "",
+        country: args.country || "tw",
+        lang: args.lang || "zh-hant",
+      });
 
       return {
         ok: true,
