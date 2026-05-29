@@ -19,8 +19,6 @@ const BOTFRAMEWORK_OPENID_URL =
   "https://login.botframework.com/v1/.well-known/openidconfiguration";
 const BOTFRAMEWORK_ISSUER = "https://api.botframework.com";
 const TOKEN_URL =
-  "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token";
-const TOKEN_URL =
   `https://login.microsoftonline.com/${env.TEAMS_TENANT_ID}/oauth2/v2.0/token`;
 const TOKEN_SCOPE = "https://api.botframework.com/.default";
 
