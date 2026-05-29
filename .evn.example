@@ -36,3 +36,11 @@ FINNHUB_API_KEY=your_finnhub_api_key
 # GNews 設定（新聞搜尋）
 # =========================
 GNEWS_API_KEY=your_gnews_api_key
+
+# =========================
+# Microsoft Teams（Bot Framework / Azure Bot）
+# =========================
+# 在 Azure Portal 註冊 Bot 後拿到的 App ID 與 client secret。
+# 未設定時 /teams/webhook 仍可啟動但會略過 JWT 驗章，僅適合本地測試。
+TEAMS_APP_ID=your_teams_app_id
+TEAMS_APP_PASSWORD=your_teams_app_password

@@ -16,6 +16,7 @@ import { routeMessageEvent } from "./router/commandRouter.js";
 import { getSorLogResultFile } from "./services/sorLogService.js";
 import { normalizeTelegramUpdate, sendTelegramText, verifyTelegramSecret } from "./platform/telegram.js";
 import { normalizeMetaWebhook, sendMetaText, verifyMetaWebhook } from "./platform/meta.js";
+import { normalizeTeamsActivity, pushTeamsReminder, verifyTeamsRequest } from "./platform/teams.js";
 import { getDueReminders, deleteReminder, rescheduleReminder } from "./services/reminderService.js";
 import { buildReminderMessage, getNextReminderTime } from "./services/reminderContentService.js";
 
@@ -141,6 +142,29 @@ app.post("/instagram/webhook", express.json(), async (req, res) => {
 });
 
 /**
+ * Microsoft Teams (Bot Framework / Azure Bot) webhook 入口
+ *
+ * Bot Framework 會在 Authorization header 帶 JWT，由 verifyTeamsRequest
+ * 驗章；通過後將 activity 正規化交給共用 router。
+ */
+app.post("/teams/webhook", express.json(), async (req, res) => {
+  const authorized = await verifyTeamsRequest(req);
+  if (!authorized) {
+    return res.status(401).send("invalid teams auth");
+  }
+
+  try {
+    const events = attachRequestBaseUrl(normalizeTeamsActivity(req.body), req);
+    await Promise.all(events.map(routeMessageEvent));
+
+    res.status(200).end();
+  } catch (error) {
+    console.error("Teams webhook error:", error);
+    res.status(500).end();
+  }
+});
+
+/**
  * 提醒功能
  */
 /**
@@ -189,6 +213,11 @@ async function pushReminder(owner, text) {
 
     await sendTelegramText(chatId, text);
     return { platform: "telegram", targetId: chatId };
+  }
+
+  if (owner?.startsWith("teams:user:teams:")) {
+    const conversationId = await pushTeamsReminder(owner, text);
+    return { platform: "teams", targetId: conversationId };
   }
 
   for (const platform of ["facebook", "instagram"]) {

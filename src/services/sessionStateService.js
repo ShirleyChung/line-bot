@@ -190,3 +190,39 @@ export async function getLastBibleContext(sessionKey) {
 
   return doc.data()?.lastBibleContext || null;
 }
+
+/**
+ * 保存 Teams conversation reference，供之後主動推送（例如提醒）使用。
+ * 與其他平台不同，Teams Bot Framework 不能單靠 user id 回覆，
+ * 必須帶 serviceUrl / conversationId / bot id 才能呼叫 reply API。
+ * @param {string} sessionKey - session 識別碼
+ * @param {object} ref - Teams conversation reference
+ * @returns {Promise<void>}
+ */
+export async function setTeamsConversationRef(sessionKey, ref) {
+  if (!sessionKey || !ref) return;
+
+  await db.collection(COLLECTION).doc(sessionKey).set(
+    {
+      teamsConversationRef: {
+        ...ref,
+        updatedAt: new Date(),
+      },
+    },
+    { merge: true }
+  );
+}
+
+/**
+ * 取得已保存的 Teams conversation reference
+ * @param {string} sessionKey - session 識別碼
+ * @returns {Promise<object|null>}
+ */
+export async function getTeamsConversationRef(sessionKey) {
+  if (!sessionKey) return null;
+
+  const doc = await db.collection(COLLECTION).doc(sessionKey).get();
+  if (!doc.exists) return null;
+
+  return doc.data()?.teamsConversationRef || null;
+}

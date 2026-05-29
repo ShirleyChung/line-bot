@@ -30,6 +30,7 @@ The repo uses a git submodule for `sorlogparser_rust`. After clone, run `git sub
 - `POST /webhook` — LINE, with `line.middleware()` signature verification.
 - `POST /telegram/webhook` — verifies `X-Telegram-Bot-Api-Secret-Token`.
 - `GET|POST /facebook/webhook`, `GET|POST /instagram/webhook` — Meta verify + receive.
+- `POST /teams/webhook` — Microsoft Teams (Bot Framework), verifies the inbound JWT against `https://login.botframework.com/v1/.well-known/openidconfiguration` using `jose`. Replies require a bearer token fetched via OAuth client_credentials and POSTed back to the activity's `serviceUrl`.
 - `GET /cron/check-reminders` — invoked by Cloud Scheduler; pushes due reminders and reschedules/deletes them.
 - `GET /sor-log-results/:token` — download endpoint for SOR log query result files.
 
@@ -60,6 +61,7 @@ Owners (used as Firestore document keys for reminders, watchlists, etc.) are der
 - LINE 1:1: `user:Uxxx`, group: `group:Gxxx`, room: `room:Rxxx`
 - Telegram: `telegram:user:telegram:<chatId>`
 - Meta: `facebook:user:facebook:<id>`, `instagram:user:instagram:<id>`
+- Teams: `teams:user:teams:<conversationId>` — anchored on the Bot Framework `conversation.id` (so 1:1, group chats, and channels each get their own session). The full conversation reference (`serviceUrl`, `bot`/`recipient` IDs, `tenantId`) is persisted in `session_state.teamsConversationRef` on first reply, because proactive pushes (reminders) need it.
 
 `src/index.js#pushReminder` reverses these prefixes to push back to the right platform. Keep that mapping in sync if you add a new platform.
 

@@ -45,6 +45,11 @@ export const env = {
   FACEBOOK_PAGE_ACCESS_TOKEN: process.env.FACEBOOK_PAGE_ACCESS_TOKEN || "",
   INSTAGRAM_ACCESS_TOKEN: process.env.INSTAGRAM_ACCESS_TOKEN || "",
 
+  // ===== Microsoft Teams (Bot Framework / Azure Bot) =====
+  // 未設定時 /teams/webhook 仍會啟動，但會略過 JWT 驗章；正式環境請務必填妥。
+  TEAMS_APP_ID: process.env.TEAMS_APP_ID || "",
+  TEAMS_APP_PASSWORD: process.env.TEAMS_APP_PASSWORD || "",
+
   // ===== Google Sheets =====
   START_COLUMN: Number(process.env.START_COLUMN || 6),
   PUBLISHED_SHEET_CSV_URL: required("PUBLISHED_SHEET_CSV_URL"),
