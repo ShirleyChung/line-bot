@@ -69,10 +69,6 @@ export async function routeMessageEvent(event) {
   if (event.type !== "message" || event.message?.type !== "text") {
     return null;
   }
-  // 先嘗試天氣訊息處理，如果有命中就直接回覆，不進 LLM
-  const handledByWeather = await handleWeatherMessage(event);
-  if (handledByWeather) return;
-
 
   // 原始文字（保留完整內容）
   const rawText = (event.message.text || "").trim();
@@ -100,10 +96,18 @@ export async function routeMessageEvent(event) {
      * - user  : 一對一聊天
      * - group : 群組
      * - room  : 多人聊天室
+     *
+     * 這個檢查必須放在所有文字訊息處理（含天氣、命令、LLM）之前，
+     * 否則群組中只要有人說「天氣」就會被觸發。
+     * 圖片與檔案接收已經在前面處理過，不受此限制。
      */
     if ((sourceType === "group" || sourceType === "room") && !isMentionToBot(event)) {
       return null;
     }
+
+    // 先嘗試天氣訊息處理，如果有命中就直接回覆，不進 LLM
+    const handledByWeather = await handleWeatherMessage(event);
+    if (handledByWeather) return;
 
     if (isResetImageIdsCommand(userText)) {
       await clearImageIds(sessionKey);
