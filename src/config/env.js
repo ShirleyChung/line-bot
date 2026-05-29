@@ -48,6 +48,7 @@ export const env = {
   // ===== Microsoft Teams (Bot Framework / Azure Bot) =====
   // 未設定時 /teams/webhook 仍會啟動，但會略過 JWT 驗章；正式環境請務必填妥。
   TEAMS_APP_ID: process.env.TEAMS_APP_ID || "",
+  TEAMS_TENANT_ID: process.env.TEAMS_TENANT_ID || "",
   TEAMS_APP_PASSWORD: process.env.TEAMS_APP_PASSWORD || "",
 
   // ===== Google Sheets =====
