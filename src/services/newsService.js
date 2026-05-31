@@ -27,6 +27,26 @@ function normalizeLang(lang) {
   return value.slice(0, 2);
 }
 
+const BRAVE_SEARCH_LANGS = new Set([
+  "ar", "eu", "bn", "bg", "ca", "zh-hans", "zh-hant", "hr", "cs", "da", "nl", "en", "en-gb", "et",
+  "fi", "fr", "gl", "de", "el", "gu", "he", "hi", "hu", "is", "it", "jp", "kn", "ko", "lv", "lt",
+  "ms", "ml", "mr", "nb", "pl", "pt-br", "pt-pt", "pa", "ro", "ru", "sr", "sk", "sl", "es", "sv",
+  "ta", "te", "th", "tr", "uk", "ur", "vi",
+]);
+
+function normalizeBraveLang(lang) {
+  const value = String(lang || "zh-hant").toLowerCase().trim();
+
+  if (value === "zh" || value === "zh-tw" || value === "zh-hant") return "zh-hant";
+  if (value === "zh-cn" || value === "zh-hans") return "zh-hans";
+  if (BRAVE_SEARCH_LANGS.has(value)) return value;
+
+  const short = value.slice(0, 2);
+  if (BRAVE_SEARCH_LANGS.has(short)) return short;
+
+  return "zh-hant";
+}
+
 function normalizeCountry(country) {
   return String(country || "tw").toLowerCase().slice(0, 2);
 }
@@ -137,7 +157,7 @@ async function fetchBraveNews({ query, lang, country, max }) {
   url.searchParams.set("q", query.trim());
   url.searchParams.set("count", String(Math.min(Math.max(max, 1), 20)));
   url.searchParams.set("country", normalizeCountry(country));
-  url.searchParams.set("search_lang", normalizeLang(lang));
+  url.searchParams.set("search_lang", normalizeBraveLang(lang));
   url.searchParams.set("freshness", "pm");
 
   const data = await fetchJson(url, {
