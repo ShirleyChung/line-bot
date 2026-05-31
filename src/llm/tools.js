@@ -284,7 +284,7 @@ export const botTools = [
           description: "最多回傳幾則頭條，範圍 1 到 10；未指定時預設 3。",
         },
       },
-      required: [],
+      required: ["max"],
       additionalProperties: false,
     },
     strict: true,
