@@ -63,7 +63,7 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、每日經節。",
+    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN 頭條新聞、每日經節。",
     parameters: {
       type: "object",
       properties: {
@@ -86,8 +86,8 @@ export const botTools = [
         },
         reminderType: {
           type: "string",
-          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "bible_verse"],
-          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；每日隨機經節用 bible_verse；一般文字用 generic。",
+          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "cnn_news", "bible_verse"],
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；CNN 頭條新聞用 cnn_news；每日隨機經節用 bible_verse；一般文字用 generic。",
         },
         city: {
           type: "string",
@@ -114,8 +114,12 @@ export const botTools = [
           type: "number",
           description: "arXiv 論文摘要要挑選的篇數，建議 5 到 8；非論文提醒填 0。",
         },
+        headlineCount: {
+          type: "number",
+          description: "CNN 頭條要回傳的則數，建議 1 到 10；未指定時填 3。非 CNN 頭條提醒填 0。",
+        },
       },
-      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount"],
+      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount"],
       additionalProperties: false,
     },
     strict: true,
@@ -264,6 +268,23 @@ export const botTools = [
         },
       },
       required: ["max"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "get_cnn_top_headlines",
+    description: "抓取 CNN Top Stories 頭條新聞，回傳重點標題與連結。",
+    parameters: {
+      type: "object",
+      properties: {
+        max: {
+          type: "number",
+          description: "最多回傳幾則頭條，範圍 1 到 10；未指定時預設 3。",
+        },
+      },
+      required: [],
       additionalProperties: false,
     },
     strict: true,

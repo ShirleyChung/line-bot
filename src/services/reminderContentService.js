@@ -8,6 +8,7 @@ import { fetchYahooFuturesQuote } from "./yahooFuturesService.js";
 import { resolveFuturesSymbol } from "./futuresSymbolService.js";
 import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
 import { getRandomRecoveryBibleVerse } from "./recoveryBibleService.js";
+import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "./cnnNewsService.js";
 
 export const REMINDER_TYPES = new Set([
   "generic",
@@ -17,6 +18,7 @@ export const REMINDER_TYPES = new Set([
   "watch_prices",
   "today_link",
   "arxiv_papers",
+  "cnn_news",
   "bible_verse",
 ]);
 
@@ -160,6 +162,12 @@ async function buildArxivPaperReminderMessage(reminder) {
   return `最新 CS / Engineering 論文摘要\n${digest}`;
 }
 
+async function buildCnnNewsReminderMessage(reminder) {
+  const max = Math.min(Math.max(Number(reminder.payload?.max) || 3, 1), 10);
+  const headlines = await fetchCnnTopHeadlines({ max });
+  return `CNN 頭條提醒\n${buildCnnTopHeadlinesMessage(headlines, { max })}`;
+}
+
 async function buildBibleVerseReminderMessage() {
   const result = await getRandomRecoveryBibleVerse();
   return `聖經提醒\n${result.replyText}`;
@@ -193,6 +201,9 @@ export async function buildReminderMessage(reminder) {
 
     case "arxiv_papers":
       return buildArxivPaperReminderMessage(normalized);
+
+    case "cnn_news":
+      return buildCnnNewsReminderMessage(normalized);
 
     case "bible_verse":
       return buildBibleVerseReminderMessage();

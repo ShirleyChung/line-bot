@@ -32,6 +32,7 @@ import { fetchNews } from "../services/newsService.js";
 import { searchWeb } from "../services/webSearchService.js";
 import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
 import { buildNewsMessage } from "../utils/format.js";
+import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "../services/cnnNewsService.js";
 import {
   formatWeatherReply,
   getWeatherForUser,
@@ -102,6 +103,10 @@ function inferReminderType(args = {}) {
   if (args.city) return "weather";
   if (args.symbol) return "stock";
   if (detectFuturesCommodity(args)) return "futures";
+  if (args.headlineCount) return "cnn_news";
+
+  const cnnHint = `${args.target || ""} ${args.action || ""}`.toLowerCase();
+  if (cnnHint.includes("cnn")) return "cnn_news";
 
   return requestedType || "generic";
 }
@@ -113,6 +118,7 @@ const QUERY_TOOL_NAMES = new Set([
   "get_etf_constituents",
   "get_futures_price",
   "get_latest_arxiv_papers",
+  "get_cnn_top_headlines",
   "find_nearby_parking",
   "find_nearby_facilities",
   "get_recovery_bible_verses",
@@ -335,6 +341,7 @@ export async function executeTool(name, args = {}, context = {}) {
         args.city ||
         reminderCommodity ||
         args.symbol ||
+        (reminderType === "cnn_news" ? "CNN 頭條" : "") ||
         (reminderType === "bible_verse" ? "聖經" : "提醒");
       const derivedAction =
         args.action ||
@@ -344,6 +351,7 @@ export async function executeTool(name, args = {}, context = {}) {
         (reminderType === "watch_prices" ? "自選股股價" : "") ||
         (reminderType === "today_link" ? "今日連結" : "") ||
         (reminderType === "arxiv_papers" ? "最新 arXiv 論文摘要" : "") ||
+        (reminderType === "cnn_news" ? "CNN 頭條新聞" : "") ||
         (reminderType === "futures" && reminderCommodity ? `${reminderCommodity}${args.contract ? ` ${args.contract}` : ""}行情` : "") ||
         (reminderType === "bible_verse" ? "隨機聖經經節" : "");
 
@@ -377,6 +385,9 @@ export async function executeTool(name, args = {}, context = {}) {
       if (args.weatherTarget) payload.target = args.weatherTarget;
       if (reminderType === "arxiv_papers") {
         payload.max = Math.min(Math.max(Number(args.paperCount) || 6, 5), 8);
+      }
+      if (reminderType === "cnn_news") {
+        payload.max = Math.min(Math.max(Number(args.headlineCount) || 3, 1), 10);
       }
 
       const reminderData = normalizeReminderData({
@@ -675,6 +686,20 @@ export async function executeTool(name, args = {}, context = {}) {
         ok: true,
         tool: name,
         type: "text",
+        text,
+      };
+    }
+
+    case "get_cnn_top_headlines": {
+      const max = Math.min(Math.max(Number(args.max) || 3, 1), 10);
+      const headlines = await fetchCnnTopHeadlines({ max });
+      const text = buildCnnTopHeadlinesMessage(headlines, { max });
+
+      return {
+        ok: true,
+        tool: name,
+        max,
+        headlines,
         text,
       };
     }
