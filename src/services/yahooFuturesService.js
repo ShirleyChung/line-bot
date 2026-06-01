@@ -9,6 +9,7 @@
 // 13:45 台北那筆是一般盤收盤。回傳前都換成 Asia/Taipei 字串方便顯示。
 
 const YAHOO_FUTURES_URL = "https://tw.stock.yahoo.com/future/";
+const TAIFEX_FUTURES_INSTITUTIONAL_URL = "https://www.taifex.com.tw/cht/3/futContractsDate";
 
 const YAHOO_HEADERS = {
   "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -20,6 +21,15 @@ const YAHOO_HEADERS = {
 
 const cache = new Map();
 const CACHE_TTL_MS = 30 * 1000;
+const YAHOO_TO_TAIFEX_COMMODITY = {
+  WTX: "TXF",
+  WMT: "MXF",
+  WTM: "TMF",
+  WTE: "TE",
+  WTF: "TF",
+  WXI: "XIF",
+  WGT: "GTF",
+};
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -63,6 +73,21 @@ function isoToTaipei(iso) {
   return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
+function toTaipeiDateSlash(input = new Date()) {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const get = (t) => parts.find((p) => p.type === t)?.value || "";
+  return `${get("year")}/${get("month")}/${get("day")}`;
+}
+
 function classifySession(iso) {
   // Yahoo 把日盤 + 夜盤合在同一個「regularMarket」欄位。
   // 用收盤時間推一下：13:45 收 → 一般盤；近 05:00 / 04:59 → 夜盤；其他時段視為盤中。
@@ -84,6 +109,85 @@ function classifySession(iso) {
   if (total >= 8 * 60 + 45 && total <= 13 * 60 + 45) return "一般盤";
   if (total >= 15 * 60 || total <= 5 * 60) return "夜盤";
   return "盤中";
+}
+
+function extractForeignNetOpenInterest(html) {
+  const markerMatch = /外資\s*<\/div>\s*<\/td>/i.exec(html);
+  if (!markerMatch) return null;
+  const markerIdx = markerMatch.index;
+
+  const rowStart = Math.max(html.lastIndexOf("<TR", markerIdx), html.lastIndexOf("<tr", markerIdx));
+  if (rowStart < 0) return null;
+
+  let rowEnd = html.indexOf("</TR>", markerIdx);
+  if (rowEnd < 0) rowEnd = html.indexOf("</tr>", markerIdx);
+  if (rowEnd < 0) return null;
+  rowEnd += 5;
+
+  const rowHtml = html.slice(rowStart, rowEnd);
+  const rowText = rowHtml
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const values = rowText.match(/-?\d[\d,]*/g) || [];
+  if (values.length < 11) return null;
+
+  // 依表格欄位順序，第 11 個數字是「未平倉餘額－多空淨額（口數）」。
+  return parseNumber(values[10]);
+}
+
+function inferTaifexCommodityId(yahooSymbol) {
+  const m = String(yahooSymbol || "").trim().toUpperCase().match(/^(W[A-Z]{2,3})/);
+  if (!m) return null;
+  return YAHOO_TO_TAIFEX_COMMODITY[m[1]] || null;
+}
+
+async function fetchTaifexForeignPosition(taifexCommodityId, queryDate) {
+  if (!taifexCommodityId || !queryDate) {
+    return { found: false, message: "缺少台期所查詢參數" };
+  }
+
+  const params = new URLSearchParams({
+    queryType: "1",
+    goDay: "",
+    doQuery: "1",
+    dateaddcnt: "",
+    queryDate,
+    commodityId: taifexCommodityId,
+  });
+  const url = `${TAIFEX_FUTURES_INSTITUTIONAL_URL}?${params.toString()}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: YAHOO_HEADERS,
+      redirect: "follow",
+    });
+    if (!res.ok) {
+      throw new Error(`台期所回應 HTTP ${res.status}`);
+    }
+
+    const html = await res.text();
+    const netOpenInterest = extractForeignNetOpenInterest(html);
+    if (netOpenInterest == null) {
+      throw new Error("找不到外資未平倉淨額欄位");
+    }
+
+    return {
+      found: true,
+      source: "TAIFEX",
+      queryDate,
+      netOpenInterest,
+      netShort: netOpenInterest < 0 ? Math.abs(netOpenInterest) : 0,
+    };
+  } catch (err) {
+    return {
+      found: false,
+      source: "TAIFEX",
+      queryDate,
+      message: `台期所外資留倉查詢失敗：${err.message}`,
+    };
+  }
 }
 
 async function fetchYahooFutureHtml(yahooSymbol) {
@@ -186,6 +290,16 @@ export async function fetchYahooFuturesQuote(yahooSymbol) {
     };
   }
 
+  let foreignPosition = { found: false };
+  const taifexCommodityId = inferTaifexCommodityId(symbol);
+  const taifexQueryDate = toTaipeiDateSlash(time) || toTaipeiDateSlash();
+  if (taifexCommodityId && taifexQueryDate) {
+    foreignPosition = await fetchTaifexForeignPosition(taifexCommodityId, taifexQueryDate);
+    if (!foreignPosition.found) {
+      console.warn("[yahooFutures]", foreignPosition.message);
+    }
+  }
+
   const data = {
     symbol,
     name,
@@ -205,6 +319,9 @@ export async function fetchYahooFuturesQuote(yahooSymbol) {
     rawTime: time,
     session: classifySession(time),
     marketStatus,
+    foreignNetShort: foreignPosition.found ? foreignPosition.netShort : null,
+    foreignNetOpenInterest: foreignPosition.found ? foreignPosition.netOpenInterest : null,
+    foreignPositionDate: foreignPosition.found ? foreignPosition.queryDate : null,
   };
 
   cache.set(symbol, { at: Date.now(), data });

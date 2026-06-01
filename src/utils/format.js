@@ -332,8 +332,12 @@ export function buildFuturesQuoteMessage(quote, request = {}) {
     lines.push(`未平倉：${formatNumber(quote.openInterest)} 口`);
   }
 
+  if (quote.foreignNetShort != null) {
+    lines.push(`外資淨空單：${formatNumber(quote.foreignNetShort)} 口`);
+  }
+
   lines.push("");
-  lines.push("資料來源：Yahoo 奇摩股市");
+  lines.push("資料來源：Yahoo 奇摩股市、台灣期貨交易所");
 
   return lines.join("\n").trim();
 }
