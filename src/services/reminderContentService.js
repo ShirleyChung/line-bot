@@ -9,6 +9,7 @@ import { resolveFuturesSymbol } from "./futuresSymbolService.js";
 import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
 import { getRandomRecoveryBibleVerse } from "./recoveryBibleService.js";
 import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "./cnnNewsService.js";
+import { fetchTopHeadlines, buildTopHeadlinesMessage } from "./topHeadlinesService.js";
 import { fetchNews } from "./newsService.js";
 import { buildNewsMessage } from "../utils/format.js";
 
@@ -21,6 +22,7 @@ export const REMINDER_TYPES = new Set([
   "today_link",
   "arxiv_papers",
   "cnn_news",
+  "top_headlines",
   "general_news",
   "bible_verse",
 ]);
@@ -171,6 +173,12 @@ async function buildCnnNewsReminderMessage(reminder) {
   return `CNN 頭條提醒\n${buildCnnTopHeadlinesMessage(headlines, { max })}`;
 }
 
+async function buildTopHeadlinesReminderMessage(reminder) {
+  const max = Math.min(Math.max(Number(reminder.payload?.max) || 5, 1), 10);
+  const headlines = await fetchTopHeadlines({ max });
+  return buildTopHeadlinesMessage(headlines, { max });
+}
+
 async function buildGeneralNewsReminderMessage(reminder) {
   const query = String(reminder.payload?.query || reminder.target || "").trim();
   if (!query) {
@@ -219,6 +227,9 @@ export async function buildReminderMessage(reminder) {
 
     case "cnn_news":
       return buildCnnNewsReminderMessage(normalized);
+
+    case "top_headlines":
+      return buildTopHeadlinesReminderMessage(normalized);
 
     case "general_news":
       return buildGeneralNewsReminderMessage(normalized);
