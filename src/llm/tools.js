@@ -63,7 +63,7 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN 頭條新聞、每日經節。",
+    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN 頭條新聞、指定關鍵字的最新新聞、每日經節。",
     parameters: {
       type: "object",
       properties: {
@@ -86,8 +86,8 @@ export const botTools = [
         },
         reminderType: {
           type: "string",
-          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "cnn_news", "bible_verse"],
-          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；CNN 頭條新聞用 cnn_news；每日隨機經節用 bible_verse；一般文字用 generic。",
+          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "cnn_news", "general_news", "bible_verse"],
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；CNN 頭條新聞用 cnn_news；指定關鍵字（公司/產業/人物/事件）的最新新聞用 general_news；每日隨機經節用 bible_verse；一般文字用 generic。",
         },
         city: {
           type: "string",
@@ -118,8 +118,16 @@ export const botTools = [
           type: "number",
           description: "CNN 頭條要回傳的則數，建議 1 到 10；未指定時填 3。非 CNN 頭條提醒填 0。",
         },
+        newsQuery: {
+          type: "string",
+          description: "general_news 提醒的新聞搜尋關鍵字，例如：台積電、聯發科、AI 伺服器、美元匯率。非新聞提醒請填空字串。",
+        },
+        newsCount: {
+          type: "number",
+          description: "general_news 提醒要回傳的新聞則數，建議 1 到 10；未指定時填 5。非新聞提醒填 0。",
+        },
       },
-      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount"],
+      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount", "newsQuery", "newsCount"],
       additionalProperties: false,
     },
     strict: true,

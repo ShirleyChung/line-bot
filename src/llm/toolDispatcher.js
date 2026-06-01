@@ -108,6 +108,8 @@ function inferReminderType(args = {}) {
   const cnnHint = `${args.target || ""} ${args.action || ""}`.toLowerCase();
   if (cnnHint.includes("cnn")) return "cnn_news";
 
+  if (String(args.newsQuery || "").trim()) return "general_news";
+
   return requestedType || "generic";
 }
 
@@ -342,6 +344,7 @@ export async function executeTool(name, args = {}, context = {}) {
         reminderCommodity ||
         args.symbol ||
         (reminderType === "cnn_news" ? "CNN 頭條" : "") ||
+        (reminderType === "general_news" && args.newsQuery ? `${args.newsQuery} 新聞` : "") ||
         (reminderType === "bible_verse" ? "聖經" : "提醒");
       const derivedAction =
         args.action ||
@@ -352,6 +355,7 @@ export async function executeTool(name, args = {}, context = {}) {
         (reminderType === "today_link" ? "今日連結" : "") ||
         (reminderType === "arxiv_papers" ? "最新 arXiv 論文摘要" : "") ||
         (reminderType === "cnn_news" ? "CNN 頭條新聞" : "") ||
+        (reminderType === "general_news" && args.newsQuery ? `${args.newsQuery} 最新新聞` : "") ||
         (reminderType === "futures" && reminderCommodity ? `${reminderCommodity}${args.contract ? ` ${args.contract}` : ""}行情` : "") ||
         (reminderType === "bible_verse" ? "隨機聖經經節" : "");
 
@@ -388,6 +392,10 @@ export async function executeTool(name, args = {}, context = {}) {
       }
       if (reminderType === "cnn_news") {
         payload.max = Math.min(Math.max(Number(args.headlineCount) || 3, 1), 10);
+      }
+      if (reminderType === "general_news") {
+        payload.query = String(args.newsQuery || "").trim();
+        payload.max = Math.min(Math.max(Number(args.newsCount) || 5, 1), 10);
       }
 
       const reminderData = normalizeReminderData({

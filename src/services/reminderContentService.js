@@ -9,6 +9,8 @@ import { resolveFuturesSymbol } from "./futuresSymbolService.js";
 import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
 import { getRandomRecoveryBibleVerse } from "./recoveryBibleService.js";
 import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "./cnnNewsService.js";
+import { fetchNews } from "./newsService.js";
+import { buildNewsMessage } from "../utils/format.js";
 
 export const REMINDER_TYPES = new Set([
   "generic",
@@ -19,6 +21,7 @@ export const REMINDER_TYPES = new Set([
   "today_link",
   "arxiv_papers",
   "cnn_news",
+  "general_news",
   "bible_verse",
 ]);
 
@@ -168,6 +171,18 @@ async function buildCnnNewsReminderMessage(reminder) {
   return `CNN 頭條提醒\n${buildCnnTopHeadlinesMessage(headlines, { max })}`;
 }
 
+async function buildGeneralNewsReminderMessage(reminder) {
+  const query = String(reminder.payload?.query || reminder.target || "").trim();
+  if (!query) {
+    return "新聞提醒設定缺少查詢關鍵字。";
+  }
+  const max = Math.min(Math.max(Number(reminder.payload?.max) || 5, 1), 10);
+  const lang = reminder.payload?.lang || "zh";
+  const country = reminder.payload?.country || "tw";
+  const news = await fetchNews({ query, lang, country, max });
+  return `新聞提醒（${query}）\n${buildNewsMessage(news, query)}`;
+}
+
 async function buildBibleVerseReminderMessage() {
   const result = await getRandomRecoveryBibleVerse();
   return `聖經提醒\n${result.replyText}`;
@@ -204,6 +219,9 @@ export async function buildReminderMessage(reminder) {
 
     case "cnn_news":
       return buildCnnNewsReminderMessage(normalized);
+
+    case "general_news":
+      return buildGeneralNewsReminderMessage(normalized);
 
     case "bible_verse":
       return buildBibleVerseReminderMessage();
