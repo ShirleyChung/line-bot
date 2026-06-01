@@ -115,11 +115,23 @@ export async function askLlmWithTools(userText, context = {}) {
       try {
         args = JSON.parse(call.arguments || "{}");
       } catch (error) {
-        return {
-          type: "text",
-          text: `工具參數格式錯誤：${error?.message || String(error)}`,
-          toolUsed: true,
-        };
+        // 模型（尤其 mini 等級）偶爾會產生格式錯誤的工具參數 JSON，
+        // 最常見是字串值內含未跳脫的雙引號或換行（例如新聞排程的 newsQuery/action）。
+        // 與其直接中斷整個請求，把錯誤回饋給模型，讓它在剩餘輪次重新產生正確的參數。
+        console.warn("[askLlmWithTools] 工具參數 JSON 解析失敗", {
+          name: call.name,
+          message: error?.message || String(error),
+          arguments: call.arguments,
+        });
+        toolOutputs.push({
+          type: "function_call_output",
+          call_id: call.call_id,
+          output: JSON.stringify({
+            ok: false,
+            error: `參數 JSON 格式錯誤：${error?.message || String(error)}。請重新呼叫這個工具，並產生格式正確的 JSON；字串值內的雙引號與換行請正確跳脫。`,
+          }),
+        });
+        continue;
       }
 
       let result;
