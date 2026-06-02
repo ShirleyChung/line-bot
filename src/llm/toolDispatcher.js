@@ -52,6 +52,10 @@ import {
   queryRecoveryBibleNotes,
   queryRecoveryBibleVerses,
 } from "../services/recoveryBibleService.js";
+import {
+  queryHousePrice,
+  formatHousePriceReply,
+} from "../services/realEstateService.js";
 
 function detectMarket(symbol) {
   const code = String(symbol).trim().toUpperCase();
@@ -125,6 +129,7 @@ const QUERY_TOOL_NAMES = new Set([
   "get_cnn_top_headlines",
   "find_nearby_parking",
   "find_nearby_facilities",
+  "get_house_price",
   "get_recovery_bible_verses",
   "get_random_bible_verse",
   "get_recovery_bible_notes",
@@ -768,6 +773,23 @@ export async function executeTool(name, args = {}, context = {}) {
         origin: result.origin,
         facilities: result.facilities,
         replyText: formatNearbyFacilityToolReply(locationQuery, facilityQuery, result),
+      };
+    }
+
+    case "get_house_price": {
+      // 不丟錯：缺值就帶空字串/預設，由 queryHousePrice 判斷並回傳可直接回覆的錯誤訊息。
+      const result = await queryHousePrice({
+        city: String(args.city || "").trim(),
+        district: String(args.district || "").trim(),
+        road: String(args.road || "").trim(),
+        rangeMonths: Number(args.rangeMonths) > 0 ? Number(args.rangeMonths) : 12,
+      });
+
+      return {
+        ok: result.ok,
+        tool: name,
+        ...result,
+        replyText: formatHousePriceReply(result),
       };
     }
 

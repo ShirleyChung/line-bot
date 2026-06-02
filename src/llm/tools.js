@@ -679,4 +679,33 @@ export const botTools = [
     },
     strict: true,
   },
+  {
+    type: "function",
+    name: "get_house_price",
+    description: "查詢內政部實價登錄的房價，回傳指定縣市/鄉鎮市區（可再指定路名）在一段時間內的平均單價、最新成交價與一年內最高成交價。適合回答「查某地房價」「某路平均房價」「某區近半個月/近一年房價」。找不到指定範圍的資料時，會自動回退到最近一筆成交。",
+    parameters: {
+      type: "object",
+      properties: {
+        city: {
+          type: "string",
+          description: "縣市，例如：台北市、新北市、台中市、高雄市。必填。",
+        },
+        district: {
+          type: "string",
+          description: "鄉鎮市區，例如：大安區、淡水區、北屯區。必填。",
+        },
+        road: {
+          type: "string",
+          description: "路/街名，可精細到門牌號，例如：紅樹林路、忠孝東路四段、紅樹林路169號。只查整個行政區時填空字串。",
+        },
+        rangeMonths: {
+          type: "number",
+          description: "平均房價的時間範圍，往前幾個月。一般填 12（近一年）；近半個月填 0.5；近一個月填 1；近三個月填 3。",
+        },
+      },
+      required: ["city", "district", "road", "rangeMonths"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
