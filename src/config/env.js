@@ -126,8 +126,8 @@ export const env = {
 - count 預設 5（1-10）；要近期資料用 freshness=pd/pw/pm/py，否則傳空字串。
 - 中文圈內容用 country=tw、lang=zh-hant；英文資料可用 country=us、lang=en。
 - 「最新新聞/最新消息」優先用 searchNews；只有當使用者明確想搜尋一般網頁資料時才用 web_search。
-- 「CNN 頭條/CNN 頭版/CNN top stories」優先用 get_cnn_top_headlines（max 預設 3）。
-- 使用者已貼網址 → 由網頁摘要流程處理，不要再呼叫 web_search。
+- 「CNN 頭條/CNN 頭版/CNN top stories」優先用 get_cnn_top_headlines（max 預設 3，直接回中文摘要）。
+- 使用者已貼網址或要求摘要某個超連結 → 用 summarize_article_url；若 router 已先處理網址摘要則不要重複呼叫其他搜尋工具。
 - 取得結果後依標題、摘要整理 2-5 點重點，並附 1-3 個來源連結。
 
 8) 恢復本與生命讀經

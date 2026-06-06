@@ -283,7 +283,7 @@ export const botTools = [
   {
     type: "function",
     name: "get_cnn_top_headlines",
-    description: "抓取 CNN Top Stories 頭條新聞，回傳重點標題與連結。",
+    description: "抓取 CNN Top Stories 頭條新聞，並直接根據頭條連結產生繁體中文摘要。",
     parameters: {
       type: "object",
       properties: {
@@ -293,6 +293,23 @@ export const botTools = [
         },
       },
       required: ["max"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "summarize_article_url",
+    description: "抓取指定超連結所指向的文章或網頁內容，並以繁體中文摘要回覆。",
+    parameters: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "要摘要的 http 或 https 網址。",
+        },
+      },
+      required: ["url"],
       additionalProperties: false,
     },
     strict: true,
@@ -409,7 +426,7 @@ export const botTools = [
   {
     type: "function",
     name: "web_search",
-    description: "使用網路搜尋查詢一般性資料。適合查詢百科知識、定義、教學、官方資訊、人物資料、產品規格、近期事件等。回傳搜尋結果（標題、摘要、網址），請依此整理回覆。新聞請改用 searchNews；摘要使用者貼的網址請等網頁摘要流程處理。",
+    description: "使用網路搜尋查詢一般性資料。適合查詢百科知識、定義、教學、官方資訊、人物資料、產品規格、近期事件等。回傳搜尋結果（標題、摘要、網址），請依此整理回覆。新聞請改用 searchNews；摘要使用者貼的網址請改用 summarize_article_url。",
     parameters: {
       type: "object",
       properties: {

@@ -33,6 +33,7 @@ import { searchWeb } from "../services/webSearchService.js";
 import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
 import { buildNewsMessage } from "../utils/format.js";
 import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "../services/cnnNewsService.js";
+import { summarizeArticleUrl, summarizeWebpageTargets } from "../services/webpageSummaryService.js";
 import {
   formatWeatherReply,
   getWeatherForUser,
@@ -713,13 +714,45 @@ export async function executeTool(name, args = {}, context = {}) {
     case "get_cnn_top_headlines": {
       const max = Math.min(Math.max(Number(args.max) || 3, 1), 10);
       const headlines = await fetchCnnTopHeadlines({ max });
-      const text = buildCnnTopHeadlinesMessage(headlines, { max });
+      let text = await summarizeWebpageTargets(
+        headlines
+          .slice(0, max)
+          .map((headline) => ({
+            url: headline.url,
+            label: headline.title,
+          })),
+      );
+
+      if (!text) {
+        text = buildCnnTopHeadlinesMessage(headlines, { max });
+      } else if (/抓不到這些網址的可摘要內容/.test(text)) {
+        text = `${text}\n\n${buildCnnTopHeadlinesMessage(headlines, { max })}`;
+      }
 
       return {
         ok: true,
         tool: name,
         max,
         headlines,
+        text,
+      };
+    }
+
+    case "summarize_article_url": {
+      const url = String(args.url || "").trim();
+      if (!url) {
+        throw new Error("summarize_article_url 缺少網址 url");
+      }
+
+      const text = await summarizeArticleUrl(url);
+      if (!text) {
+        throw new Error("找不到可摘要的網址內容");
+      }
+
+      return {
+        ok: true,
+        tool: name,
+        url,
         text,
       };
     }
