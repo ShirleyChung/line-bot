@@ -41,6 +41,36 @@ export function containsHttpUrl(text = "") {
   return extractHttpUrls(text).length > 0;
 }
 
+function normalizeSummaryTargets(targets = []) {
+  const normalized = [];
+  const seen = new Set();
+
+  for (const target of targets) {
+    const rawUrl = typeof target === "string" ? target : target?.url;
+    if (!rawUrl) continue;
+
+    try {
+      const url = new URL(String(rawUrl).trim());
+      if (!["http:", "https:"].includes(url.protocol)) continue;
+
+      const normalizedUrl = url.toString();
+      if (seen.has(normalizedUrl)) continue;
+      seen.add(normalizedUrl);
+
+      normalized.push({
+        url: normalizedUrl,
+        label: typeof target === "object"
+          ? String(target?.label || target?.title || "").trim()
+          : "",
+      });
+    } catch {
+      // Ignore malformed URLs.
+    }
+  }
+
+  return normalized.slice(0, MAX_URLS);
+}
+
 function decodeHtmlEntities(text = "") {
   const named = {
     amp: "&",
@@ -248,23 +278,27 @@ function trimForLine(text) {
   return `${text.slice(0, LINE_TEXT_LIMIT - 20).trim()}\n\n（內容已截斷）`;
 }
 
-export async function summarizeUrlsFromText(userText = "") {
+export async function summarizeWebpageTargets(targets = []) {
   if (!env.OPENAI_API_KEY) {
     return "目前尚未設定 OpenAI API Key，無法摘要網頁。";
   }
 
-  const urls = extractHttpUrls(userText).slice(0, MAX_URLS);
-  if (!urls.length) return null;
+  const normalizedTargets = normalizeSummaryTargets(targets);
+  if (!normalizedTargets.length) return null;
 
   const pages = [];
   const failures = [];
 
-  for (const url of urls) {
+  for (const target of normalizedTargets) {
     try {
-      pages.push(await fetchWebpageText(url));
+      const page = await fetchWebpageText(target.url);
+      pages.push({
+        ...page,
+        label: target.label,
+      });
     } catch (error) {
       failures.push({
-        url,
+        url: target.url,
         message: error instanceof Error ? error.message : String(error),
       });
     }
@@ -280,7 +314,8 @@ export async function summarizeUrlsFromText(userText = "") {
   const input = pages
     .map((page, index) => {
       return [
-        `URL ${index + 1}: ${page.finalUrl}`,
+        `文章 ${index + 1}${page.label ? `：${page.label}` : ""}`,
+        `URL: ${page.finalUrl}`,
         "內容：",
         page.text,
       ].join("\n");
@@ -306,4 +341,15 @@ export async function summarizeUrlsFromText(userText = "") {
     : "";
 
   return trimForLine(`${summary}${failureText}`);
+}
+
+export async function summarizeArticleUrl(url, { label = "" } = {}) {
+  return summarizeWebpageTargets([{ url, label }]);
+}
+
+export async function summarizeUrlsFromText(userText = "") {
+  const urls = extractHttpUrls(userText);
+  if (!urls.length) return null;
+
+  return summarizeWebpageTargets(urls.map((url) => ({ url })));
 }

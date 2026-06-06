@@ -153,7 +153,7 @@ export async function askLlmWithTools(userText, context = {}) {
         };
       }
       // 已經格式化好的 LINE 文字，直接回覆，不再交給 LLM 重排
-      if (["get_watch_prices", "get_stock_price", "get_etf_constituents", "get_futures_price", "get_latest_arxiv_papers", "get_cnn_top_headlines"].includes(call.name) && result?.text) {
+      if (["get_watch_prices", "get_stock_price", "get_etf_constituents", "get_futures_price", "get_latest_arxiv_papers", "get_cnn_top_headlines", "summarize_article_url"].includes(call.name) && result?.text) {
         return {
           type: "text",
           text: result.text,
