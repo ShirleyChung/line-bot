@@ -128,6 +128,7 @@ const QUERY_TOOL_NAMES = new Set([
   "get_futures_price",
   "get_latest_arxiv_papers",
   "get_cnn_top_headlines",
+  "summarize_article_url",
   "find_nearby_parking",
   "find_nearby_facilities",
   "get_house_price",
@@ -725,7 +726,7 @@ export async function executeTool(name, args = {}, context = {}) {
 
       if (!text) {
         text = buildCnnTopHeadlinesMessage(headlines, { max });
-      } else if (/抓不到這些網址的可摘要內容/.test(text)) {
+      } else if (/抓不到這些網址的可摘要內容|無法摘要網頁/.test(text)) {
         text = `${text}\n\n${buildCnnTopHeadlinesMessage(headlines, { max })}`;
       }
 
