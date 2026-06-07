@@ -9,6 +9,7 @@ import { resolveFuturesSymbol } from "./futuresSymbolService.js";
 import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
 import { getRandomRecoveryBibleVerse } from "./recoveryBibleService.js";
 import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "./cnnNewsService.js";
+import { summarizeWebpageTargets } from "./webpageSummaryService.js";
 import { fetchTopHeadlines, buildTopHeadlinesMessage } from "./topHeadlinesService.js";
 import { fetchNews } from "./newsService.js";
 import { buildNewsMessage } from "../utils/format.js";
@@ -170,7 +171,22 @@ async function buildArxivPaperReminderMessage(reminder) {
 async function buildCnnNewsReminderMessage(reminder) {
   const max = Math.min(Math.max(Number(reminder.payload?.max) || 3, 1), 10);
   const headlines = await fetchCnnTopHeadlines({ max });
-  return `CNN 頭條提醒\n${buildCnnTopHeadlinesMessage(headlines, { max })}`;
+  let text = await summarizeWebpageTargets(
+    headlines
+      .slice(0, max)
+      .map((headline) => ({
+        url: headline.url,
+        label: headline.title,
+      })),
+  );
+
+  if (!text) {
+    text = buildCnnTopHeadlinesMessage(headlines, { max });
+  } else if (/抓不到這些網址的可摘要內容|無法摘要網頁/.test(text)) {
+    text = `${text}\n\n${buildCnnTopHeadlinesMessage(headlines, { max })}`;
+  }
+
+  return `CNN 頭條提醒\n${text}`;
 }
 
 async function buildTopHeadlinesReminderMessage(reminder) {
