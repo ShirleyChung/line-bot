@@ -86,8 +86,8 @@ export const botTools = [
         },
         reminderType: {
           type: "string",
-          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "cnn_news", "top_headlines", "general_news", "bible_verse"],
-          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；CNN 頭條新聞用 cnn_news；未指定來源的綜合頭條/今日頭條/重點新聞（不需關鍵字）用 top_headlines；指定關鍵字（公司/產業/人物/事件）的最新新聞用 general_news；每日隨機經節用 bible_verse；一般文字用 generic。",
+          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "cnn_news", "top_headlines", "general_news", "bible_verse", "bible_outline"],
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；CNN 頭條新聞用 cnn_news；未指定來源的綜合頭條/今日頭條/重點新聞（不需關鍵字）用 top_headlines；指定關鍵字（公司/產業/人物/事件）的最新新聞用 general_news；每日隨機經節用 bible_verse；依綱目循序讀某書卷用 bible_outline（需同時填 bibleBookName）；一般文字用 generic。",
         },
         city: {
           type: "string",
@@ -126,8 +126,12 @@ export const botTools = [
           type: "number",
           description: "general_news 提醒要回傳的新聞則數，建議 1 到 10；未指定時填 5。非新聞提醒填 0。",
         },
+        bibleBookName: {
+          type: "string",
+          description: "bible_outline 提醒的聖經書卷名稱，例如「加拉太書」、「詩篇」、「約翰福音」。非 bible_outline 提醒請填空字串。",
+        },
       },
-      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount", "newsQuery", "newsCount"],
+      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount", "newsQuery", "newsCount", "bibleBookName"],
       additionalProperties: false,
     },
     strict: true,

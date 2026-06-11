@@ -212,7 +212,7 @@ function findBookByToken(token = "") {
   return null;
 }
 
-function detectBookFromText(text = "") {
+export function detectBookFromText(text = "") {
   const normalized = normalizeBookAlias(text);
   if (!normalized) return null;
 
@@ -576,6 +576,123 @@ function buildLifeStudyExcerpt(text, focusTokens = [], maxLength = 220) {
 
 function uniqueValues(values = []) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function fromChineseNumber(s) {
+  if (!s) return NaN;
+  const digits = { 零: 0, 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+  let result = 0;
+  let temp = 0;
+  for (const c of String(s)) {
+    if (c === "十") {
+      result += (temp || 1) * 10;
+      temp = 0;
+    } else if (c === "百") {
+      result += (temp || 1) * 100;
+      temp = 0;
+    } else if (Object.prototype.hasOwnProperty.call(digits, c)) {
+      temp = digits[c];
+    }
+  }
+  return result + temp || NaN;
+}
+
+function parseOutlineVerseRange(rangeText, defaultChapter) {
+  // Take first segment only if there are comma-separated multi-segment ranges
+  const text = String(rangeText || "").replace(/[上下]/g, "").split(/[，,]/)[0].trim();
+  if (!text) return null;
+  const CN = "[一二三四五六七八九十百零]+";
+  const m = text.match(new RegExp(`^(${CN})?(\\d+)(?:[∼~](${CN})?(\\d+))?$`));
+  if (!m) return null;
+  const startChapter = m[1] ? fromChineseNumber(m[1]) : defaultChapter || NaN;
+  const startVerse = Number(m[2]);
+  const endChapter = m[3] ? fromChineseNumber(m[3]) : startChapter;
+  const endVerse = m[4] ? Number(m[4]) : startVerse;
+  if (!Number.isFinite(startChapter) || !Number.isFinite(endChapter)) return null;
+  if (!Number.isFinite(startVerse) || !Number.isFinite(endVerse)) return null;
+  return { startChapter, startVerse, endChapter, endVerse };
+}
+
+async function fetchBookOutlineItems(bookNo) {
+  const url = `${RECOVERY_BASE_URL}/outline_List.php?Bx=${bookNo}`;
+  const html = await fetchText(url);
+  const items = [];
+  const rowRegex = /<tr[^>]*height=10[^>]*>([\s\S]*?)<\/tr>/gi;
+  let m;
+  while ((m = rowRegex.exec(html)) !== null) {
+    const row = m[1];
+    const levelM = row.match(/title='(\d+)'/i);
+    if (!levelM) continue;
+    const level = Number(levelM[1]);
+    if (level < 1 || level > 3) continue;
+    const hrefM = row.match(/href='read_01\.php\?KB=\d+_(\d+)_\d+'/i);
+    if (!hrefM) continue;
+    const chapter = Number(hrefM[1]);
+    const tdTexts = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
+      .map((td) => htmlToText(td[1]).trim())
+      .filter((t) => t && !/^\s+$/.test(t));
+    const titleText = tdTexts[tdTexts.length - 1] || "";
+    const spaceIdx = titleText.lastIndexOf("　");
+    const rangeText = spaceIdx >= 0 ? titleText.slice(spaceIdx + 1).trim() : "";
+    const titleOnly = spaceIdx >= 0 ? titleText.slice(0, spaceIdx).trim() : titleText;
+    const verseRange = parseOutlineVerseRange(rangeText, chapter);
+    items.push({ level, chapter, title: titleOnly, verseRange, bookNo });
+  }
+  return items;
+}
+
+function extractLeafItems(items) {
+  return items.filter((item, i) => {
+    const next = items[i + 1];
+    return !next || next.level <= item.level;
+  });
+}
+
+export async function getBookOutlineLeafItems(bookNo) {
+  const items = await fetchBookOutlineItems(Number(bookNo));
+  return extractLeafItems(items);
+}
+
+export async function getOutlineItemContent(item) {
+  const { bookNo, title, verseRange } = item;
+  if (!verseRange) throw new Error("此綱目項目無法解析經節範圍");
+  const { startChapter, startVerse, endChapter, endVerse } = verseRange;
+  const book = BOOK_BY_NO.get(Number(bookNo));
+  if (!book) throw new Error(`找不到書卷編號 ${bookNo}`);
+
+  const allVerses = [];
+  for (let ch = startChapter; ch <= endChapter && allVerses.length < 50; ch++) {
+    const html = await fetchChapterPage(book.no, ch, ch === startChapter ? startVerse : 1);
+    const chVerses = parseChapterVerses(html, ch).filter((v) => {
+      if (ch === startChapter && v.verse < startVerse) return false;
+      if (ch === endChapter && v.verse > endVerse) return false;
+      return true;
+    });
+    allVerses.push(...chVerses.map((v) => ({ ...v, chapter: ch })));
+  }
+
+  if (!allVerses.length) throw new Error(`找不到 ${book.name} ${startChapter}:${startVerse} 的經文`);
+
+  const startRef = `${book.shortName}${startChapter}:${startVerse}`;
+  const endRef =
+    startChapter === endChapter && startVerse === endVerse
+      ? ""
+      : startChapter === endChapter
+        ? `-${endVerse}`
+        : `～${book.shortName}${endChapter}:${endVerse}`;
+  const displayRef = `${startRef}${endRef}`;
+
+  const sourceUrl = buildRecoveryUrl("read_01.php", {
+    KB: `${book.no}_${startChapter}_${startVerse}`,
+  });
+
+  const lines = [`網目：${title}`, `經文：${displayRef}`, ""];
+  for (const v of allVerses) {
+    lines.push(`${book.shortName}${v.chapter}:${v.verse} ${v.text}`);
+  }
+  lines.push("", `來源：${sourceUrl}`);
+
+  return { ok: true, title, displayRef, verses: allVerses, replyText: lines.join("\n") };
 }
 
 export async function getRandomRecoveryBibleVerse(options = {}) {

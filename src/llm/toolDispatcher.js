@@ -48,6 +48,7 @@ import {
   findFacilitiesAlongRoute,
 } from "../services/placesService.js";
 import {
+  detectBookFromText,
   getRandomRecoveryBibleVerse,
   queryLifeStudyExcerpt,
   queryRecoveryBibleNotes,
@@ -355,7 +356,9 @@ export async function executeTool(name, args = {}, context = {}) {
         (reminderType === "cnn_news" ? "CNN 頭條" : "") ||
         (reminderType === "top_headlines" ? "今日頭條" : "") ||
         (reminderType === "general_news" && args.newsQuery ? `${args.newsQuery} 新聞` : "") ||
-        (reminderType === "bible_verse" ? "聖經" : "提醒");
+        (reminderType === "bible_verse" ? "聖經" : "") ||
+        (reminderType === "bible_outline" && args.bibleBookName ? args.bibleBookName : "") ||
+        "提醒";
       const derivedAction =
         args.action ||
         reminderCommodity ||
@@ -368,7 +371,8 @@ export async function executeTool(name, args = {}, context = {}) {
         (reminderType === "top_headlines" ? "今日頭條新聞" : "") ||
         (reminderType === "general_news" && args.newsQuery ? `${args.newsQuery} 最新新聞` : "") ||
         (reminderType === "futures" && reminderCommodity ? `${reminderCommodity}${args.contract ? ` ${args.contract}` : ""}行情` : "") ||
-        (reminderType === "bible_verse" ? "隨機聖經經節" : "");
+        (reminderType === "bible_verse" ? "隨機聖經經節" : "") ||
+        (reminderType === "bible_outline" && args.bibleBookName ? `${args.bibleBookName}循序讀經` : "");
 
       if (!derivedTarget || !derivedAction || !args.time) {
         throw new Error("create_reminder 缺少必要參數");
@@ -410,6 +414,14 @@ export async function executeTool(name, args = {}, context = {}) {
       if (reminderType === "general_news") {
         payload.query = String(args.newsQuery || "").trim();
         payload.max = Math.min(Math.max(Number(args.newsCount) || 5, 1), 10);
+      }
+      if (reminderType === "bible_outline") {
+        const bookName = String(args.bibleBookName || "").trim();
+        const book = bookName ? detectBookFromText(bookName) : null;
+        if (!book) throw new Error(`找不到聖經書卷「${bookName}」，請提供有效的書卷名稱，例如「加拉太書」`);
+        payload.bookNo = book.no;
+        payload.bookName = book.name;
+        payload.currentIndex = 0;
       }
 
       const reminderData = normalizeReminderData({

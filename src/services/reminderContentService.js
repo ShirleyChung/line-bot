@@ -7,7 +7,12 @@ import { buildWatchPricesMessage, buildFuturesQuoteMessage } from "../utils/form
 import { fetchYahooFuturesQuote } from "./yahooFuturesService.js";
 import { resolveFuturesSymbol } from "./futuresSymbolService.js";
 import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
-import { getRandomRecoveryBibleVerse } from "./recoveryBibleService.js";
+import {
+  getRandomRecoveryBibleVerse,
+  getBookOutlineLeafItems,
+  getOutlineItemContent,
+} from "./recoveryBibleService.js";
+import { updateReminderPayload } from "./reminderService.js";
 import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "./cnnNewsService.js";
 import { summarizeWebpageTargets } from "./webpageSummaryService.js";
 import { fetchTopHeadlines, buildTopHeadlinesMessage } from "./topHeadlinesService.js";
@@ -26,6 +31,7 @@ export const REMINDER_TYPES = new Set([
   "top_headlines",
   "general_news",
   "bible_verse",
+  "bible_outline",
 ]);
 
 export const RECURRENCES = new Set(["none", "daily"]);
@@ -212,6 +218,26 @@ async function buildBibleVerseReminderMessage() {
   return `聖經提醒\n${result.replyText}`;
 }
 
+async function buildBibleOutlineReminderMessage(reminder) {
+  const bookNo = Number(reminder.payload?.bookNo);
+  const bookName = String(reminder.payload?.bookName || "");
+  const currentIndex = Number(reminder.payload?.currentIndex) || 0;
+
+  if (!bookNo) throw new Error("bible_outline 提醒缺少書卷資訊");
+
+  const leafItems = await getBookOutlineLeafItems(bookNo);
+  if (!leafItems.length) throw new Error(`找不到 ${bookName} 的讀經綱目`);
+
+  const index = currentIndex % leafItems.length;
+  const item = leafItems[index];
+  const content = await getOutlineItemContent(item);
+
+  await updateReminderPayload(reminder.id, { currentIndex: currentIndex + 1 });
+
+  const total = leafItems.length;
+  return `聖經讀經提醒\n今日讀經：${bookName}（第 ${index + 1} / ${total} 段）\n${content.replyText}`;
+}
+
 /**
  * 根據提醒類型建構提醒訊息
  * @param {object} reminder - 提醒物件
@@ -252,6 +278,9 @@ export async function buildReminderMessage(reminder) {
 
     case "bible_verse":
       return buildBibleVerseReminderMessage();
+
+    case "bible_outline":
+      return buildBibleOutlineReminderMessage(normalized);
 
     case "generic":
     default:

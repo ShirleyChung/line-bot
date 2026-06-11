@@ -68,6 +68,17 @@ export async function rescheduleReminder(id, nextTime) {
 }
 
 /**
+ * 更新提醒的 payload 欄位（使用 Firestore 點記法更新巢狀欄位）
+ */
+export async function updateReminderPayload(id, payloadUpdates) {
+  const updates = { updatedAt: new Date() };
+  for (const [key, value] of Object.entries(payloadUpdates)) {
+    updates[`payload.${key}`] = value;
+  }
+  await db.collection(COLLECTION).doc(id).update(updates);
+}
+
+/**
  * 刪除提醒
  */
 export async function deleteReminder(id) {
