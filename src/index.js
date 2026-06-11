@@ -19,6 +19,7 @@ import { normalizeMetaWebhook, sendMetaText, verifyMetaWebhook } from "./platfor
 import { normalizeTeamsActivity, pushTeamsReminder, verifyTeamsRequest } from "./platform/teams.js";
 import { getDueReminders, deleteReminder, rescheduleReminder } from "./services/reminderService.js";
 import { buildReminderMessage, getNextReminderTime } from "./services/reminderContentService.js";
+import { sendEmail } from "./services/emailService.js";
 
 const app = express();
 app.set("trust proxy", true);
@@ -199,12 +200,25 @@ function toMetaRecipientId(owner, platform) {
 }
 
 /**
- * 根據 owner 推送提醒訊息到對應平台
+ * 根據 owner 推送提醒訊息到對應平台；若 reminder 的 payload 帶有 emailRecipient，改寄 email。
  * @param {string} owner - owner 字串，包含平台與 ID 資訊
  * @param {string} text - 要推送的訊息內容
+ * @param {object} [options] - 額外選項
+ * @param {string} [options.emailRecipient] - 若設定則以 email 取代聊天推送
+ * @param {string} [options.subject] - email 主旨
  * @returns {Promise<object>} 推送結果，包含 platform 和 targetId
  */
-async function pushReminder(owner, text) {
+async function pushReminder(owner, text, options = {}) {
+  const { emailRecipient, subject } = options;
+
+  if (emailRecipient) {
+    await sendEmail({
+      to: emailRecipient,
+      subject: subject || "排程提醒",
+      body: text,
+    });
+    return { platform: "email", targetId: emailRecipient };
+  }
   if (owner?.startsWith("telegram:user:telegram:")) {
     const chatId = toTelegramChatId(owner);
     if (!chatId) {
@@ -281,7 +295,10 @@ app.get("/cron/check-reminders", async (req, res) => {
           text = `提醒執行失敗：${r.action || "提醒"}\n請稍後再試或重新設定提醒。`;
         }
 
-        const pushResult = await pushReminder(r.owner, text);
+        const pushResult = await pushReminder(r.owner, text, {
+          emailRecipient: r.payload?.emailRecipient,
+          subject: r.action,
+        });
         console.log("[cron] reminder pushed:", {
           id: r.id,
           platform: pushResult.platform,

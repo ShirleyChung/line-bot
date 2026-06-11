@@ -51,6 +51,13 @@ export const env = {
   TEAMS_TENANT_ID: process.env.TEAMS_TENANT_ID || "",
   TEAMS_APP_PASSWORD: process.env.TEAMS_APP_PASSWORD || "",
 
+  // ===== Email (SMTP) =====
+  EMAIL_SMTP_HOST: process.env.EMAIL_SMTP_HOST || "",
+  EMAIL_SMTP_PORT: Number(process.env.EMAIL_SMTP_PORT || 587),
+  EMAIL_SMTP_USER: process.env.EMAIL_SMTP_USER || "",
+  EMAIL_SMTP_PASS: process.env.EMAIL_SMTP_PASS || "",
+  EMAIL_FROM: process.env.EMAIL_FROM || "",
+
   // ===== Google Sheets =====
   START_COLUMN: Number(process.env.START_COLUMN || 6),
   PUBLISHED_SHEET_CSV_URL: required("PUBLISHED_SHEET_CSV_URL"),
@@ -143,5 +150,11 @@ export const env = {
 - rangeMonths 是平均的時間範圍：未指定填 12（近一年）；「近半個月」填 0.5、「近一個月」填 1、「近三個月」填 3、「近半年」填 6。
 - 從使用者描述拆出縣市與鄉鎮市區；只給「淡水區紅樹林路」這類無縣市時，依常識補上縣市（淡水區→新北市），不確定再追問。
 - 工具會一併回最新成交與一年內最高，且查無範圍內資料時自動回退最近一筆，不需自行換工具。
+
+10) 寄送 Email
+- 使用者說「寄信給 xxx@xxx.com」、「寄給 xxx@xxx.com」或「發信到 xxx@xxx.com」→ send_email。
+- subject 填使用者的請求（不含 email 地址），body 填完整的回覆內文。
+- 若使用者的請求需要先查資料（例如股價、新聞、期貨行情），先呼叫對應工具取得結果，再將結果組成 body，最後呼叫 send_email。
+- 排程提醒若使用者附上 email（例如「每天早上 8 點寄信到 xxx@xxx.com 通知大台指行情」），建立 create_reminder 時將 emailRecipient 填入該 email 地址；屆時系統會以 email 取代聊天推送。
 `
 };

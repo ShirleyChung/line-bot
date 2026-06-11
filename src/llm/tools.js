@@ -130,8 +130,37 @@ export const botTools = [
           type: "string",
           description: "bible_outline 提醒的聖經書卷名稱，例如「加拉太書」、「詩篇」、「約翰福音」。非 bible_outline 提醒請填空字串。",
         },
+        emailRecipient: {
+          type: "string",
+          description: "若希望以 email 取代聊天推送，填入收件人 email 地址，例如 user@example.com；否則填空字串。",
+        },
       },
-      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount", "newsQuery", "newsCount", "bibleBookName"],
+      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount", "newsQuery", "newsCount", "bibleBookName", "emailRecipient"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "send_email",
+    description: "寄送電子郵件給指定收件人。若需要查資料（股價、新聞、行情等），先呼叫對應工具取得結果，再組成 body 呼叫此工具。",
+    parameters: {
+      type: "object",
+      properties: {
+        to: {
+          type: "string",
+          description: "收件人 email 地址，例如 user@example.com",
+        },
+        subject: {
+          type: "string",
+          description: "郵件主旨，通常填使用者的請求（不含 email 地址本身）",
+        },
+        body: {
+          type: "string",
+          description: "郵件正文，填完整的回覆內文",
+        },
+      },
+      required: ["to", "subject", "body"],
       additionalProperties: false,
     },
     strict: true,

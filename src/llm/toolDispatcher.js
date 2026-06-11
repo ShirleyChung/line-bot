@@ -1,4 +1,5 @@
 import { createReminder, listReminders, deleteReminderByOwner } from "../services/reminderService.js";
+import { sendEmail } from "../services/emailService.js";
 import { getNextReminderTime, normalizeReminderData } from "../services/reminderContentService.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
@@ -423,6 +424,8 @@ export async function executeTool(name, args = {}, context = {}) {
         payload.bookName = book.name;
         payload.currentIndex = 0;
       }
+      const emailRecipient = String(args.emailRecipient || "").trim();
+      if (emailRecipient) payload.emailRecipient = emailRecipient;
 
       const reminderData = normalizeReminderData({
         owner,
@@ -1226,6 +1229,25 @@ export async function executeTool(name, args = {}, context = {}) {
         facilities: result.facilities,
         hasFacilities: result.hasFacilities,
         replyText: lines.join("\n"),
+      };
+    }
+
+    case "send_email": {
+      const to = String(args.to || "").trim();
+      const subject = String(args.subject || "").trim();
+      const body = String(args.body || "").trim();
+
+      if (!to || !subject || !body) {
+        throw new Error("send_email 缺少必要參數（to、subject、body）");
+      }
+
+      await sendEmail({ to, subject, body });
+
+      return {
+        ok: true,
+        tool: name,
+        to,
+        subject,
       };
     }
 
