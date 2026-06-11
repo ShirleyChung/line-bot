@@ -115,6 +115,7 @@ export async function routeMessageEvent(event) {
       return await handleLlmFallback(event, emailCommand.rewrittenPrompt, {
         ...context,
         emailRecipient: emailCommand.to,
+        emailSubject: emailCommand.requestText || "Email 通知",
         originalUserText: userText || rawText,
       });
     }

@@ -10,6 +10,7 @@ import OpenAI from "openai";
 import { env } from "../config/env.js";
 import { botTools } from "../llm/tools.js";
 import { executeTool } from "../llm/toolDispatcher.js";
+import { sendEmail } from "./emailService.js";
 import { getUserMemory } from "./userMemoryService.js";
 import {
   buildSessionKey,
@@ -21,6 +22,32 @@ import {
 const client = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
 });
+
+async function deliverDirectResult(text, userText, context = {}) {
+  const emailRecipient = String(context.emailRecipient || "").trim();
+  if (!emailRecipient) {
+    return {
+      type: "text",
+      text,
+    };
+  }
+
+  const subject = String(context.emailSubject || context.originalUserText || userText || "查詢結果")
+    .trim()
+    .slice(0, 200);
+
+  await sendEmail({
+    to: emailRecipient,
+    subject: subject || "查詢結果",
+    body: text,
+  });
+
+  return {
+    type: "text",
+    text: `已寄到 ${emailRecipient}`,
+    emailed: true,
+  };
+}
 
 /**
  * 使用 LLM + tools 處理使用者輸入
@@ -154,10 +181,7 @@ export async function askLlmWithTools(userText, context = {}) {
       }
       // 已經格式化好的 LINE 文字，直接回覆，不再交給 LLM 重排
       if (["get_watch_prices", "get_stock_price", "get_etf_constituents", "get_futures_price", "get_latest_arxiv_papers", "get_cnn_top_headlines", "summarize_article_url"].includes(call.name) && result?.text) {
-        return {
-          type: "text",
-          text: result.text,
-        };
+        return deliverDirectResult(result.text, userText, context);
       }
       if (
         [
@@ -171,10 +195,7 @@ export async function askLlmWithTools(userText, context = {}) {
         ].includes(call.name) &&
         result?.replyText
       ) {
-        return {
-          type: "text",
-          text: result.replyText,
-        };
+        return deliverDirectResult(result.replyText, userText, context);
       }
       toolOutputs.push({
         type: "function_call_output",
