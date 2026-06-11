@@ -23,6 +23,7 @@ import {
   isMentionToBot,
   stripMentionsFromText,
 } from "../utils/textUtils.js";
+import { parseEmailCommand } from "../utils/emailCommand.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import {
   addImageId,
@@ -103,6 +104,19 @@ export async function routeMessageEvent(event) {
      */
     if ((sourceType === "group" || sourceType === "room") && !isMentionToBot(event)) {
       return null;
+    }
+
+    const emailCommand = parseEmailCommand(userText || rawText);
+    if (emailCommand) {
+      if (!emailCommand.requestText) {
+        return await replyText(event, `請在 email 後面補上要寄送的內容，例如：寄給 ${emailCommand.to} 今天天氣`);
+      }
+
+      return await handleLlmFallback(event, emailCommand.rewrittenPrompt, {
+        ...context,
+        emailRecipient: emailCommand.to,
+        originalUserText: userText || rawText,
+      });
     }
 
     // 先嘗試天氣訊息處理，如果有命中就直接回覆，不進 LLM

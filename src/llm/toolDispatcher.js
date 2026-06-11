@@ -448,6 +448,8 @@ export async function executeTool(name, args = {}, context = {}) {
         action: reminderData.action,
         recurrence: reminderData.recurrence,
         reminderType: reminderData.reminderType,
+        deliveryChannel: emailRecipient ? "email" : "chat",
+        emailRecipient: emailRecipient || "",
         payload: reminderData.payload,
         time: normalizedReminderTime.toISOString(),
       };
@@ -473,6 +475,8 @@ export async function executeTool(name, args = {}, context = {}) {
           action: r.action,
           recurrence: r.recurrence || "none",
           reminderType: r.reminderType || "generic",
+          deliveryChannel: r.payload?.emailRecipient ? "email" : "chat",
+          emailRecipient: r.payload?.emailRecipient || "",
           payload: r.payload || {},
           time: r.time?.toDate ? r.time.toDate().toISOString() : r.time,
         })),
