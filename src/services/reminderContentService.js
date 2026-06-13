@@ -9,7 +9,7 @@ import { resolveFuturesSymbol } from "./futuresSymbolService.js";
 import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
 import {
   getRandomRecoveryBibleVerse,
-  getBookOutlineLeafItems,
+  getBookOutlineReminderItems,
   getOutlineItemContent,
 } from "./recoveryBibleService.js";
 import { updateReminderPayload } from "./reminderService.js";
@@ -225,16 +225,16 @@ async function buildBibleOutlineReminderMessage(reminder) {
 
   if (!bookNo) throw new Error("bible_outline 提醒缺少書卷資訊");
 
-  const leafItems = await getBookOutlineLeafItems(bookNo);
-  if (!leafItems.length) throw new Error(`找不到 ${bookName} 的讀經綱目`);
+  const readingItems = await getBookOutlineReminderItems(bookNo);
+  if (!readingItems.length) throw new Error(`找不到 ${bookName} 的讀經綱目`);
 
-  const index = currentIndex % leafItems.length;
-  const item = leafItems[index];
+  const index = currentIndex % readingItems.length;
+  const item = readingItems[index];
   const content = await getOutlineItemContent(item);
 
   await updateReminderPayload(reminder.id, { currentIndex: currentIndex + 1 });
 
-  const total = leafItems.length;
+  const total = readingItems.length;
   return `聖經讀經提醒\n今日讀經：${bookName}（第 ${index + 1} / ${total} 段）\n${content.replyText}`;
 }
 

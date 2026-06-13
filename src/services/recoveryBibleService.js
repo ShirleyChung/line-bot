@@ -597,9 +597,12 @@ function fromChineseNumber(s) {
   return result + temp || NaN;
 }
 
-function parseOutlineVerseRange(rangeText, defaultChapter) {
-  // Take first segment only if there are comma-separated multi-segment ranges
-  const text = String(rangeText || "").replace(/[上下]/g, "").split(/[，,]/)[0].trim();
+function parseOutlineVerseSegment(segmentText, defaultChapter) {
+  const text = String(segmentText || "")
+    .replace(/[上下]/g, "")
+    .replace(/[：﹕]/g, ":")
+    .replace(/[～﹣－—–]/g, "∼")
+    .trim();
   if (!text) return null;
   const CN = "[一二三四五六七八九十百零]+";
   const m = text.match(new RegExp(`^(${CN})?(\\d+)(?:[∼~](${CN})?(\\d+))?$`));
@@ -611,6 +614,13 @@ function parseOutlineVerseRange(rangeText, defaultChapter) {
   if (!Number.isFinite(startChapter) || !Number.isFinite(endChapter)) return null;
   if (!Number.isFinite(startVerse) || !Number.isFinite(endVerse)) return null;
   return { startChapter, startVerse, endChapter, endVerse };
+}
+
+function parseOutlineVerseRanges(rangeText, defaultChapter) {
+  return String(rangeText || "")
+    .split(/[，,、；;]/)
+    .map((segment) => parseOutlineVerseSegment(segment, defaultChapter))
+    .filter(Boolean);
 }
 
 async function fetchBookOutlineItems(bookNo) {
@@ -635,8 +645,15 @@ async function fetchBookOutlineItems(bookNo) {
     const spaceIdx = titleText.lastIndexOf("　");
     const rangeText = spaceIdx >= 0 ? titleText.slice(spaceIdx + 1).trim() : "";
     const titleOnly = spaceIdx >= 0 ? titleText.slice(0, spaceIdx).trim() : titleText;
-    const verseRange = parseOutlineVerseRange(rangeText, chapter);
-    items.push({ level, chapter, title: titleOnly, verseRange, bookNo });
+    const verseRanges = parseOutlineVerseRanges(rangeText, chapter);
+    items.push({
+      level,
+      chapter,
+      title: titleOnly,
+      verseRange: verseRanges[0] || null,
+      verseRanges,
+      bookNo,
+    });
   }
   return items;
 }
@@ -653,34 +670,61 @@ export async function getBookOutlineLeafItems(bookNo) {
   return extractLeafItems(items);
 }
 
+export async function getBookOutlineReminderItems(bookNo) {
+  const items = await fetchBookOutlineItems(Number(bookNo));
+  const levelTwoItems = items.filter((item) => item.level === 2 && item.verseRange);
+  return levelTwoItems.length ? levelTwoItems : extractLeafItems(items);
+}
+
 export async function getOutlineItemContent(item) {
-  const { bookNo, title, verseRange } = item;
-  if (!verseRange) throw new Error("此綱目項目無法解析經節範圍");
-  const { startChapter, startVerse, endChapter, endVerse } = verseRange;
+  const { bookNo, title } = item;
+  const verseRanges = Array.isArray(item?.verseRanges) && item.verseRanges.length
+    ? item.verseRanges
+    : item?.verseRange
+      ? [item.verseRange]
+      : [];
+  if (!verseRanges.length) throw new Error("此綱目項目無法解析經節範圍");
+  const firstRange = verseRanges[0];
   const book = BOOK_BY_NO.get(Number(bookNo));
   if (!book) throw new Error(`找不到書卷編號 ${bookNo}`);
 
   const allVerses = [];
-  for (let ch = startChapter; ch <= endChapter && allVerses.length < 50; ch++) {
-    const html = await fetchChapterPage(book.no, ch, ch === startChapter ? startVerse : 1);
-    const chVerses = parseChapterVerses(html, ch).filter((v) => {
-      if (ch === startChapter && v.verse < startVerse) return false;
-      if (ch === endChapter && v.verse > endVerse) return false;
-      return true;
-    });
-    allVerses.push(...chVerses.map((v) => ({ ...v, chapter: ch })));
+  const seenRefs = new Set();
+  for (const range of verseRanges) {
+    const { startChapter, startVerse, endChapter, endVerse } = range;
+    for (let ch = startChapter; ch <= endChapter; ch++) {
+      const html = await fetchChapterPage(book.no, ch, ch === startChapter ? startVerse : 1);
+      const chVerses = parseChapterVerses(html, ch).filter((v) => {
+        if (ch === startChapter && v.verse < startVerse) return false;
+        if (ch === endChapter && v.verse > endVerse) return false;
+        return true;
+      });
+      for (const verse of chVerses) {
+        const refKey = `${ch}:${verse.verse}`;
+        if (seenRefs.has(refKey)) continue;
+        seenRefs.add(refKey);
+        allVerses.push({ ...verse, chapter: ch });
+      }
+    }
   }
 
-  if (!allVerses.length) throw new Error(`找不到 ${book.name} ${startChapter}:${startVerse} 的經文`);
+  if (!allVerses.length) {
+    throw new Error(`找不到 ${book.name} ${firstRange.startChapter}:${firstRange.startVerse} 的經文`);
+  }
 
-  const startRef = `${book.shortName}${startChapter}:${startVerse}`;
-  const endRef =
-    startChapter === endChapter && startVerse === endVerse
-      ? ""
-      : startChapter === endChapter
-        ? `-${endVerse}`
-        : `～${book.shortName}${endChapter}:${endVerse}`;
-  const displayRef = `${startRef}${endRef}`;
+  const { startChapter, startVerse } = firstRange;
+  const displayRef = verseRanges
+    .map((range) => {
+      const startRef = `${book.shortName}${range.startChapter}:${range.startVerse}`;
+      if (range.startChapter === range.endChapter && range.startVerse === range.endVerse) {
+        return startRef;
+      }
+      if (range.startChapter === range.endChapter) {
+        return `${startRef}-${range.endVerse}`;
+      }
+      return `${startRef}～${book.shortName}${range.endChapter}:${range.endVerse}`;
+    })
+    .join("，");
 
   const sourceUrl = buildRecoveryUrl("read_01.php", {
     KB: `${book.no}_${startChapter}_${startVerse}`,
