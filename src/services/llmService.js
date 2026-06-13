@@ -23,6 +23,73 @@ const client = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
 });
 
+function countUnclosedObjectBraces(jsonText) {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (const char of jsonText) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = inString;
+      continue;
+    }
+    if (char === "\"") {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === "{") depth++;
+    if (char === "}") depth--;
+  }
+
+  return inString || depth < 0 ? null : depth;
+}
+
+function parseToolArguments(argumentsText) {
+  const raw = argumentsText || "{}";
+
+  try {
+    return {
+      args: JSON.parse(raw),
+      repaired: false,
+    };
+  } catch (originalError) {
+    // Responses API strict tools should produce JSON, but models can occasionally
+    // emit a valid object followed by CR/LF noise or omit only the final "}".
+    const sanitized = raw.replace(/[\s\u0000-\u001f]+$/u, "");
+    const unclosedObjectBraces = countUnclosedObjectBraces(sanitized);
+    const candidates = [];
+
+    if (sanitized && sanitized !== raw) {
+      candidates.push(sanitized);
+    }
+    if (
+      sanitized.startsWith("{") &&
+      unclosedObjectBraces &&
+      unclosedObjectBraces > 0
+    ) {
+      candidates.push(`${sanitized}${"}".repeat(unclosedObjectBraces)}`);
+    }
+
+    for (const candidate of candidates) {
+      try {
+        return {
+          args: JSON.parse(candidate),
+          repaired: true,
+        };
+      } catch {
+        // Keep trying narrower repairs; if all fail, surface original parse error.
+      }
+    }
+
+    throw originalError;
+  }
+}
+
 async function deliverDirectResult(text, userText, context = {}) {
   const emailRecipient = String(context.emailRecipient || "").trim();
   if (!emailRecipient) {
@@ -140,7 +207,15 @@ export async function askLlmWithTools(userText, context = {}) {
     for (const call of functionCalls) {
       let args = {};
       try {
-        args = JSON.parse(call.arguments || "{}");
+        const parsed = parseToolArguments(call.arguments);
+        args = parsed.args;
+        if (parsed.repaired) {
+          console.warn("[askLlmWithTools] 已修復工具參數 JSON 尾端格式", {
+            name: call.name,
+            arguments: call.arguments,
+            parsedArgs: args,
+          });
+        }
       } catch (error) {
         // 模型（尤其 mini 等級）偶爾會產生格式錯誤的工具參數 JSON，
         // 最常見是字串值內含未跳脫的雙引號或換行（例如新聞排程的 newsQuery/action）。

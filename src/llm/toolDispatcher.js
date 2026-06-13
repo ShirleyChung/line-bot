@@ -101,7 +101,21 @@ function detectFuturesCommodity(args = {}) {
   return "";
 }
 
+function detectBibleOutlineBookName(args = {}) {
+  const explicitBookName = String(args.bibleBookName || "").trim();
+  if (explicitBookName) return explicitBookName;
+
+  const hint = `${args.target || ""} ${args.action || ""}`;
+  if (!/綱目|循序|逐日|讀經|進度/.test(hint)) return "";
+
+  return detectBookFromText(hint)?.name || "";
+}
+
 function inferReminderType(args = {}) {
+  if (detectBibleOutlineBookName(args)) {
+    return "bible_outline";
+  }
+
   const requestedType = String(args.reminderType || "").trim();
   if (requestedType && requestedType !== "generic") {
     return requestedType;
@@ -348,6 +362,8 @@ export async function executeTool(name, args = {}, context = {}) {
     case "create_reminder": {
       const reminderType = inferReminderType(args);
       const reminderCommodity = detectFuturesCommodity(args);
+      const bibleOutlineBookName =
+        reminderType === "bible_outline" ? detectBibleOutlineBookName(args) : "";
       // LLM 可能依工具類型填 city/symbol/action，不同提醒在這裡收斂成共通 target/action。
       const derivedTarget =
         args.target ||
@@ -358,7 +374,7 @@ export async function executeTool(name, args = {}, context = {}) {
         (reminderType === "top_headlines" ? "今日頭條" : "") ||
         (reminderType === "general_news" && args.newsQuery ? `${args.newsQuery} 新聞` : "") ||
         (reminderType === "bible_verse" ? "聖經" : "") ||
-        (reminderType === "bible_outline" && args.bibleBookName ? args.bibleBookName : "") ||
+        (reminderType === "bible_outline" ? bibleOutlineBookName : "") ||
         "提醒";
       const derivedAction =
         args.action ||
@@ -373,7 +389,7 @@ export async function executeTool(name, args = {}, context = {}) {
         (reminderType === "general_news" && args.newsQuery ? `${args.newsQuery} 最新新聞` : "") ||
         (reminderType === "futures" && reminderCommodity ? `${reminderCommodity}${args.contract ? ` ${args.contract}` : ""}行情` : "") ||
         (reminderType === "bible_verse" ? "隨機聖經經節" : "") ||
-        (reminderType === "bible_outline" && args.bibleBookName ? `${args.bibleBookName}循序讀經` : "");
+        (reminderType === "bible_outline" && bibleOutlineBookName ? `${bibleOutlineBookName}循序讀經` : "");
 
       if (!derivedTarget || !derivedAction || !args.time) {
         throw new Error("create_reminder 缺少必要參數");
@@ -417,7 +433,7 @@ export async function executeTool(name, args = {}, context = {}) {
         payload.max = Math.min(Math.max(Number(args.newsCount) || 5, 1), 10);
       }
       if (reminderType === "bible_outline") {
-        const bookName = String(args.bibleBookName || "").trim();
+        const bookName = String(bibleOutlineBookName || "").trim();
         const book = bookName ? detectBookFromText(bookName) : null;
         if (!book) throw new Error(`找不到聖經書卷「${bookName}」，請提供有效的書卷名稱，例如「加拉太書」`);
         payload.bookNo = book.no;
