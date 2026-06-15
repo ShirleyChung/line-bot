@@ -73,7 +73,7 @@ function normalizeDateRange(startDate, endDate) {
 }
 
 function normalizeRegion(region) {
-  const value = String(region || "").trim();
+  const value = String(region || "Asia").trim();
   if (!value) return { key: "", label: "", keywords: [] };
 
   const normalized = value.toLowerCase().replace(/\s+/g, "_");
@@ -99,8 +99,122 @@ function compactText(value, max = 220) {
     .slice(0, max);
 }
 
+function decodeHtml(value) {
+  return String(value || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function stripHtml(value) {
+  return compactText(decodeHtml(String(value || "").replace(/<[^>]+>/g, " ")), 500);
+}
+
 function cleanupTitle(value) {
-  return compactText(String(value || "").replace(/\s*\|\s*ITF.*$/i, ""), 140);
+  return compactText(stripHtml(value).replace(/\s*\|\s*ITF.*$/i, ""), 140);
+}
+
+function titleFromTournamentUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const tournamentIndex = parts.indexOf("tournament");
+    const slug = tournamentIndex >= 0 ? parts[tournamentIndex + 1] : "";
+    if (!slug) return "";
+
+    return slug
+      .split("-")
+      .filter(Boolean)
+      .map((part) => (part.length <= 4 ? part.toUpperCase() : part[0].toUpperCase() + part.slice(1)))
+      .join(" ");
+  } catch {
+    return "";
+  }
+}
+
+function locationFromTournamentUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const tournamentIndex = parts.indexOf("tournament");
+    const slug = tournamentIndex >= 0 ? parts[tournamentIndex + 1] : "";
+    const countryCode = tournamentIndex >= 0 ? parts[tournamentIndex + 2] : "";
+    const place = slug
+      .split("-")
+      .filter((part) => !/^j\d{2,3}$/i.test(part) && !/^\d{4}$/.test(part))
+      .map((part) => part[0]?.toUpperCase() + part.slice(1))
+      .join(" ");
+
+    return [place, countryCode ? countryCode.toUpperCase() : ""].filter(Boolean).join(", ");
+  } catch {
+    return "";
+  }
+}
+
+function findLabeledValue(text, labels) {
+  const normalized = compactText(text, 1000);
+  for (const label of labels) {
+    const regex = new RegExp(`${label}\\s*:?\\s*([^|\\n,;]{3,80})`, "i");
+    const match = normalized.match(regex);
+    if (match?.[1]) return compactText(match[1], 80);
+  }
+
+  return "";
+}
+
+function extractDateRange(text) {
+  const normalized = compactText(text, 1000);
+  const isoRange = normalized.match(/\b(\d{4}-\d{2}-\d{2})(?:\s*(?:to|-|–|~)\s*(\d{4}-\d{2}-\d{2}))?\b/);
+  if (isoRange) return isoRange[2] ? `${isoRange[1]} ~ ${isoRange[2]}` : isoRange[1];
+
+  const dayMonthRange = normalized.match(/\b(\d{1,2}\s+[A-Z][a-z]{2,8})(?:\s*(?:to|-|–|~)\s*(\d{1,2}\s+[A-Z][a-z]{2,8}))?\s+(\d{4})\b/);
+  if (dayMonthRange) {
+    return dayMonthRange[2]
+      ? `${dayMonthRange[1]} ~ ${dayMonthRange[2]} ${dayMonthRange[3]}`
+      : `${dayMonthRange[1]} ${dayMonthRange[3]}`;
+  }
+
+  return findLabeledValue(normalized, ["Dates?", "Tournament dates?", "Main draw"]);
+}
+
+function extractWithdrawDeadline(text) {
+  const value = findLabeledValue(text, [
+    "Withdrawal deadline",
+    "Withdraw deadline",
+    "Withdrawal date",
+    "Withdrawal",
+    "Withdraw",
+  ]);
+  return extractDateRange(value) || value;
+}
+
+function extractLocation(text, url) {
+  return (
+    findLabeledValue(text, ["Location", "Venue", "City", "Country"]) ||
+    locationFromTournamentUrl(url)
+  );
+}
+
+function enrichTournament(item) {
+  const title = cleanupTitle(item.title) || titleFromTournamentUrl(item.url) || "ITF tournament";
+  const searchableText = [
+    title,
+    item.description,
+    item.context,
+  ].filter(Boolean).join(" | ");
+
+  return {
+    title,
+    url: item.url,
+    date: item.date || extractDateRange(searchableText),
+    location: item.location || extractLocation(searchableText, item.url),
+    withdrawDeadline: item.withdrawDeadline || extractWithdrawDeadline(searchableText),
+    description: compactText(item.description, 220),
+    source: item.source || "",
+  };
 }
 
 function buildOfficialCalendarUrl({ tourConfig, startDate, endDate, country, region, level }) {
@@ -146,7 +260,7 @@ async function fetchText(url) {
 function extractTournamentLinksFromHtml(html, { fallbackTitle = "" } = {}) {
   const links = [];
   const seen = new Set();
-  const hrefRegex = /<a\b[^>]*href="([^"]+\/en\/tournament\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  const hrefRegex = /<a\b[^>]*href="([^"]*\/en\/tournament\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
 
   for (const match of html.matchAll(hrefRegex)) {
     const rawHref = match[1];
@@ -162,13 +276,17 @@ function extractTournamentLinksFromHtml(html, { fallbackTitle = "" } = {}) {
     if (seen.has(url)) continue;
     seen.add(url);
 
-    const anchorText = cleanupTitle(anchorHtml.replace(/<[^>]+>/g, " "));
-    links.push({
+    const contextStart = Math.max(0, match.index - 1500);
+    const contextEnd = Math.min(html.length, match.index + match[0].length + 1500);
+    const context = stripHtml(html.slice(contextStart, contextEnd));
+    const anchorText = cleanupTitle(anchorHtml);
+    links.push(enrichTournament({
       title: anchorText || fallbackTitle || "ITF tournament",
       url,
       description: "",
+      context,
       source: "official_calendar_html",
-    });
+    }));
   }
 
   return links;
@@ -206,12 +324,7 @@ function dedupeTournaments(tournaments, max) {
     const url = String(item?.url || "").trim();
     if (!url || seen.has(url)) continue;
     seen.add(url);
-    output.push({
-      title: cleanupTitle(item.title) || "ITF tournament",
-      url,
-      description: compactText(item.description, 220),
-      source: item.source || "",
-    });
+    output.push(enrichTournament({ ...item, url }));
     if (output.length >= max) break;
   }
 
@@ -288,10 +401,9 @@ function formatTournamentList({
 
   tournaments.forEach((item, index) => {
     lines.push(`${index + 1}. ${item.title}`);
-    if (item.description) {
-      lines.push(`摘要：${item.description}`);
-    }
-    lines.push(`連結：${item.url}`);
+    lines.push(`日期：${item.date || "未提供"}`);
+    lines.push(`地點：${item.location || "未提供"}`);
+    lines.push(`Withdraw 期限：${item.withdrawDeadline || "未提供"}`);
     if (index !== tournaments.length - 1) {
       lines.push("");
     }
@@ -304,7 +416,7 @@ export async function fetchItfTournaments({
   tour = "juniors",
   startDate = "",
   endDate = "",
-  region = "",
+  region = "Asia",
   country = "",
   level = "",
   max = 5,

@@ -316,7 +316,7 @@ export const botTools = [
   {
     type: "function",
     name: "get_itf_tournaments",
-    description: "查詢 ITF 網球賽事資訊，預設查 ITF World Tennis Tour Juniors。優先使用 ITF 官方 calendar 與 ITF 官方賽事頁，回傳賽事列表與連結。",
+    description: "查詢 ITF 網球賽事資訊，預設查 ITF World Tennis Tour Juniors 與 Asia。優先使用 ITF 官方 juniors calendar，回傳乾淨的日期、地點與 withdraw 期限。",
     parameters: {
       type: "object",
       properties: {
@@ -335,7 +335,7 @@ export const botTools = [
         },
         region: {
           type: "string",
-          description: "可選，較大區域，例如 Asia、Europe、North America、South America、Oceania、Africa、Middle East。未指定請填空字串。",
+          description: "可選，較大區域，例如 Asia、Europe、North America、South America、Oceania、Africa、Middle East。未指定時填 Asia。",
         },
         country: {
           type: "string",

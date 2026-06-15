@@ -754,7 +754,7 @@ export async function executeTool(name, args = {}, context = {}) {
         tour: args.tour || "juniors",
         startDate: args.startDate || "",
         endDate: args.endDate || "",
-        region: args.region || "",
+        region: args.region || "Asia",
         country: args.country || "",
         level: args.level || "",
         max: args.max || 5,

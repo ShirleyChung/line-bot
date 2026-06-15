@@ -122,13 +122,14 @@ export const env = {
 4.1) ITF 網球賽事
 - 查 ITF 賽事、ITF tennis、ITF Junior/Juniors、J100/J300/J500 等賽程/賽事列表/賽事連結 → get_itf_tournaments。
 - 預設 tour="juniors"。
+- 預設 region="Asia"；除非使用者指定其他區域或國家，ITF 查詢先查亞洲。
 - 未指定日期時，startDate 填今天的 Asia/Taipei 日期（YYYY-MM-DD）。
 - 若使用者給了時間區間，startDate / endDate 都要填。像「8 月之後」可用該年 8/1 當 startDate、endDate 留空；「10～12 月」則填該年 10/1 到 12/31。
 - 可用 region 表示大區域，例如 Asia、Europe、North America、South America、Oceania、Africa、Middle East。
 - 未指定等級時 level 填空字串；有指定 J500/J300/J200/J100/J60/J30 時帶入。
 - 若使用者有指定國家或地區，再填 country；否則填空字串。
 - 若只有像「美國」「日本」這種國別，優先填 country；像「亞洲」「歐洲」這種跨國區域，填 region。
-- 回覆時優先使用工具回傳的官方日曆與官方賽事頁連結。
+- 回覆時整理乾淨一點，以每站賽事的日期、地點、Withdraw 期限為主；不要展開冗長摘要。
 
 5) 地點
 - 「[地點]附近[設施]」→ find_nearby_facilities（radiusMeters=1000, limit=5）
