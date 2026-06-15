@@ -48,10 +48,13 @@ function normalizeDateInput(date) {
   const value = String(date || "").trim();
   if (!value) return getTaipeiTodayDate();
 
-  const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (match) return match[1];
+  const dateMatch = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (dateMatch) return dateMatch[1];
 
-  throw new Error(`日期格式錯誤：${date}，請使用 YYYY-MM-DD`);
+  const monthMatch = value.match(/^(\d{4}-\d{2})$/);
+  if (monthMatch) return `${monthMatch[1]}-01`;
+
+  throw new Error(`日期格式錯誤：${date}，請使用 YYYY-MM-DD 或 YYYY-MM`);
 }
 
 function compareDateText(a, b) {
@@ -69,6 +72,51 @@ function normalizeDateRange(startDate, endDate) {
   return {
     startDate: normalizedStartDate,
     endDate: normalizedEndDate,
+  };
+}
+
+function normalizeMonthInput(value, fallbackDate = "") {
+  const text = String(value || "").trim();
+  if (!text) return String(fallbackDate || getTaipeiTodayDate()).slice(0, 7);
+
+  const monthMatch = text.match(/^(\d{4}-\d{2})$/);
+  if (monthMatch) return monthMatch[1];
+
+  const dateMatch = text.match(/^(\d{4}-\d{2})-\d{2}$/);
+  if (dateMatch) return dateMatch[1];
+
+  throw new Error(`月份格式錯誤：${value}，請使用 YYYY-MM 或 YYYY-MM-DD`);
+}
+
+function compareMonthText(a, b) {
+  return String(a).localeCompare(String(b));
+}
+
+function buildMonthRange(startMonth, endMonth) {
+  const normalizedStartMonth = normalizeMonthInput(startMonth);
+  const normalizedEndMonth = endMonth ? normalizeMonthInput(endMonth) : normalizedStartMonth;
+
+  if (compareMonthText(normalizedStartMonth, normalizedEndMonth) > 0) {
+    throw new Error(`結束月份不可早於開始月份：${normalizedStartMonth} > ${normalizedEndMonth}`);
+  }
+
+  const months = [];
+  let [year, month] = normalizedStartMonth.split("-").map(Number);
+  const [endYear, endMonthNumber] = normalizedEndMonth.split("-").map(Number);
+
+  while (year < endYear || (year === endYear && month <= endMonthNumber)) {
+    months.push(`${year}-${String(month).padStart(2, "0")}`);
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+
+  return {
+    startMonth: normalizedStartMonth,
+    endMonth: normalizedEndMonth,
+    months,
   };
 }
 
@@ -109,8 +157,8 @@ function decodeHtml(value) {
     .replace(/&gt;/gi, ">");
 }
 
-function stripHtml(value) {
-  return compactText(decodeHtml(String(value || "").replace(/<[^>]+>/g, " ")), 500);
+function stripHtml(value, max = 500) {
+  return compactText(decodeHtml(String(value || "").replace(/<[^>]+>/g, " ")), max);
 }
 
 function cleanupTitle(value) {
@@ -154,19 +202,24 @@ function locationFromTournamentUrl(url) {
   }
 }
 
+function levelFromTournamentUrl(url) {
+  const match = String(url || "").match(/\/(j\d{2,3})[-/]/i) || String(url || "").match(/\b(J\d{2,3})\b/i);
+  return match?.[1]?.toUpperCase() || "";
+}
+
 function findLabeledValue(text, labels) {
-  const normalized = compactText(text, 1000);
+  const normalized = compactText(text, 3000);
   for (const label of labels) {
-    const regex = new RegExp(`${label}\\s*:?\\s*([^|\\n,;]{3,80})`, "i");
+    const regex = new RegExp(`${label}\\s*:?\\s*([^|\\n]{2,120})`, "i");
     const match = normalized.match(regex);
-    if (match?.[1]) return compactText(match[1], 80);
+    if (match?.[1]) return compactText(match[1], 120);
   }
 
   return "";
 }
 
 function extractDateRange(text) {
-  const normalized = compactText(text, 1000);
+  const normalized = compactText(text, 3000);
   const isoRange = normalized.match(/\b(\d{4}-\d{2}-\d{2})(?:\s*(?:to|-|–|~)\s*(\d{4}-\d{2}-\d{2}))?\b/);
   if (isoRange) return isoRange[2] ? `${isoRange[1]} ~ ${isoRange[2]}` : isoRange[1];
 
@@ -177,7 +230,7 @@ function extractDateRange(text) {
       : `${dayMonthRange[1]} ${dayMonthRange[3]}`;
   }
 
-  return findLabeledValue(normalized, ["Dates?", "Tournament dates?", "Main draw"]);
+  return findLabeledValue(normalized, ["Dates?", "Tournament dates?", "Main draw", "Date"]);
 }
 
 function extractWithdrawDeadline(text) {
@@ -193,38 +246,35 @@ function extractWithdrawDeadline(text) {
 
 function extractLocation(text, url) {
   return (
-    findLabeledValue(text, ["Location", "Venue", "City", "Country"]) ||
+    findLabeledValue(text, ["Location", "Venue", "City", "Country", "Host nation", "Host Nation"]) ||
     locationFromTournamentUrl(url)
   );
 }
 
 function enrichTournament(item) {
   const title = cleanupTitle(item.title) || titleFromTournamentUrl(item.url) || "ITF tournament";
-  const searchableText = [
-    title,
-    item.description,
-    item.context,
-  ].filter(Boolean).join(" | ");
+  const searchableText = [title, item.description, item.context].filter(Boolean).join(" | ");
 
   return {
     title,
     url: item.url,
     date: item.date || extractDateRange(searchableText),
     location: item.location || extractLocation(searchableText, item.url),
+    level: item.level || levelFromTournamentUrl(item.url) || findLabeledValue(searchableText, ["Level", "Category"]),
+    surface: item.surface || findLabeledValue(searchableText, ["Surface"]),
+    hostNation: item.hostNation || findLabeledValue(searchableText, ["Host nation", "Host Nation"]),
     withdrawDeadline: item.withdrawDeadline || extractWithdrawDeadline(searchableText),
     description: compactText(item.description, 220),
     source: item.source || "",
   };
 }
 
-function buildOfficialCalendarUrl({ tourConfig, startDate, endDate, country, region, level }) {
+function buildOfficialCalendarUrl({ tourConfig, month, country, region, level }) {
   const url = new URL(tourConfig.calendarPath, ITF_BASE_URL);
-  url.searchParams.set("startdate", startDate);
-  if (endDate) url.searchParams.set("enddate", endDate);
+  url.searchParams.set("categories", "All");
+  url.searchParams.set("startdate", month);
 
-  // 這些 query params 來自現行 calendar URL 的可見行為與既有站內慣例；
-  // 就算官方前端未使用，也不影響 fallback 搜尋。
-  if (country) url.searchParams.set("country", country.trim());
+  if (country) url.searchParams.set("nation", country.trim());
   if (region?.label) url.searchParams.set("region", region.label);
   if (level) url.searchParams.set("category", level);
 
@@ -251,7 +301,12 @@ async function fetchText(url) {
       throw new Error(`HTTP ${resp.status}`);
     }
 
-    return await resp.text();
+    const html = await resp.text();
+    if (/<script[^>]+_Incapsula_Resource/i.test(html) || /NOINDEX, NOFOLLOW/i.test(html) && /Incapsula/i.test(html)) {
+      throw new Error("ITF anti-bot blocked");
+    }
+
+    return html;
   } finally {
     clearTimeout(timer);
   }
@@ -278,7 +333,7 @@ function extractTournamentLinksFromHtml(html, { fallbackTitle = "" } = {}) {
 
     const contextStart = Math.max(0, match.index - 1500);
     const contextEnd = Math.min(html.length, match.index + match[0].length + 1500);
-    const context = stripHtml(html.slice(contextStart, contextEnd));
+    const context = stripHtml(html.slice(contextStart, contextEnd), 1200);
     const anchorText = cleanupTitle(anchorHtml);
     links.push(enrichTournament({
       title: anchorText || fallbackTitle || "ITF tournament",
@@ -292,27 +347,20 @@ function extractTournamentLinksFromHtml(html, { fallbackTitle = "" } = {}) {
   return links;
 }
 
-function buildSearchQueries({ tourConfig, startDate, endDate, level, country, region }) {
-  const [year, month] = startDate.split("-");
+function buildSearchQueries({ tourConfig, monthKey, level, country, region }) {
+  const [year] = monthKey.split("-");
   const monthLabel = new Intl.DateTimeFormat("en-US", {
     month: "long",
     timeZone: "Asia/Taipei",
-  }).format(new Date(`${startDate}T00:00:00+08:00`));
-  const endMonthLabel = endDate
-    ? new Intl.DateTimeFormat("en-US", {
-      month: "long",
-      timeZone: "Asia/Taipei",
-    }).format(new Date(`${endDate}T00:00:00+08:00`))
-    : "";
+  }).format(new Date(`${monthKey}-01T00:00:00+08:00`));
   const countryHint = country ? ` ${country.trim()}` : "";
   const regionHint = region?.keywords?.[0] ? ` ${region.keywords[0]}` : "";
   const levelHint = level ? ` ${level}` : "";
-  const rangeHint = endDate ? ` "${monthLabel} ${year}" "${endMonthLabel} ${endDate.slice(0, 4)}"` : ` "${monthLabel} ${year}"`;
 
   return [
-    `site:itftennis.com/en/tournament/ "${tourConfig.label}"${rangeHint}${levelHint}${countryHint}${regionHint}`,
-    `site:itftennis.com/en/tournament/ ITF juniors ${year}${levelHint}${countryHint}${regionHint}`,
-    `site:itftennis.com/en/tournament/ "ITF" "${year}"${levelHint}${countryHint}${regionHint}`,
+    `site:itftennis.com/en/tournament/ "${tourConfig.label}" "${monthLabel} ${year}"${levelHint}${countryHint}${regionHint}`,
+    `site:itftennis.com/en/tournament/ ITF juniors "${monthLabel}" "${year}"${levelHint}${countryHint}${regionHint}`,
+    `site:itftennis.com/en/tournament/ "ITF" "${monthLabel}" "${year}"${levelHint}${countryHint}${regionHint}`,
   ];
 }
 
@@ -331,8 +379,8 @@ function dedupeTournaments(tournaments, max) {
   return output;
 }
 
-async function searchOfficialTournamentPages({ tourConfig, startDate, endDate, level, country, region, max }) {
-  const queries = buildSearchQueries({ tourConfig, startDate, endDate, level, country, region });
+async function searchOfficialTournamentPages({ tourConfig, monthKey, level, country, region, max }) {
+  const queries = buildSearchQueries({ tourConfig, monthKey, level, country, region });
   const collected = [];
 
   for (const query of queries) {
@@ -370,17 +418,17 @@ async function searchOfficialTournamentPages({ tourConfig, startDate, endDate, l
 
 function formatTournamentList({
   tourConfig,
-  calendarUrl,
+  calendarUrls,
   tournaments,
   source,
-  startDate,
-  endDate,
+  startMonth,
+  endMonth,
   level,
   country,
   region,
 }) {
   const filters = [
-    endDate ? `日期區間：${startDate} ~ ${endDate}` : `日期起點：${startDate}`,
+    startMonth === endMonth ? `月份：${startMonth}` : `月份區間：${startMonth} ~ ${endMonth}`,
     level ? `等級：${level}` : "",
     region?.label ? `地區：${region.label}` : "",
     country ? `國家/地區：${country}` : "",
@@ -389,10 +437,11 @@ function formatTournamentList({
   const lines = [
     `${tourConfig.label} 賽事列表`,
     filters.join("｜"),
-    `官方日曆：${calendarUrl}`,
+    `官方日曆：${calendarUrls[0] || ""}`,
+    calendarUrls.length > 1 ? `查詢月份數：${calendarUrls.length}` : "",
     `資料來源：${source}`,
     "",
-  ];
+  ].filter(Boolean);
 
   if (!tournaments.length) {
     lines.push("目前沒有抓到可列出的官方賽事頁面。可先打開上面的 ITF 官方日曆連結查看最新列表。");
@@ -402,12 +451,63 @@ function formatTournamentList({
   tournaments.forEach((item, index) => {
     lines.push(`${index + 1}. ${item.title}`);
     lines.push(`日期：${item.date || "未提供"}`);
-    lines.push(`地點：${item.location || "未提供"}`);
-    lines.push(`Withdraw 期限：${item.withdrawDeadline || "未提供"}`);
+    lines.push(`地點：${item.location || item.hostNation || "未提供"}`);
+    lines.push(`等級：${item.level || "未提供"}`);
+    lines.push(`場地：${item.surface || "未提供"}`);
+    lines.push(`連結：${item.url}`);
     if (index !== tournaments.length - 1) {
       lines.push("");
     }
   });
+
+  return lines.join("\n");
+}
+
+function extractBetweenLabels(text, startLabel, nextLabels = []) {
+  const escapedStart = String(startLabel || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedNext = nextLabels.map((label) => String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const regex = new RegExp(`${escapedStart}\\s*:?\\s*([\\s\\S]*?)(?=${escapedNext.length ? escapedNext.join("|") : "$"})`, "i");
+  const match = String(text || "").match(regex);
+  return compactText(match?.[1] || "", 200);
+}
+
+function extractTournamentDetailFromHtml(html, url) {
+  const text = stripHtml(String(html || "").replace(/<br\s*\/?>/gi, "\n"), 12000);
+  const titleMatch = text.match(/(?:Back to ITF World Tennis Tour Juniors Calendar\s+)?(J\d{2,3}\s+[A-Za-z0-9'().,\- ]{2,120})/i);
+  const sectionStart = text.indexOf("Tournament Information");
+  const venueStart = text.indexOf("Tournament Venue");
+  const sectionText = sectionStart >= 0 ? text.slice(sectionStart, venueStart >= 0 ? venueStart : undefined) : text;
+  const venueText = venueStart >= 0 ? text.slice(venueStart) : text;
+
+  return {
+    title: cleanupTitle(titleMatch?.[1] || titleFromTournamentUrl(url) || "ITF tournament"),
+    url,
+    level: levelFromTournamentUrl(url),
+    dates: extractDateRange(text) || findLabeledValue(text, ["Dates", "Date"]),
+    hostNation: findLabeledValue(text, ["Host nation", "Host Nation"]),
+    surface: findLabeledValue(text, ["Surface"]),
+    hospitality: findLabeledValue(text, ["Hospitality"]),
+    entryDeadline: extractBetweenLabels(sectionText, "Entry deadline", ["Withdrawal deadline", "Single Main Draw Sign-in date/time", "Singles Qualifying sign-in date/time"]),
+    withdrawalDeadline: extractBetweenLabels(sectionText, "Withdrawal deadline", ["Single Main Draw Sign-in date/time", "Singles Qualifying sign-in date/time", "First day of Singles Qualifying"]),
+    signIn: extractBetweenLabels(sectionText, "Singles Qualifying sign-in date/time", ["First day of Singles Qualifying", "First day of Singles Main Draw"]),
+    firstMainDraw: extractBetweenLabels(sectionText, "First day of Singles Main Draw", ["Tournament Director name", "Tournament Director email"]),
+    venueName: extractBetweenLabels(venueText, "Venue Name", ["Venue Address"]),
+    venueAddress: extractBetweenLabels(venueText, "Venue Address", ["National Associations", "Commercial Partners"]),
+  };
+}
+
+function formatTournamentDetailsTable(details) {
+  const lines = [
+    "| 賽事 | 日期 | 等級 | 主辦國 | 場地 | Entry deadline | Withdrawal deadline | 場館 |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+  ];
+
+  for (const item of details) {
+    const venue = [item.venueName, item.venueAddress].filter(Boolean).join(" / ");
+    lines.push(
+      `| ${compactText(item.title || "未提供", 80).replace(/\|/g, "/")} | ${compactText(item.dates || "未提供", 60).replace(/\|/g, "/")} | ${compactText(item.level || "未提供", 20).replace(/\|/g, "/")} | ${compactText(item.hostNation || "未提供", 30).replace(/\|/g, "/")} | ${compactText(item.surface || "未提供", 30).replace(/\|/g, "/")} | ${compactText(item.entryDeadline || "未提供", 60).replace(/\|/g, "/")} | ${compactText(item.withdrawalDeadline || "未提供", 60).replace(/\|/g, "/")} | ${compactText(venue || "未提供", 120).replace(/\|/g, "/")} |`,
+    );
+  }
 
   return lines.join("\n");
 }
@@ -425,50 +525,63 @@ export async function fetchItfTournaments({
   const normalizedDateRange = normalizeDateRange(startDate, endDate);
   const normalizedStartDate = normalizedDateRange.startDate;
   const normalizedEndDate = normalizedDateRange.endDate;
+  const normalizedMonthRange = buildMonthRange(normalizedStartDate, normalizedEndDate || normalizedStartDate);
   const normalizedRegion = normalizeRegion(region);
   const normalizedLevel = normalizeLevel(level, tourConfig);
   const normalizedCountry = String(country || "").trim();
   const normalizedMax = Math.min(Math.max(Number(max) || 5, 1), 10);
 
-  const calendarUrl = buildOfficialCalendarUrl({
+  const calendarUrls = normalizedMonthRange.months.map((month) => buildOfficialCalendarUrl({
     tourConfig,
-    startDate: normalizedStartDate,
-    endDate: normalizedEndDate,
+    month,
     country: normalizedCountry,
     region: normalizedRegion,
     level: normalizedLevel,
-  });
+  }));
 
   const collected = [];
   let source = "ITF official calendar";
 
-  try {
-    const html = await fetchText(calendarUrl);
-    collected.push(
-      ...extractTournamentLinksFromHtml(html, {
-        fallbackTitle: tourConfig.label,
-      }),
-    );
-  } catch {
-    source = "ITF official search fallback";
+  for (const [index, calendarUrl] of calendarUrls.entries()) {
+    try {
+      const html = await fetchText(calendarUrl);
+      collected.push(
+        ...extractTournamentLinksFromHtml(html, {
+          fallbackTitle: `${tourConfig.label} ${normalizedMonthRange.months[index]}`,
+        }),
+      );
+    } catch {
+      source = "ITF official search fallback";
+    }
+
+    if (dedupeTournaments(collected, normalizedMax).length >= normalizedMax) {
+      break;
+    }
   }
 
   let tournaments = dedupeTournaments(collected, normalizedMax);
 
   if (!tournaments.length) {
-    const searched = await searchOfficialTournamentPages({
-      tourConfig,
-      startDate: normalizedStartDate,
-      endDate: normalizedEndDate,
-      level: normalizedLevel,
-      country: normalizedCountry,
-      region: normalizedRegion,
-      max: normalizedMax,
-    });
+    for (const monthKey of normalizedMonthRange.months) {
+      const searched = await searchOfficialTournamentPages({
+        tourConfig,
+        monthKey,
+        level: normalizedLevel,
+        country: normalizedCountry,
+        region: normalizedRegion,
+        max: normalizedMax,
+      });
 
-    if (searched.length) {
-      source = "ITF official site search";
-      tournaments = searched;
+      collected.push(...searched);
+      tournaments = dedupeTournaments(collected, normalizedMax);
+
+      if (tournaments.length) {
+        source = "ITF official site search";
+      }
+
+      if (tournaments.length >= normalizedMax) {
+        break;
+      }
     }
   }
 
@@ -477,23 +590,70 @@ export async function fetchItfTournaments({
     tour: tourConfig.key,
     startDate: normalizedStartDate,
     endDate: normalizedEndDate,
+    startMonth: normalizedMonthRange.startMonth,
+    endMonth: normalizedMonthRange.endMonth,
+    searchedMonths: normalizedMonthRange.months,
     region: normalizedRegion.label,
     country: normalizedCountry,
     level: normalizedLevel,
     max: normalizedMax,
-    calendarUrl,
+    calendarUrl: calendarUrls[0] || "",
+    calendarUrls,
     source,
     tournaments,
     text: formatTournamentList({
       tourConfig,
-      calendarUrl,
+      calendarUrls,
       tournaments,
       source,
-      startDate: normalizedStartDate,
-      endDate: normalizedEndDate,
+      startMonth: normalizedMonthRange.startMonth,
+      endMonth: normalizedMonthRange.endMonth,
       level: normalizedLevel,
       country: normalizedCountry,
       region: normalizedRegion,
     }),
+  };
+}
+
+export async function fetchItfTournamentDetails({
+  tournamentUrls = [],
+  max = 5,
+} = {}) {
+  const urls = Array.from(new Set(
+    (Array.isArray(tournamentUrls) ? tournamentUrls : [])
+      .map((value) => String(value || "").trim())
+      .filter((value) => /^https:\/\/www\.itftennis\.com\/en\/tournament\//i.test(value)),
+  )).slice(0, Math.min(Math.max(Number(max) || 5, 1), 10));
+
+  const details = [];
+
+  for (const url of urls) {
+    try {
+      const html = await fetchText(url);
+      details.push(extractTournamentDetailFromHtml(html, url));
+    } catch (error) {
+      details.push({
+        title: titleFromTournamentUrl(url) || "ITF tournament",
+        url,
+        level: levelFromTournamentUrl(url),
+        dates: "",
+        hostNation: "",
+        surface: "",
+        entryDeadline: "",
+        withdrawalDeadline: "",
+        venueName: "",
+        venueAddress: error instanceof Error ? error.message : "fetch_failed",
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    tournamentUrls: urls,
+    count: details.length,
+    details,
+    text: details.length
+      ? formatTournamentDetailsTable(details)
+      : "沒有可查詢的 ITF 賽事連結。請先從賽事列表挑選官方 tournament URL。",
   };
 }

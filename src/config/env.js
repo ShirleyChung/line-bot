@@ -124,12 +124,13 @@ export const env = {
 - 預設 tour="juniors"。
 - 預設 region="Asia"；除非使用者指定其他區域或國家，ITF 查詢先查亞洲。
 - 未指定日期時，startDate 填今天的 Asia/Taipei 日期（YYYY-MM-DD）。
-- 若使用者給了時間區間，startDate / endDate 都要填。像「8 月之後」可用該年 8/1 當 startDate、endDate 留空；「10～12 月」則填該年 10/1 到 12/31。
+- 第一階段優先用月份查詢；startDate / endDate 可直接用 YYYY-MM。像「6～12 月」就查 2026-06 到 2026-12。
 - 可用 region 表示大區域，例如 Asia、Europe、North America、South America、Oceania、Africa、Middle East。
 - 未指定等級時 level 填空字串；有指定 J500/J300/J200/J100/J60/J30 時帶入。
 - 若使用者有指定國家或地區，再填 country；否則填空字串。
 - 若只有像「美國」「日本」這種國別，優先填 country；像「亞洲」「歐洲」這種跨國區域，填 region。
-- 回覆時整理乾淨一點，以每站賽事的日期、地點、Withdraw 期限為主；不要展開冗長摘要。
+- 第一階段先回賽事列表與官方 tournament 連結，不先抓 withdrawal deadline。
+- 若使用者要進一步看特定賽事詳情、withdrawal deadline、場地、場館等，再呼叫 get_itf_tournament_details。
 
 5) 地點
 - 「[地點]附近[設施]」→ find_nearby_facilities（radiusMeters=1000, limit=5）

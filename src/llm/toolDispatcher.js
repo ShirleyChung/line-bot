@@ -34,7 +34,7 @@ import { searchWeb } from "../services/webSearchService.js";
 import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
 import { buildNewsMessage } from "../utils/format.js";
 import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "../services/cnnNewsService.js";
-import { fetchItfTournaments } from "../services/itfTennisService.js";
+import { fetchItfTournamentDetails, fetchItfTournaments } from "../services/itfTennisService.js";
 import { summarizeArticleUrl, summarizeWebpageTargets } from "../services/webpageSummaryService.js";
 import {
   formatWeatherReply,
@@ -145,6 +145,7 @@ const QUERY_TOOL_NAMES = new Set([
   "get_futures_price",
   "get_latest_arxiv_papers",
   "get_itf_tournaments",
+  "get_itf_tournament_details",
   "get_cnn_top_headlines",
   "summarize_article_url",
   "find_nearby_parking",
@@ -757,6 +758,19 @@ export async function executeTool(name, args = {}, context = {}) {
         region: args.region || "Asia",
         country: args.country || "",
         level: args.level || "",
+        max: args.max || 5,
+      });
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
+      };
+    }
+
+    case "get_itf_tournament_details": {
+      const result = await fetchItfTournamentDetails({
+        tournamentUrls: Array.isArray(args.tournamentUrls) ? args.tournamentUrls : [],
         max: args.max || 5,
       });
 
