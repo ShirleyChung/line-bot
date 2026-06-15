@@ -315,6 +315,48 @@ export const botTools = [
   },
   {
     type: "function",
+    name: "get_itf_tournaments",
+    description: "查詢 ITF 網球賽事資訊，預設查 ITF World Tennis Tour Juniors。優先使用 ITF 官方 calendar 與 ITF 官方賽事頁，回傳賽事列表與連結。",
+    parameters: {
+      type: "object",
+      properties: {
+        tour: {
+          type: "string",
+          enum: ["juniors"],
+          description: "賽事巡迴類型。預設 juniors。",
+        },
+        startDate: {
+          type: "string",
+          description: "查詢起始日期，格式 YYYY-MM-DD。未指定時填今天的 Asia/Taipei 日期。",
+        },
+        endDate: {
+          type: "string",
+          description: "可選，查詢結束日期，格式 YYYY-MM-DD。像「10 到 12 月」時可填該區間最後一天；未指定請填空字串。",
+        },
+        region: {
+          type: "string",
+          description: "可選，較大區域，例如 Asia、Europe、North America、South America、Oceania、Africa、Middle East。未指定請填空字串。",
+        },
+        country: {
+          type: "string",
+          description: "可選，國家或地區關鍵字，例如 Taiwan、TPE、Japan。沒有限制請填空字串。",
+        },
+        level: {
+          type: "string",
+          description: "可選，Juniors 等級，例如 J500、J300、J200、J100、J60、J30。未指定請填空字串。",
+        },
+        max: {
+          type: "number",
+          description: "最多回傳幾個賽事，1 到 10，預設 5。",
+        },
+      },
+      required: ["tour", "startDate", "endDate", "region", "country", "level", "max"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
     name: "get_cnn_top_headlines",
     description: "抓取 CNN Top Stories 頭條新聞，並直接根據頭條連結產生繁體中文摘要。",
     parameters: {

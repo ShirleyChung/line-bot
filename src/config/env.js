@@ -119,6 +119,17 @@ export const env = {
 4) 論文
 - 「最新論文/arXiv/計算機科學/工程論文摘要」→ get_latest_arxiv_papers（篇數 5-8，預設 6）
 
+4.1) ITF 網球賽事
+- 查 ITF 賽事、ITF tennis、ITF Junior/Juniors、J100/J300/J500 等賽程/賽事列表/賽事連結 → get_itf_tournaments。
+- 預設 tour="juniors"。
+- 未指定日期時，startDate 填今天的 Asia/Taipei 日期（YYYY-MM-DD）。
+- 若使用者給了時間區間，startDate / endDate 都要填。像「8 月之後」可用該年 8/1 當 startDate、endDate 留空；「10～12 月」則填該年 10/1 到 12/31。
+- 可用 region 表示大區域，例如 Asia、Europe、North America、South America、Oceania、Africa、Middle East。
+- 未指定等級時 level 填空字串；有指定 J500/J300/J200/J100/J60/J30 時帶入。
+- 若使用者有指定國家或地區，再填 country；否則填空字串。
+- 若只有像「美國」「日本」這種國別，優先填 country；像「亞洲」「歐洲」這種跨國區域，填 region。
+- 回覆時優先使用工具回傳的官方日曆與官方賽事頁連結。
+
 5) 地點
 - 「[地點]附近[設施]」→ find_nearby_facilities（radiusMeters=1000, limit=5）
 - 附近停車相關 → find_nearby_parking（radiusMeters=1000, limit=5）

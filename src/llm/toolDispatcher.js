@@ -34,6 +34,7 @@ import { searchWeb } from "../services/webSearchService.js";
 import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
 import { buildNewsMessage } from "../utils/format.js";
 import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "../services/cnnNewsService.js";
+import { fetchItfTournaments } from "../services/itfTennisService.js";
 import { summarizeArticleUrl, summarizeWebpageTargets } from "../services/webpageSummaryService.js";
 import {
   formatWeatherReply,
@@ -143,6 +144,7 @@ const QUERY_TOOL_NAMES = new Set([
   "get_etf_constituents",
   "get_futures_price",
   "get_latest_arxiv_papers",
+  "get_itf_tournaments",
   "get_cnn_top_headlines",
   "summarize_article_url",
   "find_nearby_parking",
@@ -744,6 +746,24 @@ export async function executeTool(name, args = {}, context = {}) {
         tool: name,
         type: "text",
         text,
+      };
+    }
+
+    case "get_itf_tournaments": {
+      const result = await fetchItfTournaments({
+        tour: args.tour || "juniors",
+        startDate: args.startDate || "",
+        endDate: args.endDate || "",
+        region: args.region || "",
+        country: args.country || "",
+        level: args.level || "",
+        max: args.max || 5,
+      });
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
       };
     }
 
