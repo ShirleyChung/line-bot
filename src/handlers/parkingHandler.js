@@ -8,9 +8,16 @@ import {
 const PARKING_WORDS = /(停車場|停車位|停車|parking)/i;
 const NEARBY_WORDS = /(附近|旁邊|周邊|一帶|附近有沒有|附近是否有|near|around)/i;
 const QUERY_PREFIX = /^(請問|幫我|幫忙|查詢|查|找|搜尋|我想知道|想知道|一下)+/;
+const ITF_TOURNAMENT_WORDS =
+  /\b(?:ITF|TIF)\b|world tennis tour|(?:itf|tif)\s*juniors?\b|\bJ(?:30|60|100|200|300|500)\b/i;
+
+function isItfTournamentQuery(text) {
+  return ITF_TOURNAMENT_WORDS.test(String(text || "").trim());
+}
 
 export function isParkingIntent(text) {
   const value = String(text || "").trim();
+  if (isItfTournamentQuery(value)) return false;
   return PARKING_WORDS.test(value) && NEARBY_WORDS.test(value);
 }
 
@@ -19,6 +26,8 @@ export function parseParkingLocation(text) {
     .trim()
     .replace(/[？?！!。,.，]/g, " ")
     .replace(/\s+/g, " ");
+
+  if (isItfTournamentQuery(value)) return "";
 
   const patterns = [
     /(?:請問|幫我|幫忙|查詢|查|找|搜尋)?\s*(.+?)\s*(?:附近|旁邊|周邊|一帶).*?(?:停車場|停車位|停車|parking)/i,
@@ -53,6 +62,7 @@ function cleanupFacility(facility) {
 
 export function isNearbyFacilityIntent(text) {
   const value = String(text || "").trim();
+  if (isItfTournamentQuery(value)) return false;
   return NEARBY_WORDS.test(value) && Boolean(parseNearbyFacilityQuery(value));
 }
 
@@ -61,6 +71,8 @@ export function parseNearbyFacilityQuery(text) {
     .trim()
     .replace(/[？?！!。,.，]/g, " ")
     .replace(/\s+/g, " ");
+
+  if (isItfTournamentQuery(value)) return null;
 
   const patterns = [
     /(?:請問|幫我|幫忙|查詢|查|找|搜尋|我想知道|想知道)?\s*(.+?)\s*(?:附近|旁邊|周邊|一帶)\s*(?:有什麼|有哪些|有沒有|是否有|哪裡有)?\s*(.+)$/i,
@@ -158,6 +170,8 @@ export function formatNearbyFacilityReply(locationQuery, facilityQuery, result) 
 }
 
 export async function handleNearbyFacilityMessage(event, text) {
+  if (isItfTournamentQuery(text)) return false;
+
   const query = parseNearbyFacilityQuery(text);
   if (!query) return false;
 
