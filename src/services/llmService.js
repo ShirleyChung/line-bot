@@ -254,12 +254,9 @@ export async function askLlmWithTools(userText, context = {}) {
           toolUsed: true,
         };
       }
-      // 已經格式化好的 LINE 文字，直接回覆，不再交給 LLM 重排
+      // 已經格式化好的工具結果，若有 emailRecipient 則直接寄送；否則回聊天室。
       if (["get_watch_prices", "get_stock_price", "get_etf_constituents", "get_futures_price", "get_latest_arxiv_papers", "get_itf_tournaments", "get_itf_tournament_details", "get_cnn_top_headlines", "summarize_article_url"].includes(call.name) && result?.text) {
-        return {
-          type: "text",
-          text: result.text,
-        };
+        return deliverDirectResult(result.text, userText, context);
       }
       if (
         [
