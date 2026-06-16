@@ -14,6 +14,7 @@ import { startAgentRun } from "../agent/runner.js";
 export const requestsRouter = express.Router();
 
 function normalizeRequestBody(body = {}) {
+  // 對外 API 可能來自 LINE 或其他平台，這裡先把欄位正規化成 evolveEngine 內部格式。
   return {
     userText: String(body.userText || "").trim(),
     reason: String(body.reason || "").trim(),
@@ -27,6 +28,7 @@ function normalizeRequestBody(body = {}) {
 }
 
 function buildReplyText({ request, estimate, outcome }) {
+  // 回覆文字會交給呼叫端顯示給使用者，因此保持短句並附上追蹤 ID。
   if (outcome.status === "deferred") {
     return [
       "這個需求我已存入未來目標。",
@@ -66,9 +68,12 @@ requestsRouter.post("/requests", verifyRequest, async (req, res) => {
     await saveEstimate(request.id, estimate);
 
     let outcome;
+
+    // 非 Codex 模式下，超過 10 分鐘門檻的需求只入 backlog，避免自動執行大改動。
     if (estimate.shouldDefer && env.EVOLVE_AGENT_MODE !== "codex") {
       outcome = { status: "deferred", ...(await createFutureGoal(request, estimate)) };
     } else {
+      // 小型需求或 Codex 模式會建立 implementation job，再交給 agent runner 產生下一步狀態。
       const job = await createImplementationJob(request, estimate);
       const agentState = await startAgentRun({ job, request, estimate });
       outcome = {
@@ -78,6 +83,7 @@ requestsRouter.post("/requests", verifyRequest, async (req, res) => {
       };
     }
 
+    // 無論是延期或排程，都寄出摘要，讓維護者可以追蹤 evolveEngine 的決策。
     await notifyReport({ request, estimate, outcome });
 
     return res.status(201).json({

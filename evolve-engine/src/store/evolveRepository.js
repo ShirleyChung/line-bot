@@ -7,6 +7,7 @@ const JOBS = "evolve_jobs";
 const FUTURE_GOALS = "future_goals";
 
 export async function createRequest(payload) {
+  // 每一筆使用者需求先以 received 狀態落庫，後續估算與排程都用 requestId 串起來。
   const ref = db.collection(REQUESTS).doc();
   const now = nowDate();
   const doc = {
@@ -21,6 +22,7 @@ export async function createRequest(payload) {
 }
 
 export async function saveEstimate(requestId, estimate) {
+  // estimate 使用 requestId 當 doc id，讓同一需求的估算結果可被覆寫且容易查找。
   const ref = db.collection(ESTIMATES).doc(requestId);
   const now = nowDate();
   const doc = {
@@ -35,6 +37,7 @@ export async function saveEstimate(requestId, estimate) {
 }
 
 export async function createFutureGoal(request, estimate) {
+  // 超過自動處理門檻的需求改存 future_goals，避免 evolveEngine 自行啟動高風險變更。
   const ref = db.collection(FUTURE_GOALS).doc();
   const now = nowDate();
   const doc = {
@@ -51,6 +54,8 @@ export async function createFutureGoal(request, estimate) {
   };
 
   await ref.set(doc);
+
+  // 同步回寫原始 request 狀態，讓查詢端不用跨 collection 才知道目前進度。
   await db.collection(REQUESTS).doc(request.id).update({
     status: "deferred",
     futureGoalId: ref.id,
@@ -61,6 +66,7 @@ export async function createFutureGoal(request, estimate) {
 }
 
 export async function createImplementationJob(request, estimate) {
+  // 可自動處理的需求會建立 job；實際執行方式由 EVOLVE_AGENT_MODE 決定。
   const ref = db.collection(JOBS).doc();
   const now = nowDate();
   const doc = {
@@ -78,6 +84,8 @@ export async function createImplementationJob(request, estimate) {
   };
 
   await ref.set(doc);
+
+  // request 只保存 jobId 與 queued 狀態，詳細 agent 狀態集中在 evolve_jobs。
   await db.collection(REQUESTS).doc(request.id).update({
     status: "queued",
     jobId: ref.id,
@@ -88,6 +96,7 @@ export async function createImplementationJob(request, estimate) {
 }
 
 export async function updateImplementationJob(jobId, patch) {
+  // 所有 job 狀態更新都集中在這裡補 updatedAt，避免各呼叫點忘記維護時間戳。
   const now = nowDate();
   const update = {
     ...patch,

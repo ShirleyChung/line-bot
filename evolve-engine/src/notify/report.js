@@ -2,6 +2,7 @@ import { env } from "../config/env.js";
 import { sendEmail } from "../services/emailService.js";
 
 function buildReportBody({ request, estimate, outcome }) {
+  // 通知信保留估算原因與 outcome，方便維護者不用查 Firestore 也能判斷下一步。
   const lines = [
     "evolveEngine 收到新的工具演進需求。",
     "",
@@ -23,6 +24,7 @@ function buildReportBody({ request, estimate, outcome }) {
     `Outcome ID: ${outcome.id}`,
   ];
 
+  // Codex workflow 存在時，把後續 worker 需要追蹤的 branch、PR 與部署指令一起列出。
   if (outcome.codexWorkflow) {
     lines.push(
       "",
@@ -40,6 +42,7 @@ function buildReportBody({ request, estimate, outcome }) {
 }
 
 export async function notifyReport({ request, estimate, outcome }) {
+  // subject 放入 Deferred/Queued，可在信箱中快速分辨是否需要人工處理。
   const subjectPrefix = outcome.status === "deferred" ? "Deferred" : "Queued";
   return sendEmail({
     to: env.EVOLVE_REPORT_EMAIL,

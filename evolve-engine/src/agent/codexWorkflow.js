@@ -1,10 +1,12 @@
 import { env } from "../config/env.js";
 
 function buildBranchName(requestId) {
+  // branch 名稱保留 requestId 前 12 碼，足夠追蹤來源且不會太長。
   return `codex/evolve-${requestId.slice(0, 12)}`;
 }
 
 function buildPrTitle(request) {
+  // PR 標題壓到 72 字內，避免 GitHub 清單頁顯示過長。
   const summary = String(request.userText || "Update line-bot capability")
     .replace(/\s+/g, " ")
     .trim()
@@ -13,6 +15,7 @@ function buildPrTitle(request) {
 }
 
 function buildCodexPrompt({ request, estimate }) {
+  // 這段 prompt 是交給後續 Codex worker 的工作單，包含需求背景與必要交付流程。
   return [
     "You are modifying the line-bot repository for an evolveEngine request.",
     "",
@@ -35,6 +38,7 @@ export function buildCodexWorkflow({ job, request, estimate }) {
   const baseBranch = env.EVOLVE_REPO_BASE_BRANCH;
   const branch = buildBranchName(request.id);
 
+  // workflow 只描述要做什麼，不直接執行 git 或部署；實作留給外部 worker。
   return {
     provider: "codex",
     repository: env.EVOLVE_REPO_FULL_NAME,
