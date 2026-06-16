@@ -13,6 +13,7 @@ A multi-platform chat bot (LINE primary, plus Telegram, Facebook Messenger, Inst
 npm start
 # Deploy to Cloud Run (asia-east1, public).
 ./run
+# Deploy both `line-bot` and `evolve-engine` to Cloud Run.
 # Build the Rust SOR log parser used by sorLogService (also built inside the Dockerfile).
 cd sorlogparser_rust && cargo build --release --no-default-features
 ```

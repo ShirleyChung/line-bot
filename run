@@ -2,3 +2,8 @@ gcloud run deploy line-bot \
   --source . \
   --region asia-east1 \
   --allow-unauthenticated
+
+gcloud run deploy evolve-engine \
+  --source evolve-engine \
+  --region asia-east1 \
+  --allow-unauthenticated
