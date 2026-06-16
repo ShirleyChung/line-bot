@@ -8,6 +8,8 @@ export const env = {
   EVOLVE_ENGINE_SHARED_SECRET: process.env.EVOLVE_ENGINE_SHARED_SECRET || "",
   EVOLVE_REPORT_EMAIL: process.env.EVOLVE_REPORT_EMAIL || "joniesg@gmail.com",
   EVOLVE_AGENT_MODE: process.env.EVOLVE_AGENT_MODE || "manual",
+  EVOLVE_REPO_FULL_NAME: process.env.EVOLVE_REPO_FULL_NAME || "ShirleyChung/line-bot",
+  EVOLVE_REPO_BASE_BRANCH: process.env.EVOLVE_REPO_BASE_BRANCH || "master",
 
   EMAIL_SMTP_HOST: process.env.EMAIL_SMTP_HOST || "",
   EMAIL_SMTP_PORT: Number(process.env.EMAIL_SMTP_PORT || 587),

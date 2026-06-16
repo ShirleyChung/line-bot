@@ -1,6 +1,7 @@
 import express from "express";
 import { verifyRequest } from "./auth.js";
 import { estimateEngineeringSize } from "../triage/estimate.js";
+import { env } from "../config/env.js";
 import {
   createFutureGoal,
   createImplementationJob,
@@ -34,6 +35,15 @@ function buildReplyText({ request, estimate, outcome }) {
     ].join("\n");
   }
 
+  if (outcome.status === "awaiting_codex_pr") {
+    return [
+      "這個需求已建立 Codex PR 開發工作。",
+      `估算工程量約 ${estimate.estimatedMinutes} 分鐘，等待 Codex 建立 PR。`,
+      "PR 合併後會拉取最新版並部署 line-bot。",
+      `追蹤 ID：${request.id}`,
+    ].join("\n");
+  }
+
   return [
     "這個需求已建立 evolveEngine 開發工作。",
     `估算工程量約 ${estimate.estimatedMinutes} 分鐘，目前狀態：${outcome.status}。`,
@@ -56,7 +66,7 @@ requestsRouter.post("/requests", verifyRequest, async (req, res) => {
     await saveEstimate(request.id, estimate);
 
     let outcome;
-    if (estimate.shouldDefer) {
+    if (estimate.shouldDefer && env.EVOLVE_AGENT_MODE !== "codex") {
       outcome = { status: "deferred", ...(await createFutureGoal(request, estimate)) };
     } else {
       const job = await createImplementationJob(request, estimate);

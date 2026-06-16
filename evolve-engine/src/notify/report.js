@@ -2,7 +2,7 @@ import { env } from "../config/env.js";
 import { sendEmail } from "../services/emailService.js";
 
 function buildReportBody({ request, estimate, outcome }) {
-  return [
+  const lines = [
     "evolveEngine 收到新的工具演進需求。",
     "",
     `Request ID: ${request.id}`,
@@ -21,7 +21,22 @@ function buildReportBody({ request, estimate, outcome }) {
     `Expected behavior: ${request.expectedBehavior || "(not specified)"}`,
     "",
     `Outcome ID: ${outcome.id}`,
-  ].join("\n");
+  ];
+
+  if (outcome.codexWorkflow) {
+    lines.push(
+      "",
+      "Codex workflow:",
+      `- Repository: ${outcome.codexWorkflow.repository}`,
+      `- Base branch: ${outcome.codexWorkflow.baseBranch}`,
+      `- Work branch: ${outcome.codexWorkflow.branch}`,
+      `- PR title: ${outcome.codexWorkflow.prTitle}`,
+      `- Post-merge pull: ${outcome.codexWorkflow.postMerge.pullCommand}`,
+      `- Post-merge deploy: ${outcome.codexWorkflow.postMerge.deployCommand}`
+    );
+  }
+
+  return lines.join("\n");
 }
 
 export async function notifyReport({ request, estimate, outcome }) {
