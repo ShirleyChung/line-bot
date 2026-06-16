@@ -824,4 +824,33 @@ export const botTools = [
     },
     strict: true,
   },
+  {
+    type: "function",
+    name: "request_tool_development",
+    description: "當使用者要求新增 bot 能力、開發新工具、串接新資料源，或現有工具無法完成需求時，把需求送交 evolveEngine 評估與排程。",
+    parameters: {
+      type: "object",
+      properties: {
+        userText: {
+          type: "string",
+          description: "使用者原始需求或完整重述。",
+        },
+        reason: {
+          type: "string",
+          description: "為什麼目前做不到，例如沒有對應工具、缺少 API 串接、需要新增資料解析。",
+        },
+        missingCapability: {
+          type: "string",
+          description: "目前缺少的能力，簡短描述。",
+        },
+        expectedBehavior: {
+          type: "string",
+          description: "完成後 bot 應該如何使用這個新能力與回覆使用者。",
+        },
+      },
+      required: ["userText", "reason", "missingCapability", "expectedBehavior"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];

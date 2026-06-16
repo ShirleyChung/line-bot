@@ -267,6 +267,7 @@ export async function askLlmWithTools(userText, context = {}) {
           "get_recovery_bible_verses",
           "get_recovery_bible_notes",
           "get_life_study_excerpt",
+          "request_tool_development",
         ].includes(call.name) &&
         result?.replyText
       ) {

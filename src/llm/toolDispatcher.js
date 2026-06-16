@@ -60,6 +60,7 @@ import {
   queryHousePrice,
   formatHousePriceReply,
 } from "../services/realEstateService.js";
+import { submitEvolveRequest } from "../services/evolveClient.js";
 
 function detectMarket(symbol) {
   const code = String(symbol).trim().toUpperCase();
@@ -1302,6 +1303,34 @@ export async function executeTool(name, args = {}, context = {}) {
         tool: name,
         to,
         subject,
+      };
+    }
+
+    case "request_tool_development": {
+      const userText = String(args.userText || "").trim();
+      const owner = buildSessionKey(context.source);
+
+      if (!userText) {
+        throw new Error("request_tool_development 缺少 userText");
+      }
+
+      const result = await submitEvolveRequest({
+        userText,
+        reason: String(args.reason || "").trim(),
+        missingCapability: String(args.missingCapability || "").trim(),
+        expectedBehavior: String(args.expectedBehavior || "").trim(),
+        source: context.source || null,
+        sessionKey: owner,
+        metadata: {
+          originalUserText: context.originalUserText || "",
+        },
+      });
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
+        replyText: result.replyText || `已送交 evolveEngine 評估。追蹤 ID：${result.requestId}`,
       };
     }
 

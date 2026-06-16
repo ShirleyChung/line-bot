@@ -58,6 +58,10 @@ export const env = {
   EMAIL_SMTP_PASS: process.env.EMAIL_SMTP_PASS || "",
   EMAIL_FROM: process.env.EMAIL_FROM || "",
 
+  // ===== evolveEngine =====
+  EVOLVE_ENGINE_URL: process.env.EVOLVE_ENGINE_URL || "",
+  EVOLVE_ENGINE_SECRET: process.env.EVOLVE_ENGINE_SECRET || "",
+
   // ===== Google Sheets =====
   START_COLUMN: Number(process.env.START_COLUMN || 6),
   PUBLISHED_SHEET_CSV_URL: required("PUBLISHED_SHEET_CSV_URL"),
@@ -169,5 +173,10 @@ export const env = {
 - subject 填使用者的請求（不含 email 地址），body 填完整的回覆內文。
 - 若使用者的請求需要先查資料（例如股價、新聞、期貨行情），先呼叫對應工具取得結果，再將結果組成 body，最後呼叫 send_email。
 - 排程提醒若使用者附上 email（例如「每天早上 8 點寄信到 xxx@xxx.com 通知大台指行情」），建立 create_reminder 時將 emailRecipient 填入該 email 地址；屆時系統會以 email 取代聊天推送。
+
+11) 工具演進需求
+- 當使用者要求的是「新增 bot 能力 / 開發新工具 / 目前工具做不到的需求 / 需要串接新資料源或 API」且現有工具無法完成時，呼叫 request_tool_development。
+- 不要假裝已經完成新工具開發；只負責把需求送交 evolveEngine。
+- missingCapability 簡短描述目前缺少什麼能力；expectedBehavior 描述完成後使用者應該如何使用、bot 應如何回覆。
 `
 };
