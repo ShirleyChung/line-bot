@@ -13,6 +13,8 @@ export const env = {
   EVOLVE_AGENT_MODE: process.env.EVOLVE_AGENT_MODE || "manual",
   EVOLVE_REPO_FULL_NAME: process.env.EVOLVE_REPO_FULL_NAME || "ShirleyChung/line-bot",
   EVOLVE_REPO_BASE_BRANCH: process.env.EVOLVE_REPO_BASE_BRANCH || "master",
+  EVOLVE_GITHUB_TOKEN: process.env.EVOLVE_GITHUB_TOKEN || "",
+  EVOLVE_CODEX_TRIGGER_MODE: process.env.EVOLVE_CODEX_TRIGGER_MODE || "github_issue",
 
   // 通知信 SMTP 設定；缺少任一必要欄位時會跳過寄信。
   EMAIL_SMTP_HOST: process.env.EMAIL_SMTP_HOST || "",

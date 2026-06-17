@@ -1,6 +1,7 @@
 import { env } from "../config/env.js";
 import { updateImplementationJob } from "../store/evolveRepository.js";
 import { buildCodexWorkflow } from "./codexWorkflow.js";
+import { createCodexIssueTrigger } from "./githubCodexTrigger.js";
 
 export async function startAgentRun({ job, request, estimate }) {
   // manual 是保守預設：只建立 job，不讓服務自動修改程式碼或部署。
@@ -23,6 +24,53 @@ export async function startAgentRun({ job, request, estimate }) {
   // Codex 模式目前只準備 workflow 狀態，實際開分支、PR、部署交給外部 worker 執行。
   if (env.EVOLVE_AGENT_MODE === "codex") {
     const workflow = buildCodexWorkflow({ job, request, estimate });
+
+    if (env.EVOLVE_CODEX_TRIGGER_MODE === "github_issue") {
+      if (!env.EVOLVE_GITHUB_TOKEN) {
+        return updateImplementationJob(job.id, {
+          status: "codex_trigger_not_configured",
+          branch: workflow.branch,
+          codexWorkflow: workflow,
+          logsSummary:
+            "Codex workflow prepared, but EVOLVE_GITHUB_TOKEN is not set. " +
+            "Set a GitHub token with issue write access so evolveEngine can create an @codex issue.",
+        });
+      }
+
+      try {
+        const codexIssue = await createCodexIssueTrigger({
+          githubToken: env.EVOLVE_GITHUB_TOKEN,
+          workflow,
+          request,
+          estimate,
+        });
+
+        return updateImplementationJob(job.id, {
+          status: "awaiting_codex_pr",
+          branch: workflow.branch,
+          codexWorkflow: {
+            ...workflow,
+            trigger: {
+              type: "github_issue",
+              status: "created",
+              ...codexIssue,
+            },
+          },
+          codexIssue,
+          logsSummary:
+            `Created GitHub issue ${codexIssue.issueUrl} with @codex instructions. ` +
+            "Codex cloud should pick up the issue, modify the repository, and open a PR for review.",
+        });
+      } catch (error) {
+        return updateImplementationJob(job.id, {
+          status: "codex_trigger_failed",
+          branch: workflow.branch,
+          codexWorkflow: workflow,
+          logsSummary: error?.message || "Failed to create Codex GitHub issue.",
+        });
+      }
+    }
+
     return updateImplementationJob(job.id, {
       status: "awaiting_codex_pr",
       branch: workflow.branch,

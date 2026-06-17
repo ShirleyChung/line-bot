@@ -38,10 +38,30 @@ function buildReplyText({ request, estimate, outcome }) {
   }
 
   if (outcome.status === "awaiting_codex_pr") {
+    const issueUrl = outcome.codexIssue?.issueUrl || outcome.codexWorkflow?.trigger?.issueUrl;
     return [
       "這個需求已建立 Codex PR 開發工作。",
       `估算工程量約 ${estimate.estimatedMinutes} 分鐘，等待 Codex 建立 PR。`,
+      issueUrl ? `Codex issue：${issueUrl}` : "",
       "PR 合併後會拉取最新版並部署 line-bot。",
+      `追蹤 ID：${request.id}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (outcome.status === "codex_trigger_not_configured") {
+    return [
+      "這個需求已建立 Codex 工作單，但尚未送出給 Codex cloud。",
+      "請設定 EVOLVE_GITHUB_TOKEN，讓 evolveEngine 可以建立 @codex GitHub issue。",
+      `追蹤 ID：${request.id}`,
+    ].join("\n");
+  }
+
+  if (outcome.status === "codex_trigger_failed") {
+    return [
+      "這個需求已建立 Codex 工作單，但建立 @codex GitHub issue 失敗。",
+      "請檢查 GitHub token 權限與 Codex cloud repo 連線。",
       `追蹤 ID：${request.id}`,
     ].join("\n");
   }
