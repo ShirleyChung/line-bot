@@ -36,6 +36,14 @@ function buildReportBody({ request, estimate, outcome }) {
       `- Post-merge pull: ${outcome.codexWorkflow.postMerge.pullCommand}`,
       `- Post-merge deploy: ${outcome.codexWorkflow.postMerge.deployCommand}`
     );
+
+    if (outcome.codexWorkflow.trigger) {
+      lines.push(
+        `- Trigger type: ${outcome.codexWorkflow.trigger.type}`,
+        `- Trigger status: ${outcome.codexWorkflow.trigger.status}`,
+        `- Codex issue: ${outcome.codexWorkflow.trigger.issueUrl || "(not created)"}`
+      );
+    }
   }
 
   return lines.join("\n");
