@@ -34,7 +34,39 @@ export const REMINDER_TYPES = new Set([
   "bible_outline",
 ]);
 
-export const RECURRENCES = new Set(["none", "daily"]);
+export const RECURRENCES = new Set(["none", "daily", "weekly"]);
+
+// 以 Asia/Taipei 當地時間判斷星期幾（0=星期日 … 6=星期六）。
+// 雲端執行環境為 UTC，靠近午夜時 Date.getDay() 會算錯台北的星期，故用 Intl 取台北星期。
+const WEEKDAY_INDEX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+/**
+ * 取得某個時間點在 Asia/Taipei 的星期幾
+ * @param {Date} date - 時間點
+ * @returns {number} 0（星期日）到 6（星期六）
+ */
+export function getTaipeiWeekday(date) {
+  const label = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    weekday: "short",
+  }).format(date);
+  return WEEKDAY_INDEX[label] ?? date.getDay();
+}
+
+/**
+ * 正規化每週提醒的星期清單
+ * @param {Array} weekDays - 星期陣列，元素為 0-6
+ * @returns {number[]} 去重、排序後的合法星期陣列
+ */
+export function normalizeWeekDays(weekDays) {
+  if (!Array.isArray(weekDays)) return [];
+  const set = new Set();
+  for (const day of weekDays) {
+    const num = Number(day);
+    if (Number.isInteger(num) && num >= 0 && num <= 6) set.add(num);
+  }
+  return [...set].sort((a, b) => a - b);
+}
 
 /**
  * 偵測股票所屬市場
@@ -76,11 +108,14 @@ function normalizeRecurrence(recurrence) {
  */
 export function normalizeReminderData(data = {}) {
   const payload = data.payload && typeof data.payload === "object" ? data.payload : {};
+  const recurrence = normalizeRecurrence(data.recurrence);
 
   return {
     ...data,
     reminderType: normalizeReminderType(data.reminderType),
-    recurrence: normalizeRecurrence(data.recurrence),
+    recurrence,
+    // 只有每週提醒需要 weekDays，其餘一律存空陣列。
+    weekDays: recurrence === "weekly" ? normalizeWeekDays(data.weekDays) : [],
     payload,
   };
 }
@@ -93,17 +128,27 @@ export function normalizeReminderData(data = {}) {
  */
 export function getNextReminderTime(reminder, from = new Date()) {
   const recurrence = normalizeRecurrence(reminder?.recurrence);
-  if (recurrence !== "daily") return null;
+  if (recurrence !== "daily" && recurrence !== "weekly") return null;
 
   const rawTime = reminder.time?.toDate ? reminder.time.toDate() : new Date(reminder.time);
   if (Number.isNaN(rawTime.getTime())) return null;
 
+  // 每週提醒需要指定星期；沒有合法星期就無法再排程。
+  const weekDays = recurrence === "weekly" ? normalizeWeekDays(reminder.weekDays) : [];
+  if (recurrence === "weekly" && weekDays.length === 0) return null;
+
+  // 逐日往後推（加整天 = +24h，台北無日光節約，當地時刻維持不變）。
+  // 每週提醒額外要求台北星期落在 weekDays；上限 370 天避免無窮迴圈。
   const next = new Date(rawTime);
-  while (next <= from) {
+  for (let i = 0; i < 370; i++) {
+    const matchesWeekday = recurrence === "daily" || weekDays.includes(getTaipeiWeekday(next));
+    if (next > from && matchesWeekday) {
+      return next;
+    }
     next.setDate(next.getDate() + 1);
   }
 
-  return next;
+  return null;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { createReminder, listReminders, deleteReminderByOwner } from "../services/reminderService.js";
 import { sendEmail } from "../services/emailService.js";
-import { getNextReminderTime, normalizeReminderData } from "../services/reminderContentService.js";
+import { getNextReminderTime, normalizeReminderData, normalizeWeekDays } from "../services/reminderContentService.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
 import { replyText } from "../platform/reply.js";
@@ -406,11 +406,27 @@ export async function executeTool(name, args = {}, context = {}) {
         throw new Error(`create_reminder 時間格式錯誤：${args.time}`);
       }
 
+      const recurrence =
+        args.recurrence === "weekly" || args.recurrence === "daily" ? args.recurrence : "none";
+      const weekDays = recurrence === "weekly" ? normalizeWeekDays(args.weekDays) : [];
+
+      if (recurrence === "weekly" && weekDays.length === 0) {
+        throw new Error("每週提醒需要指定 weekDays（0=星期日 … 6=星期六），例如每個星期五填 [5]");
+      }
+
       const now = new Date();
-      const normalizedReminderTime =
-        args.recurrence === "daily" && reminderTime <= now
-          ? getNextReminderTime({ time: reminderTime, recurrence: "daily" }, now)
-          : reminderTime;
+      let normalizedReminderTime;
+      if (recurrence === "weekly") {
+        // 對齊到下一個符合星期的日期（保留使用者指定的時刻）。
+        normalizedReminderTime = getNextReminderTime(
+          { time: reminderTime, recurrence: "weekly", weekDays },
+          now
+        );
+      } else if (recurrence === "daily" && reminderTime <= now) {
+        normalizedReminderTime = getNextReminderTime({ time: reminderTime, recurrence: "daily" }, now);
+      } else {
+        normalizedReminderTime = reminderTime;
+      }
 
       if (!normalizedReminderTime || normalizedReminderTime <= now) {
         throw new Error(`create_reminder 時間已過：${args.time}`);
@@ -452,7 +468,8 @@ export async function executeTool(name, args = {}, context = {}) {
         target: derivedTarget,
         action: derivedAction,
         time: normalizedReminderTime,
-        recurrence: args.recurrence || "none",
+        recurrence,
+        weekDays,
         reminderType,
         payload,
       });
@@ -467,6 +484,7 @@ export async function executeTool(name, args = {}, context = {}) {
         target: reminderData.target,
         action: reminderData.action,
         recurrence: reminderData.recurrence,
+        weekDays: reminderData.weekDays,
         reminderType: reminderData.reminderType,
         deliveryChannel: emailRecipient ? "email" : "chat",
         emailRecipient: emailRecipient || "",
@@ -494,6 +512,7 @@ export async function executeTool(name, args = {}, context = {}) {
           target: r.target,
           action: r.action,
           recurrence: r.recurrence || "none",
+          weekDays: Array.isArray(r.weekDays) ? r.weekDays : [],
           reminderType: r.reminderType || "generic",
           deliveryChannel: r.payload?.emailRecipient ? "email" : "chat",
           emailRecipient: r.payload?.emailRecipient || "",

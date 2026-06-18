@@ -63,7 +63,7 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項。可建立一般提醒，也可建立每日排程提醒天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN 頭條新聞、指定關鍵字的最新新聞、每日經節。",
+    description: "建立提醒事項。可建立一次性提醒、每日排程，或每週特定星期的排程（例如每個星期五，或除了星期四外每天）。內容可為天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN 頭條新聞、指定關鍵字的最新新聞、每日經節。",
     parameters: {
       type: "object",
       properties: {
@@ -77,12 +77,17 @@ export const botTools = [
         },
         time: {
           type: "string",
-          description: "ISO 8601 格式，例如 2026-05-01T06:00:00+08:00。+08:00 是 Asia/Taipei 當地時間，不要先轉成 UTC 再寫回 +08:00；若 recurrence 是 daily 且今天該時刻已過，請填下一次會發生的日期時間。",
+          description: "ISO 8601 格式，例如 2026-05-01T06:00:00+08:00。+08:00 是 Asia/Taipei 當地時間，不要先轉成 UTC 再寫回 +08:00；若 recurrence 是 daily 且今天該時刻已過，請填下一次會發生的日期時間；recurrence 是 weekly 時填下一個符合 weekDays 星期的日期時間（時刻要正確，系統會自動對齊到正確星期）。",
         },
         recurrence: {
           type: "string",
-          enum: ["none", "daily"],
-          description: "none 表示一次性提醒；daily 表示每天同一時間重複提醒。",
+          enum: ["none", "daily", "weekly"],
+          description: "none 表示一次性提醒；daily 表示每天同一時間重複；weekly 表示只在 weekDays 指定的星期重複（例如每個星期五，或除了星期四外的每天）。",
+        },
+        weekDays: {
+          type: "array",
+          items: { type: "integer", minimum: 0, maximum: 6 },
+          description: "recurrence=weekly 時要在一週的哪幾天提醒。0=星期日,1=星期一,2=星期二,3=星期三,4=星期四,5=星期五,6=星期六。例如「每個星期五」填 [5]；「每週一三五」填 [1,3,5]；「除了星期四外每天」填 [0,1,2,3,5,6]。非 weekly 提醒一律填空陣列 []。",
         },
         reminderType: {
           type: "string",
@@ -135,7 +140,7 @@ export const botTools = [
           description: "若希望以 email 取代聊天推送，填入收件人 email 地址，例如 user@example.com；否則填空字串。",
         },
       },
-      required: ["target", "action", "time", "recurrence", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount", "newsQuery", "newsCount", "bibleBookName", "emailRecipient"],
+      required: ["target", "action", "time", "recurrence", "weekDays", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount", "newsQuery", "newsCount", "bibleBookName", "emailRecipient"],
       additionalProperties: false,
     },
     strict: true,

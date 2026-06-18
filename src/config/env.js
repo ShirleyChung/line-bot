@@ -82,10 +82,12 @@ export const env = {
 - 涉及提醒時間時，統一轉為 ISO 8601（含 +08:00）。
 
 1) 提醒/排程
-- 使用者提到「提醒/幫我記/記得/設提醒/排程/每天/每日」→ create_reminder。
-- recurrence：每天/每日用 daily，其餘用 none。
+- 使用者提到「提醒/幫我記/記得/設提醒/排程/每天/每日/每週/每星期」→ create_reminder。
+- recurrence：每天/每日用 daily；只在特定星期（每星期X、每週X、週一三五等）或「除了星期X外每天」用 weekly；其餘用 none。
+- weekly 時要填 weekDays（0=星期日 … 6=星期六）：例如「每個星期五」填 [5]；「每週一三五」填 [1,3,5]；「除了星期四外每天」填 [0,1,2,3,5,6]（七天扣掉星期四）；非 weekly 一律填空陣列 []。
 - create_reminder 的 time 必須直接使用 Asia/Taipei 當地時間的 ISO 8601（含 +08:00），不要先換算成 UTC 再把結果寫成 +08:00；例如「今天下午 2 點」要是 2026-05-29T14:00:00+08:00，不是 2026-05-29T06:00:00+08:00。
 - 若 recurrence = daily 且今天該時刻已過，請改成下一次會發生的日期時間。
+- 若 recurrence = weekly，time 填下一個符合 weekDays 星期的日期時間（時刻要對；系統會自動把日期對齊到正確星期）。例如「每個星期五早上 8 點通知我當天論文」→ recurrence=weekly、weekDays=[5]、reminderType=arxiv_papers；「除了星期四外每天 20:00 通知我今天連結」→ recurrence=weekly、weekDays=[0,1,2,3,5,6]、reminderType=today_link。
 - reminderType 對應：
   - weather：天氣提醒（city 填台灣地名）
   - stock：單一股票（symbol）
