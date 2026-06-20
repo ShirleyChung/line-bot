@@ -33,9 +33,9 @@ import { fetchNews } from "../services/newsService.js";
 import { searchWeb } from "../services/webSearchService.js";
 import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
 import { buildNewsMessage } from "../utils/format.js";
-import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "../services/cnnNewsService.js";
+import { fetchTopHeadlines, buildTopHeadlinesMessage } from "../services/topHeadlinesService.js";
 import { fetchItfTournamentDetails, fetchItfTournaments } from "../services/itfTennisService.js";
-import { summarizeArticleUrl, summarizeWebpageTargets } from "../services/webpageSummaryService.js";
+import { summarizeArticleUrl } from "../services/webpageSummaryService.js";
 import {
   formatWeatherReply,
   getWeatherForUser,
@@ -119,6 +119,7 @@ function inferReminderType(args = {}) {
   }
 
   const requestedType = String(args.reminderType || "").trim();
+  if (requestedType === "cnn_news") return "top_headlines";
   if (requestedType && requestedType !== "generic") {
     return requestedType;
   }
@@ -128,10 +129,9 @@ function inferReminderType(args = {}) {
   if (detectFuturesCommodity(args)) return "futures";
 
   const newsHint = `${args.target || ""} ${args.action || ""}`.toLowerCase();
-  if (newsHint.includes("cnn")) return "cnn_news";
   if (/頭條|頭版|top stories|top headlines|重點新聞/.test(newsHint)) return "top_headlines";
 
-  if (args.headlineCount) return "cnn_news";
+  if (args.headlineCount) return "top_headlines";
 
   if (String(args.newsQuery || "").trim()) return "general_news";
 
@@ -147,7 +147,7 @@ const QUERY_TOOL_NAMES = new Set([
   "get_latest_arxiv_papers",
   "get_itf_tournaments",
   "get_itf_tournament_details",
-  "get_cnn_top_headlines",
+  "get_top_headlines",
   "summarize_article_url",
   "find_nearby_parking",
   "find_nearby_facilities",
@@ -374,7 +374,6 @@ export async function executeTool(name, args = {}, context = {}) {
         args.city ||
         reminderCommodity ||
         args.symbol ||
-        (reminderType === "cnn_news" ? "CNN 頭條" : "") ||
         (reminderType === "top_headlines" ? "今日頭條" : "") ||
         (reminderType === "general_news" && args.newsQuery ? `${args.newsQuery} 新聞` : "") ||
         (reminderType === "bible_verse" ? "聖經" : "") ||
@@ -388,7 +387,6 @@ export async function executeTool(name, args = {}, context = {}) {
         (reminderType === "watch_prices" ? "自選股股價" : "") ||
         (reminderType === "today_link" ? "今日連結" : "") ||
         (reminderType === "arxiv_papers" ? "最新 arXiv 論文摘要" : "") ||
-        (reminderType === "cnn_news" ? "CNN 頭條新聞" : "") ||
         (reminderType === "top_headlines" ? "今日頭條新聞" : "") ||
         (reminderType === "general_news" && args.newsQuery ? `${args.newsQuery} 最新新聞` : "") ||
         (reminderType === "futures" && reminderCommodity ? `${reminderCommodity}${args.contract ? ` ${args.contract}` : ""}行情` : "") ||
@@ -442,11 +440,8 @@ export async function executeTool(name, args = {}, context = {}) {
       if (reminderType === "arxiv_papers") {
         payload.max = Math.min(Math.max(Number(args.paperCount) || 6, 5), 8);
       }
-      if (reminderType === "cnn_news") {
-        payload.max = Math.min(Math.max(Number(args.headlineCount) || 3, 1), 10);
-      }
       if (reminderType === "top_headlines") {
-        payload.max = Math.min(Math.max(Number(args.headlineCount) || 5, 1), 10);
+        payload.max = Math.min(Math.max(Number(args.headlineCount) || 10, 1), 14);
       }
       if (reminderType === "general_news") {
         payload.query = String(args.newsQuery || "").trim();
@@ -801,30 +796,15 @@ export async function executeTool(name, args = {}, context = {}) {
       };
     }
 
-    case "get_cnn_top_headlines": {
-      const max = Math.min(Math.max(Number(args.max) || 3, 1), 10);
-      const headlines = await fetchCnnTopHeadlines({ max });
-      let text = await summarizeWebpageTargets(
-        headlines
-          .slice(0, max)
-          .map((headline) => ({
-            url: headline.url,
-            label: headline.title,
-          })),
-      );
-
-      if (!text) {
-        text = buildCnnTopHeadlinesMessage(headlines, { max });
-      } else if (/抓不到這些網址的可摘要內容|無法摘要網頁/.test(text)) {
-        text = `${text}\n\n${buildCnnTopHeadlinesMessage(headlines, { max })}`;
-      }
-
+    case "get_top_headlines": {
+      const max = Math.min(Math.max(Number(args.max) || 10, 1), 14);
+      const headlines = await fetchTopHeadlines({ max });
       return {
         ok: true,
         tool: name,
         max,
         headlines,
-        text,
+        text: buildTopHeadlinesMessage(headlines, { max }),
       };
     }
 

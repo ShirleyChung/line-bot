@@ -13,8 +13,6 @@ import {
   getOutlineItemContent,
 } from "./recoveryBibleService.js";
 import { updateReminderPayload } from "./reminderService.js";
-import { fetchCnnTopHeadlines, buildCnnTopHeadlinesMessage } from "./cnnNewsService.js";
-import { summarizeWebpageTargets } from "./webpageSummaryService.js";
 import { fetchTopHeadlines, buildTopHeadlinesMessage } from "./topHeadlinesService.js";
 import { fetchNews } from "./newsService.js";
 import { buildNewsMessage } from "../utils/format.js";
@@ -219,29 +217,8 @@ async function buildArxivPaperReminderMessage(reminder) {
   return `最新 CS / Engineering 論文摘要\n${digest}`;
 }
 
-async function buildCnnNewsReminderMessage(reminder) {
-  const max = Math.min(Math.max(Number(reminder.payload?.max) || 3, 1), 10);
-  const headlines = await fetchCnnTopHeadlines({ max });
-  let text = await summarizeWebpageTargets(
-    headlines
-      .slice(0, max)
-      .map((headline) => ({
-        url: headline.url,
-        label: headline.title,
-      })),
-  );
-
-  if (!text) {
-    text = buildCnnTopHeadlinesMessage(headlines, { max });
-  } else if (/抓不到這些網址的可摘要內容|無法摘要網頁/.test(text)) {
-    text = `${text}\n\n${buildCnnTopHeadlinesMessage(headlines, { max })}`;
-  }
-
-  return `CNN 頭條提醒\n${text}`;
-}
-
 async function buildTopHeadlinesReminderMessage(reminder) {
-  const max = Math.min(Math.max(Number(reminder.payload?.max) || 5, 1), 10);
+  const max = Math.min(Math.max(Number(reminder.payload?.max) || 10, 1), 14);
   const headlines = await fetchTopHeadlines({ max });
   return buildTopHeadlinesMessage(headlines, { max });
 }
@@ -313,7 +290,8 @@ export async function buildReminderMessage(reminder) {
       return buildArxivPaperReminderMessage(normalized);
 
     case "cnn_news":
-      return buildCnnNewsReminderMessage(normalized);
+      // 舊版 CNN 排程保留相容性，改以整合後的多來源頭條執行。
+      return buildTopHeadlinesReminderMessage(normalized);
 
     case "top_headlines":
       return buildTopHeadlinesReminderMessage(normalized);

@@ -91,8 +91,8 @@ export const botTools = [
         },
         reminderType: {
           type: "string",
-          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "cnn_news", "top_headlines", "general_news", "bible_verse", "bible_outline"],
-          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；CNN 頭條新聞用 cnn_news；未指定來源的綜合頭條/今日頭條/重點新聞（不需關鍵字）用 top_headlines；指定關鍵字（公司/產業/人物/事件）的最新新聞用 general_news；每日隨機經節用 bible_verse；依綱目循序讀某書卷用 bible_outline（需同時填 bibleBookName）；一般文字用 generic。",
+          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "top_headlines", "general_news", "bible_verse", "bible_outline"],
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；頭條、今日頭條與指定 CNN 頭條都用 top_headlines；指定關鍵字（公司/產業/人物/事件）的最新新聞用 general_news；每日隨機經節用 bible_verse；依綱目循序讀某書卷用 bible_outline（需同時填 bibleBookName）；一般文字用 generic。",
         },
         city: {
           type: "string",
@@ -121,7 +121,7 @@ export const botTools = [
         },
         headlineCount: {
           type: "number",
-          description: "CNN 頭條（cnn_news）或綜合頭條（top_headlines）要回傳的則數，建議 1 到 10；cnn_news 未指定時填 3，top_headlines 未指定時填 5。非頭條提醒填 0。",
+          description: "綜合頭條（top_headlines）要回傳的則數，建議 1 到 14；未指定填 10。非頭條提醒填 0。",
         },
         newsQuery: {
           type: "string",
@@ -386,14 +386,14 @@ export const botTools = [
   },
   {
     type: "function",
-    name: "get_cnn_top_headlines",
-    description: "抓取 CNN Top Stories 頭條新聞，並直接根據頭條連結產生繁體中文摘要。",
+    name: "get_top_headlines",
+    description: "抓取多家媒體的即時頭條新聞。CNN、Reuters、Bloomberg、新華社與 BBC 各取一至兩則，附約 20 字繁體中文摘要與原文連結。",
     parameters: {
       type: "object",
       properties: {
         max: {
           type: "number",
-          description: "最多回傳幾則頭條，範圍 1 到 10；未指定時預設 3。",
+          description: "最多回傳幾則頭條，範圍 1 到 14；未指定時預設 10。",
         },
       },
       required: ["max"],
