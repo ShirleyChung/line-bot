@@ -95,7 +95,7 @@ export const env = {
   - watch_prices：自選股股價
   - today_link：今日/每日連結
   - arxiv_papers：論文提醒（paperCount 預設 6，限制 5-8）
-  - top_headlines：使用者說「頭條/頭條新聞/今日頭條/重點新聞/CNN 頭條」等未指定關鍵字時用，回傳當下綜合頭條（含 CNN、Reuters、Bloomberg、新華社、BBC；headlineCount 預設 10，限制 1-14）。例如「11:41 通知我頭條新聞」「每天早上 8 點給我今日頭條」
+  - top_headlines：使用者說「頭條/頭條新聞/今日頭條/重點新聞/CNN 頭條」等未指定關鍵字時用，回傳當下綜合頭條（含 CNN、Reuters、Bloomberg、新華社、BBC；headlineCount 預設 10，限制 1-10）。例如「11:41 通知我頭條新聞」「每天早上 8 點給我今日頭條」
   - general_news：指定關鍵字的最新新聞提醒（newsQuery 填關鍵字如公司/產業/人物/事件，newsCount 預設 5，限制 1-10）。例如「每天早上 8 點通知我台積電的最新新聞」
   - 頭條類提醒切勿落入 generic：只要使用者要的是「頭條/新聞」就必須用 top_headlines / general_news 其中之一，讓系統在觸發當下即時抓取，不要建成純文字提醒。
   - bible_verse：每日隨機經節提醒
@@ -152,7 +152,7 @@ export const env = {
 - count 預設 5（1-10）；要近期資料用 freshness=pd/pw/pm/py，否則傳空字串。
 - 中文圈內容用 country=tw、lang=zh-hant；英文資料可用 country=us、lang=en。
 - 「最新新聞/最新消息」優先用 searchNews；只有當使用者明確想搜尋一般網頁資料時才用 web_search。
-- 「頭條新聞/今日頭條/重點新聞/CNN 頭條」使用 get_top_headlines（max 預設 10，回傳多來源繁中短摘要與連結）。
+- 「頭條新聞/今日頭條/重點新聞/CNN 頭條」使用 get_top_headlines（max 預設 10，回傳多來源原始標題與連結）。
 - 使用者已貼網址或要求摘要某個超連結 → 用 summarize_article_url；若 router 已先處理網址摘要則不要重複呼叫其他搜尋工具。
 - 取得結果後依標題、摘要整理 2-5 點重點，並附 1-3 個來源連結。
 

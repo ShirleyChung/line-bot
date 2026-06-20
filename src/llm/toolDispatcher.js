@@ -441,7 +441,7 @@ export async function executeTool(name, args = {}, context = {}) {
         payload.max = Math.min(Math.max(Number(args.paperCount) || 6, 5), 8);
       }
       if (reminderType === "top_headlines") {
-        payload.max = Math.min(Math.max(Number(args.headlineCount) || 10, 1), 14);
+        payload.max = Math.min(Math.max(Number(args.headlineCount) || 10, 1), 10);
       }
       if (reminderType === "general_news") {
         payload.query = String(args.newsQuery || "").trim();
@@ -797,7 +797,7 @@ export async function executeTool(name, args = {}, context = {}) {
     }
 
     case "get_top_headlines": {
-      const max = Math.min(Math.max(Number(args.max) || 10, 1), 14);
+      const max = Math.min(Math.max(Number(args.max) || 10, 1), 10);
       const headlines = await fetchTopHeadlines({ max });
       return {
         ok: true,

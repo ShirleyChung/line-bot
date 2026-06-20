@@ -1,12 +1,8 @@
-// 綜合頭條新聞：聚合多家主流媒體的即時 RSS（皆為直連原始網址、免 API 金鑰），
-// 每家最多取兩則，並產生短篇繁中摘要。
+// 綜合頭條新聞：聚合多家國際主流媒體的即時 RSS（皆為直連原始網址、免 API 金鑰）。
+// 不另外抓取或摘要台灣頭條，所有頭條都使用同一套來源與輸出流程。
 // 不使用 Google News RSS，因其文章連結是不可逆的轉址 token，無法還原成原始媒體網址。
-import OpenAI from "openai";
-import { env } from "../config/env.js";
 
 const SOURCES = [
-  { name: "自由時報", url: "https://news.ltn.com.tw/rss/all.xml" },
-  { name: "ETtoday", url: "https://feeds.feedburner.com/ettoday/realtime" },
   { name: "CNN", url: "https://rss.cnn.com/rss/cnn_topstories.rss" },
   { name: "Reuters", url: "https://feeds.feedburner.com/Reuters/topNews" },
   { name: "Bloomberg", url: "https://feeds.bloomberg.com/markets/news.rss" },
@@ -16,6 +12,7 @@ const SOURCES = [
 const TOP_HEADLINES_CACHE_TTL_MS = 10 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_PER_SOURCE = 2;
+const MAX_HEADLINES = 10;
 const RSS_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
@@ -23,7 +20,6 @@ const RSS_HEADERS = {
   Accept: "application/rss+xml, application/xml;q=0.9, */*;q=0.8",
 };
 const topHeadlinesCache = new Map();
-const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
 function decodeHtmlEntities(value) {
   return String(value || "")
@@ -102,56 +98,6 @@ async function fetchSource({ name, url }) {
     .filter(Boolean);
 }
 
-function parseSummaryResponse(value) {
-  const text = String(value || "").trim();
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) return [];
-
-  try {
-    const entries = JSON.parse(match[0]);
-    return Array.isArray(entries) ? entries : [];
-  } catch {
-    return [];
-  }
-}
-
-async function addChineseSummaries(headlines) {
-  if (!headlines.length || !env.OPENAI_API_KEY) return headlines;
-
-  const input = headlines.map((item, index) => ({
-    id: index,
-    source: item.source,
-    title: item.title,
-    description: item.description,
-  }));
-
-  try {
-    const response = await client.responses.create({
-      model: env.OPENAI_MODEL,
-      max_output_tokens: 600,
-      instructions: [
-        "你是新聞編輯。根據每則提供的標題與導語，寫繁體中文的客觀摘要。",
-        "每則摘要限 16 到 24 個中文字左右，不要加標點以外的前綴、不要臆測。",
-        "只回傳 JSON 陣列，格式為 [{\"id\":0,\"summary\":\"...\"}]；必須涵蓋每個 id。",
-      ].join("\n"),
-      input: JSON.stringify(input),
-    });
-    const summaries = new Map(
-      parseSummaryResponse(response.output_text)
-        .filter((item) => Number.isInteger(item?.id) && typeof item?.summary === "string")
-        .map((item) => [item.id, item.summary.replace(/\s+/g, " ").trim().slice(0, 48)]),
-    );
-
-    return headlines.map((item, index) => ({
-      ...item,
-      summary: summaries.get(index) || "",
-    }));
-  } catch {
-    // 摘要服務暫不可用時，仍須回傳可點擊的即時頭條。
-    return headlines;
-  }
-}
-
 function recencyDesc(a, b) {
   const ta = a.publishedAt ? Date.parse(a.publishedAt) : -Infinity;
   const tb = b.publishedAt ? Date.parse(b.publishedAt) : -Infinity;
@@ -226,10 +172,10 @@ function formatPublishedAt(value) {
 /**
  * 抓取綜合頭條新聞（即時，不需關鍵字，連結為原始媒體網址）。
  * @param {{max?: number}} options
- * @returns {Promise<Array<{title: string, summary: string, url: string, publishedAt: string, source: string}>>}
+ * @returns {Promise<Array<{title: string, url: string, publishedAt: string, source: string}>>}
  */
 export async function fetchTopHeadlines({ max = 10 } = {}) {
-  const normalizedMax = Math.min(Math.max(Number(max) || 10, 1), SOURCES.length * MAX_PER_SOURCE);
+  const normalizedMax = Math.min(Math.max(Number(max) || 10, 1), MAX_HEADLINES);
   const cached = getCache(normalizedMax);
   if (cached) return cached;
 
@@ -245,7 +191,7 @@ export async function fetchTopHeadlines({ max = 10 } = {}) {
     }
   }
 
-  const headlines = await addChineseSummaries(mergeHeadlines(articles, normalizedMax));
+  const headlines = mergeHeadlines(articles, normalizedMax);
 
   if (!headlines.length) {
     throw new Error(`頭條新聞抓取失敗：${errors.join("；") || "暫時查無資料"}`);
@@ -257,7 +203,7 @@ export async function fetchTopHeadlines({ max = 10 } = {}) {
 
 export function buildTopHeadlinesMessage(headlines, { max = 10 } = {}) {
   const items = Array.isArray(headlines)
-    ? headlines.slice(0, Math.max(Number(max) || 10, 1))
+    ? headlines.slice(0, Math.min(Math.max(Number(max) || 10, 1), MAX_HEADLINES))
     : [];
   if (!items.length) {
     return "目前查不到頭條新聞。";
@@ -266,7 +212,7 @@ export function buildTopHeadlinesMessage(headlines, { max = 10 } = {}) {
   const lines = ["📰 今日頭條新聞", ""];
 
   for (const [index, item] of items.entries()) {
-    lines.push(`${index + 1}. 【${item.source}】${item.summary || item.title}`);
+    lines.push(`${index + 1}. 【${item.source}】${item.title}`);
     const meta = [item.source, item.publishedAt ? formatPublishedAt(item.publishedAt) : ""]
       .filter(Boolean)
       .join("｜");

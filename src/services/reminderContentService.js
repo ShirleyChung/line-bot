@@ -218,7 +218,7 @@ async function buildArxivPaperReminderMessage(reminder) {
 }
 
 async function buildTopHeadlinesReminderMessage(reminder) {
-  const max = Math.min(Math.max(Number(reminder.payload?.max) || 10, 1), 14);
+  const max = Math.min(Math.max(Number(reminder.payload?.max) || 10, 1), 10);
   const headlines = await fetchTopHeadlines({ max });
   return buildTopHeadlinesMessage(headlines, { max });
 }

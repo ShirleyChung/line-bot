@@ -121,7 +121,7 @@ export const botTools = [
         },
         headlineCount: {
           type: "number",
-          description: "綜合頭條（top_headlines）要回傳的則數，建議 1 到 14；未指定填 10。非頭條提醒填 0。",
+          description: "綜合頭條（top_headlines）要回傳的則數，範圍 1 到 10；未指定填 10。非頭條提醒填 0。",
         },
         newsQuery: {
           type: "string",
@@ -387,13 +387,13 @@ export const botTools = [
   {
     type: "function",
     name: "get_top_headlines",
-    description: "抓取多家媒體的即時頭條新聞。CNN、Reuters、Bloomberg、新華社與 BBC 各取一至兩則，附約 20 字繁體中文摘要與原文連結。",
+    description: "抓取多家國際媒體的即時頭條新聞。CNN、Reuters、Bloomberg、新華社與 BBC 各取一至兩則，附原始標題與原文連結。",
     parameters: {
       type: "object",
       properties: {
         max: {
           type: "number",
-          description: "最多回傳幾則頭條，範圍 1 到 14；未指定時預設 10。",
+          description: "最多回傳幾則頭條，範圍 1 到 10；未指定時預設 10。",
         },
       },
       required: ["max"],
