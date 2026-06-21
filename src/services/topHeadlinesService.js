@@ -15,6 +15,8 @@ const TOP_HEADLINES_CACHE_TTL_MS = 10 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_PER_SOURCE = 2;
 const MAX_HEADLINES = 10;
+const MIN_HEADLINE_OUTPUT_TOKENS = 3000;
+const RETRY_HEADLINE_OUTPUT_TOKENS = 4500;
 const RSS_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
@@ -127,6 +129,61 @@ function normalizeChineseSummary(value) {
   return /[\u3400-\u9fff]/.test(summary) ? summary : "";
 }
 
+function headlineOutputTokenBudget(minimum = MIN_HEADLINE_OUTPUT_TOKENS) {
+  return Math.max(Number(env.OPENAI_HEADLINE_MAX_OUTPUT_TOKENS) || 0, minimum);
+}
+
+function toSummaryMap(response) {
+  return new Map(
+    parseSummaryResponse(response?.output_text)
+      .filter((item) => Number.isInteger(item?.id) && typeof item?.summary === "string")
+      .map((item) => [item.id, normalizeChineseSummary(item.summary)])
+      .filter(([, summary]) => summary),
+  );
+}
+
+async function createChineseSummaryResponse(input, maxOutputTokens) {
+  return client.responses.create({
+    model: env.OPENAI_MODEL,
+    // 頭條翻譯不需要複雜推理，降低推理強度可保留足夠 token 給結構化輸出。
+    reasoning: { effort: "low" },
+    max_output_tokens: maxOutputTokens,
+    instructions: [
+      "你是新聞編輯。根據每則提供的標題與導語，寫繁體中文的客觀摘要。",
+      "每則摘要限 16 到 24 個中文字左右，不要加標點以外的前綴、不要臆測。",
+      "不得輸出英文原文或英文摘要；專有名詞必要時可保留英文。",
+      "必須為每個輸入 id 各回傳一則摘要。",
+    ].join("\n"),
+    input: JSON.stringify(input),
+    text: {
+      format: {
+        type: "json_schema",
+        name: "headline_summaries",
+        strict: true,
+        schema: {
+          type: "object",
+          properties: {
+            summaries: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "integer" },
+                  summary: { type: "string" },
+                },
+                required: ["id", "summary"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["summaries"],
+          additionalProperties: false,
+        },
+      },
+    },
+  });
+}
+
 async function addChineseSummaries(headlines) {
   if (!headlines.length || !env.OPENAI_API_KEY) return headlines;
 
@@ -138,48 +195,25 @@ async function addChineseSummaries(headlines) {
   }));
 
   try {
-    const response = await client.responses.create({
-      model: env.OPENAI_MODEL,
-      max_output_tokens: 600,
-      instructions: [
-        "你是新聞編輯。根據每則提供的標題與導語，寫繁體中文的客觀摘要。",
-        "每則摘要限 16 到 24 個中文字左右，不要加標點以外的前綴、不要臆測。",
-        "不得輸出英文原文或英文摘要；專有名詞必要時可保留英文。",
-      ].join("\n"),
-      input: JSON.stringify(input),
-      text: {
-        format: {
-          type: "json_schema",
-          name: "headline_summaries",
-          strict: true,
-          schema: {
-            type: "object",
-            properties: {
-              summaries: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    id: { type: "integer" },
-                    summary: { type: "string" },
-                  },
-                  required: ["id", "summary"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["summaries"],
-            additionalProperties: false,
-          },
-        },
-      },
-    });
-    const summaries = new Map(
-      parseSummaryResponse(response.output_text)
-        .filter((item) => Number.isInteger(item?.id) && typeof item?.summary === "string")
-        .map((item) => [item.id, normalizeChineseSummary(item.summary)])
-        .filter(([, summary]) => summary),
-    );
+    let response = await createChineseSummaryResponse(input, headlineOutputTokenBudget());
+    let summaries = toSummaryMap(response);
+
+    // Responses API 的上限包含 reasoning token。未完成或缺少任一筆時重試一次，
+    // 避免單次不足把整批頭條快取成「無法產生摘要」。
+    if (summaries.size < headlines.length) {
+      console.warn("[topHeadlines] Chinese summarization incomplete, retrying", {
+        status: response?.status,
+        incompleteDetails: response?.incomplete_details,
+        summaryCount: summaries.size,
+        headlineCount: headlines.length,
+        maxOutputTokens: headlineOutputTokenBudget(RETRY_HEADLINE_OUTPUT_TOKENS),
+      });
+      response = await createChineseSummaryResponse(
+        input,
+        headlineOutputTokenBudget(RETRY_HEADLINE_OUTPUT_TOKENS),
+      );
+      summaries = toSummaryMap(response);
+    }
 
     return headlines.map((item, index) => ({
       ...item,

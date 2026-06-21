@@ -73,6 +73,9 @@ export const env = {
   OPENAI_API_KEY: required("OPENAI_API_KEY"),
   OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5-mini",
   OPENAI_MAX_OUTPUT_TOKENS: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 1500),
+  // 頭條摘要會一次要求模型回傳多則嚴格 JSON；推理模型的 max_output_tokens
+  // 同時計入推理與可見輸出，不能沿用一般聊天回覆的較小預設值。
+  OPENAI_HEADLINE_MAX_OUTPUT_TOKENS: Number(process.env.OPENAI_HEADLINE_MAX_OUTPUT_TOKENS || 3000),
   OPENAI_SYSTEM_PROMPT:
     process.env.OPENAI_SYSTEM_PROMPT ||
      `
