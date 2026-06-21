@@ -23,6 +23,7 @@ const RSS_HEADERS = {
 };
 const topHeadlinesCache = new Map();
 const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+const CHINESE_SUMMARY_UNAVAILABLE = "中文摘要暫時無法產生，請開啟原文連結閱覽";
 
 function decodeHtmlEntities(value) {
   return String(value || "")
@@ -103,15 +104,27 @@ async function fetchSource({ name, url }) {
 
 function parseSummaryResponse(value) {
   const text = String(value || "").trim();
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) return [];
-
   try {
-    const entries = JSON.parse(match[0]);
-    return Array.isArray(entries) ? entries : [];
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+    return Array.isArray(parsed?.summaries) ? parsed.summaries : [];
   } catch {
-    return [];
+    // 保留對舊模型可能附上 Markdown code fence 的相容性。
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) return [];
+    try {
+      const entries = JSON.parse(match[0]);
+      return Array.isArray(entries) ? entries : [];
+    } catch {
+      return [];
+    }
   }
+}
+
+function normalizeChineseSummary(value) {
+  const summary = String(value || "").replace(/\s+/g, " ").trim().slice(0, 48);
+  // 避免模型未遵守指示而將英文原文直接送給使用者。
+  return /[\u3400-\u9fff]/.test(summary) ? summary : "";
 }
 
 async function addChineseSummaries(headlines) {
@@ -131,23 +144,51 @@ async function addChineseSummaries(headlines) {
       instructions: [
         "你是新聞編輯。根據每則提供的標題與導語，寫繁體中文的客觀摘要。",
         "每則摘要限 16 到 24 個中文字左右，不要加標點以外的前綴、不要臆測。",
-        "只回傳 JSON 陣列，格式為 [{\"id\":0,\"summary\":\"...\"}]；必須涵蓋每個 id。",
+        "不得輸出英文原文或英文摘要；專有名詞必要時可保留英文。",
       ].join("\n"),
       input: JSON.stringify(input),
+      text: {
+        format: {
+          type: "json_schema",
+          name: "headline_summaries",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              summaries: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "integer" },
+                    summary: { type: "string" },
+                  },
+                  required: ["id", "summary"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["summaries"],
+            additionalProperties: false,
+          },
+        },
+      },
     });
     const summaries = new Map(
       parseSummaryResponse(response.output_text)
         .filter((item) => Number.isInteger(item?.id) && typeof item?.summary === "string")
-        .map((item) => [item.id, item.summary.replace(/\s+/g, " ").trim().slice(0, 48)]),
+        .map((item) => [item.id, normalizeChineseSummary(item.summary)])
+        .filter(([, summary]) => summary),
     );
 
     return headlines.map((item, index) => ({
       ...item,
-      summary: summaries.get(index) || "",
+      summary: summaries.get(index) || CHINESE_SUMMARY_UNAVAILABLE,
     }));
-  } catch {
-    // 摘要服務暫不可用時，仍須回傳可點擊的即時頭條。
-    return headlines;
+  } catch (error) {
+    console.warn("[topHeadlines] Chinese summarization failed:", error?.message || error);
+    // 不以英文標題冒充摘要；仍提供原始連結，讓使用者可繼續閱讀。
+    return headlines.map((item) => ({ ...item, summary: CHINESE_SUMMARY_UNAVAILABLE }));
   }
 }
 
@@ -265,7 +306,12 @@ export function buildTopHeadlinesMessage(headlines, { max = 10 } = {}) {
   const lines = ["📰 今日頭條新聞", ""];
 
   for (const [index, item] of items.entries()) {
-    lines.push(`${index + 1}. 【${item.source}】${item.summary || item.title}`);
+    // 最後一道輸出防線：即使有舊快取或上游資料漏掉 summary，也不能把英文原文當中文摘要送出。
+    const displayText =
+      normalizeChineseSummary(item.summary) ||
+      normalizeChineseSummary(item.title) ||
+      CHINESE_SUMMARY_UNAVAILABLE;
+    lines.push(`${index + 1}. 【${item.source}】${displayText}`);
     const meta = [item.source, item.publishedAt ? formatPublishedAt(item.publishedAt) : ""]
       .filter(Boolean)
       .join("｜");
