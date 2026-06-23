@@ -8,6 +8,7 @@ import {
   setDefaultWeatherCity,
   getWeatherForUser,
   formatWeatherReply,
+  parseWeatherDateOffset,
 } from "../services/weatherService.js";
 
 /**
@@ -41,13 +42,16 @@ export async function handleWeatherMessage(event) {
     return false;
   }
 
-  const target = /未來\s*(?:一)?[週周]|(?:這|下)[週周]|一[週周]天氣/.test(text)
-    ? "week"
-    : text.includes("後天") || text.includes("大後天")
-      ? "day_after_tomorrow"
-      : text.includes("明天")
-        ? "tomorrow"
-        : "now";
+  const explicitDate = parseWeatherDateOffset(text);
+  const target = explicitDate
+    ? "date"
+    : /未來\s*(?:一)?[週周]|(?:這|下)[週周]|一[週周]天氣/.test(text)
+      ? "week"
+      : text.includes("後天") || text.includes("大後天")
+        ? "day_after_tomorrow"
+        : text.includes("明天")
+          ? "tomorrow"
+          : "now";
 
   let data;
   try {
@@ -55,6 +59,7 @@ export async function handleWeatherMessage(event) {
       text,
       userId,
       target,
+      dayOffset: explicitDate?.dayOffset,
     });
   } catch (error) {
     // 外部資料源暫時故障時仍要回覆 LINE 使用者，不能讓錯誤一路冒到 webhook。

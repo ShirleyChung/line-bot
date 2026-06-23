@@ -28,6 +28,23 @@ test("weather location extraction ignores forecast time phrases", () => {
     weatherService.extractWeatherCityFromText("淡水未來一週天氣"),
     "新北市淡水區",
   );
+  assert.equal(
+    weatherService.extractWeatherCityFromText("台北6/25天氣"),
+    "臺北市",
+  );
+});
+
+test("explicit month/day weather dates are resolved from Taipei's calendar date", () => {
+  const now = new Date("2026-06-23T08:00:00+08:00");
+
+  assert.deepEqual(weatherService.parseWeatherDateOffset("6/25天氣", now), {
+    date: "2026-06-25",
+    dayOffset: 2,
+  });
+  assert.deepEqual(weatherService.parseWeatherDateOffset("台北 2026-06-24 天氣", now), {
+    date: "2026-06-24",
+    dayOffset: 1,
+  });
 });
 
 test("weekly weather reply contains one concise line per forecast day", () => {

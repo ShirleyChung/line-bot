@@ -317,6 +317,9 @@ export function extractWeatherCityFromText(text) {
     .replace(/明天/g, '')
     .replace(/大後天/g, '')
     .replace(/後天/g, '')
+    .replace(/\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/g, '')
+    .replace(/\d{1,2}[\/-]\d{1,2}(?:日)?/g, '')
+    .replace(/\d{1,2}月\d{1,2}日?/g, '')
     .replace(/未來一週/g, '')
     .replace(/未來一周/g, '')
     .replace(/這週/g, '')
@@ -468,6 +471,53 @@ function taipeiDate(offset = 0) {
   }).formatToParts(base);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
+}
+
+/**
+ * Parse an explicit calendar date in a weather query and return its offset
+ * from the supplied Taipei date. Dates without a year refer to the next
+ * occurrence, so a past 1/1 query in December means next year's 1/1.
+ */
+export function parseWeatherDateOffset(text, now = new Date()) {
+  const value = String(text || '');
+  const match = value.match(/(?:(\d{4})(?:\/|-)(\d{1,2})(?:\/|-)(\d{1,2})|(\d{1,2})(?:\/|-|月)(\d{1,2})(?:日)?)/);
+  if (!match) return null;
+
+  const [, inputYear, yearMonthText, yearDayText, monthDayText, monthDayDayText] = match;
+  const monthText = yearMonthText || monthDayText;
+  const dayText = yearDayText || monthDayDayText;
+  const today = taipeiDateFromDate(now);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  let year = inputYear ? Number(inputYear) : Number(today.slice(0, 4));
+
+  if (!Number.isInteger(month) || !Number.isInteger(day) || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  let requested = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  if (!isValidTaipeiCalendarDate(requested)) return null;
+
+  if (!inputYear && requested < today) {
+    year += 1;
+    requested = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  const offset = Math.round((Date.parse(`${requested}T00:00:00+08:00`) - Date.parse(`${today}T00:00:00+08:00`)) / 86_400_000);
+  return { date: requested, dayOffset: offset };
+}
+
+function taipeiDateFromDate(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function isValidTaipeiCalendarDate(dateString) {
+  const date = new Date(`${dateString}T12:00:00+08:00`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === dateString;
 }
 
 function getTimeStartDate(item) {
@@ -913,7 +963,7 @@ export function formatWeatherReply(data) {
   return lines.join('\n');
 }
 
-export async function getWeatherForUser({ text, userId, city, target = 'now' }) {
+export async function getWeatherForUser({ text, userId, city, target = 'now', dayOffset }) {
   let finalLocation = city ? normalizeTaiwanWeatherLocation(city) : null;
 
   // 城市來源優先序：明確參數 > 從文字解析 > 使用者預設地點。
@@ -940,8 +990,8 @@ export async function getWeatherForUser({ text, userId, city, target = 'now' }) 
     };
   }
 
-  const fetchForecast = (forecastTarget, dayOffset) => {
-    const options = { target: forecastTarget, dayOffset };
+  const fetchForecast = (forecastTarget, offset) => {
+    const options = { target: forecastTarget, dayOffset: offset };
     if (finalLocation.type === 'city') {
       return fetchCwa36hWeather(finalLocation.city, options);
     }
@@ -952,5 +1002,5 @@ export async function getWeatherForUser({ text, userId, city, target = 'now' }) 
     return fetchWeeklyWeather(fetchForecast);
   }
 
-  return fetchForecast(target, undefined);
+  return fetchForecast(target, dayOffset);
 }
