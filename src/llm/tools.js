@@ -63,7 +63,7 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項。可建立一次性提醒、每日排程，或每週特定星期的排程（例如每個星期五，或除了星期四外每天）。內容可為天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN 頭條新聞、指定關鍵字的最新新聞、每日經節。",
+    description: "建立提醒事項。可建立一次性提醒、每日排程，或每週特定星期的排程（例如每個星期五，或除了星期四外每天）。內容可為天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN/綜合頭條新聞、指定關鍵字的最新新聞、每日經節。",
     parameters: {
       type: "object",
       properties: {
@@ -92,7 +92,7 @@ export const botTools = [
         reminderType: {
           type: "string",
           enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "top_headlines", "general_news", "bible_verse", "bible_outline"],
-          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；頭條、今日頭條與指定 CNN 頭條都用 top_headlines；指定關鍵字（公司/產業/人物/事件）的最新新聞用 general_news；每日隨機經節用 bible_verse；依綱目循序讀某書卷用 bible_outline（需同時填 bibleBookName）；一般文字用 generic。",
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；頭條、今日頭條、新聞提醒、最新新聞與指定 CNN 頭條都用 top_headlines；指定關鍵字（公司/產業/人物/事件）的最新新聞用 general_news；每日隨機經節用 bible_verse；依綱目循序讀某書卷用 bible_outline（需同時填 bibleBookName）；一般文字用 generic。",
         },
         city: {
           type: "string",

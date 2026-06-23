@@ -133,7 +133,13 @@ function inferReminderType(args = {}) {
 
   if (args.headlineCount) return "top_headlines";
 
-  if (String(args.newsQuery || "").trim()) return "general_news";
+  const newsQuery = String(args.newsQuery || "").trim();
+  const isGenericNewsQuery = /^(新聞|新聞提醒|最新新聞|新聞通知|今日新聞|今天新聞)$/u.test(newsQuery);
+  if (/新聞|新聞提醒|最新新聞|新聞通知/.test(newsHint) && (!newsQuery || isGenericNewsQuery)) {
+    return "top_headlines";
+  }
+
+  if (newsQuery) return "general_news";
 
   return requestedType || "generic";
 }

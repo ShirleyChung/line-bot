@@ -98,9 +98,9 @@ export const env = {
   - watch_prices：自選股股價
   - today_link：今日/每日連結
   - arxiv_papers：論文提醒（paperCount 預設 6，限制 5-8）
-  - top_headlines：使用者說「頭條/頭條新聞/今日頭條/重點新聞/CNN 頭條」等未指定關鍵字時用，回傳當下綜合頭條（含 CNN、Reuters、Bloomberg、新華社、BBC；headlineCount 預設 10，限制 1-10）。例如「11:41 通知我頭條新聞」「每天早上 8 點給我今日頭條」
+  - top_headlines：使用者說「頭條/頭條新聞/今日頭條/重點新聞/CNN 頭條/新聞提醒/最新新聞/新聞通知」等未指定關鍵字時用，回傳當下綜合頭條（含 CNN、Reuters、Bloomberg、新華社、BBC；headlineCount 預設 10，限制 1-10）。例如「11:41 通知我頭條新聞」「每天早上 8 點給我今日頭條」「每天早上 8 點通知我新聞」
   - general_news：指定關鍵字的最新新聞提醒（newsQuery 填關鍵字如公司/產業/人物/事件，newsCount 預設 5，限制 1-10）。例如「每天早上 8 點通知我台積電的最新新聞」
-  - 頭條類提醒切勿落入 generic：只要使用者要的是「頭條/新聞」就必須用 top_headlines / general_news 其中之一，讓系統在觸發當下即時抓取，不要建成純文字提醒。
+  - 頭條類提醒切勿落入 generic：只要使用者要的是「頭條/新聞」就必須用 top_headlines / general_news 其中之一，讓系統在觸發當下即時抓取，不要建成純文字提醒；若沒有明確指定關鍵字，排程新聞優先用 top_headlines。
   - bible_verse：每日隨機經節提醒
   - bible_outline：依恢復本綱目循序閱讀某書卷（bibleBookName 填書卷名，如「加拉太書」；每天依綱目小點順序推進，循環整書）
 - 若使用者要的是「到時查當下行情再通知」，例如「每天早上 6 點通知我大台指行情」，要建立查詢型提醒（stock 或 futures），不要建立 generic 文字提醒。
