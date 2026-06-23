@@ -41,8 +41,13 @@ export async function handleWeatherMessage(event) {
     return false;
   }
 
-  // 目前 CWA 36 小時預報只需要區分現在與明天兩種常用時段。
-  const target = text.includes("明天") ? "tomorrow" : "now";
+  const target = /未來\s*(?:一)?[週周]|(?:這|下)[週周]|一[週周]天氣/.test(text)
+    ? "week"
+    : text.includes("後天") || text.includes("大後天")
+      ? "day_after_tomorrow"
+      : text.includes("明天")
+        ? "tomorrow"
+        : "now";
 
   const data = await getWeatherForUser({
     text,

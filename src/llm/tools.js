@@ -595,7 +595,7 @@ export const botTools = [
   {
     "type": "function",
     "name": "get_weather",
-    "description": "查詢台灣縣市或鄉鎮市區的天氣。適合回答使用者詢問天氣、溫度、降雨機率、會不會下雨等問題。支援淡水、板橋、羅東、埔里等細地點；若使用者未提供地點，可留空 city，系統會嘗試使用使用者的預設天氣地點。",
+    "description": "查詢台灣縣市或鄉鎮市區的天氣與預報。適合回答使用者詢問天氣、溫度、降雨機率、會不會下雨、明天、後天或未來一週天氣。支援淡水、板橋、羅東、埔里等細地點；若使用者未提供地點，可留空 city，系統會嘗試使用使用者的預設天氣地點。",
     "parameters": {
       "type": "object",
       "properties": {
@@ -605,8 +605,8 @@ export const botTools = [
         },
         "target": {
           "type": "string",
-          "enum": ["now", "tomorrow", "later"],
-          "description": "查詢時間。now 表示最近時段，tomorrow 表示下一個預報時段，later 表示更後面的預報時段。"
+          "enum": ["now", "tomorrow", "day_after_tomorrow", "week", "later"],
+          "description": "查詢時間。now 為目前時段；tomorrow 為明天；day_after_tomorrow 為後天；week 為未來一週。later 為舊版相容值，等同後天。"
         },
         "userId": {
           "type": "string",

@@ -4,6 +4,8 @@ import { db } from "./firestore.js";
 const CWA_API_KEY = env.CWA_API_KEY;
 const CWA_36H_ENDPOINT =
   'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001';
+const CWA_WEEKLY_ENDPOINT =
+  'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-005';
 const CWA_DATASTORE_BASE =
   'https://opendata.cwa.gov.tw/api/v1/rest/datastore';
 const CWA_TOWNSHIP_DATASET_BY_CITY = {
@@ -287,6 +289,13 @@ export function extractWeatherCityFromText(text) {
     .replace(/查/g, '')
     .replace(/今天/g, '')
     .replace(/明天/g, '')
+    .replace(/大後天/g, '')
+    .replace(/後天/g, '')
+    .replace(/未來一週/g, '')
+    .replace(/未來一周/g, '')
+    .replace(/這週/g, '')
+    .replace(/一週/g, '')
+    .replace(/一周/g, '')
     .replace(/現在/g, '')
     .replace(/目前/g, '')
     .replace(/的/g, '')
@@ -419,17 +428,42 @@ function getWeatherElementMap(location) {
   return map;
 }
 
+function targetDayOffset(target = 'now') {
+  if (target === 'tomorrow') return 1;
+  // 保留 later 的相容性，並將它明確定義為後天。
+  if (target === 'day_after_tomorrow' || target === 'later') return 2;
+  return 0;
+}
+
+function taipeiDate(offset = 0) {
+  const base = new Date(Date.now() + offset * 24 * 60 * 60 * 1000);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(base);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function getTimeStartDate(item) {
+  const time = item?.startTime || item?.StartTime || item?.dataTime || item?.DataTime || '';
+  return String(time).slice(0, 10);
+}
+
 function pickTimeIndex(weatherElementMap, options = {}) {
   const target = options.target || 'now';
+  const times = Object.values(weatherElementMap).find((items) => Array.isArray(items) && items.length) || [];
+  if (target === 'now') return 0;
 
-  // CWA 36 小時通常有 3 個區段：
-  // 0: 最近 12 小時
-  // 1: 下一個 12 小時
-  // 2: 再下一個 12 小時
-  if (target === 'tomorrow') return 1;
-  if (target === 'later') return 2;
+  const expectedDate = taipeiDate(options.dayOffset ?? targetDayOffset(target));
+  const matchedIndex = times.findIndex((item) => getTimeStartDate(item) === expectedDate);
+  return matchedIndex;
+}
 
-  return 0;
+function getWeekdayLabel(dateString) {
+  const weekday = new Intl.DateTimeFormat('zh-TW', {
+    timeZone: 'Asia/Taipei', weekday: 'short',
+  }).format(new Date(`${dateString}T12:00:00+08:00`));
+  return `${dateString.slice(5).replace('-', '/')}（${weekday}）`;
 }
 
 function getParamName(item) {
@@ -604,12 +638,15 @@ export async function fetchCwa36hWeather(city, options = {}) {
   }
 
   const target = options.target || 'now';
-  const url = new URL(CWA_36H_ENDPOINT);
+  const dayOffset = options.dayOffset ?? targetDayOffset(target);
+  const useWeeklyDataset = target === 'week' || dayOffset >= 2;
+  const dataset = useWeeklyDataset ? 'F-C0032-005' : 'F-C0032-001';
+  const url = new URL(useWeeklyDataset ? CWA_WEEKLY_ENDPOINT : CWA_36H_ENDPOINT);
   url.searchParams.set('Authorization', CWA_API_KEY);
   url.searchParams.set('format', 'JSON');
   url.searchParams.set('locationName', normalizedCity);
 
-  const cacheKey = `cwa36h:${normalizedCity}:${target}`;
+  const cacheKey = `cwa:${dataset}:${normalizedCity}`;
   const json = await fetchCwaJson(url, cacheKey);
   const location = json.records?.location?.[0];
 
@@ -623,7 +660,15 @@ export async function fetchCwa36hWeather(city, options = {}) {
   }
 
   const elementMap = getWeatherElementMap(location);
-  const idx = pickTimeIndex(elementMap, { target });
+  const idx = pickTimeIndex(elementMap, { target, dayOffset });
+  if (idx < 0) {
+    return {
+      ok: false,
+      reason: 'target_out_of_range',
+      city: normalizedCity,
+      message: `「${normalizedCity}」目前沒有 ${target === 'day_after_tomorrow' || target === 'later' ? '後天' : '指定日期'} 的預報資料。`,
+    };
+  }
 
   const wx = elementMap.Wx?.[idx];
   const pop = elementMap.PoP?.[idx];
@@ -634,7 +679,7 @@ export async function fetchCwa36hWeather(city, options = {}) {
   const data = {
     ok: true,
     source: 'CWA',
-    dataset: 'F-C0032-001',
+    dataset,
     city: location.locationName,
     target,
     startTime: wx?.startTime || pop?.startTime || minT?.startTime || null,
@@ -648,6 +693,36 @@ export async function fetchCwa36hWeather(city, options = {}) {
   };
 
   return data;
+}
+
+async function fetchWeeklyWeather(fetchOneDay) {
+  const forecasts = [];
+  for (let offset = 0; offset < 7; offset += 1) {
+    const target = offset === 0 ? 'now' : offset === 1 ? 'tomorrow' : 'day_after_tomorrow';
+    const data = await fetchOneDay(target, offset);
+    if (!data.ok) {
+      if (offset < 3) return data;
+      continue;
+    }
+    const date = String(data.startTime || taipeiDate(offset)).slice(0, 10);
+    // 同一天可能有日、夜兩筆預報；週報保留第一筆，避免重複日期。
+    if (!forecasts.some((item) => item.date === date)) {
+      forecasts.push({ ...data, date, dayLabel: getWeekdayLabel(date) });
+    }
+  }
+
+  if (!forecasts.length) {
+    return { ok: false, message: '目前沒有可用的一週天氣預報資料。' };
+  }
+
+  return {
+    ok: true,
+    source: 'CWA',
+    city: forecasts[0].city,
+    locationName: forecasts[0].locationName,
+    target: 'week',
+    forecasts,
+  };
 }
 
 export async function fetchCwaTownshipWeather(locationInput, options = {}) {
@@ -664,7 +739,7 @@ export async function fetchCwaTownshipWeather(locationInput, options = {}) {
   }
 
   const target = options.target || 'now';
-  const idx = target === 'later' ? 2 : target === 'tomorrow' ? 1 : 0;
+  const dayOffset = options.dayOffset ?? targetDayOffset(target);
 
   const datasetEntries = location.city
     ? [[location.city, CWA_TOWNSHIP_DATASET_BY_CITY[location.city]]].filter(([, dataset]) => dataset)
@@ -677,7 +752,7 @@ export async function fetchCwaTownshipWeather(locationInput, options = {}) {
     url.searchParams.set('Authorization', CWA_API_KEY);
     url.searchParams.set('format', 'JSON');
 
-    const cacheKey = `cwaTownship:${dataset}:${city}:all:${target}`;
+    const cacheKey = `cwaTownship:${dataset}:${city}:all`;
     const json = await fetchCwaJson(url, cacheKey);
     const groups = getLocationsGroups(json);
     const matchedGroup = groups.find((group) => getLocationsName(group) === city) || groups[0];
@@ -716,6 +791,17 @@ export async function fetchCwaTownshipWeather(locationInput, options = {}) {
     };
   }
 
+  const elementMap = getWeatherElementMap(matches[0].location);
+  const idx = pickTimeIndex(elementMap, { target, dayOffset });
+  if (idx < 0) {
+    return {
+      ok: false,
+      reason: 'target_out_of_range',
+      city: location.label,
+      message: `「${location.label}」目前沒有指定日期的預報資料。`,
+    };
+  }
+
   return buildTownshipWeatherData({
     ...matches[0],
     target,
@@ -726,6 +812,19 @@ export async function fetchCwaTownshipWeather(locationInput, options = {}) {
 export function formatWeatherReply(data) {
   if (!data?.ok) {
     return data?.message || '天氣查詢失敗，請稍後再試。';
+  }
+
+  if (data.target === 'week' && Array.isArray(data.forecasts)) {
+    const lines = [`📍${data.locationName || data.city} 未來一週天氣`];
+    for (const forecast of data.forecasts) {
+      const details = [forecast.weather];
+      if (forecast.minTemperatureC && forecast.maxTemperatureC) {
+        details.push(`${forecast.minTemperatureC}~${forecast.maxTemperatureC}°C`);
+      }
+      if (forecast.rainProbability) details.push(`降雨 ${forecast.rainProbability}`);
+      lines.push(`${forecast.dayLabel}：${details.filter(Boolean).join('｜') || '暫無資料'}`);
+    }
+    return lines.join('\n');
   }
 
   const lines = [
@@ -794,13 +893,17 @@ export async function getWeatherForUser({ text, userId, city, target = 'now' }) 
     };
   }
 
-  if (finalLocation.type === 'township') {
-    return fetchCwaTownshipWeather(finalLocation, { target });
+  const fetchForecast = (forecastTarget, dayOffset) => {
+    const options = { target: forecastTarget, dayOffset };
+    if (finalLocation.type === 'city') {
+      return fetchCwa36hWeather(finalLocation.city, options);
+    }
+    return fetchCwaTownshipWeather(finalLocation, options);
+  };
+
+  if (target === 'week') {
+    return fetchWeeklyWeather(fetchForecast);
   }
 
-  if (finalLocation.type === 'city') {
-    return fetchCwa36hWeather(finalLocation.city, { target });
-  }
-
-  return fetchCwaTownshipWeather(finalLocation, { target });
+  return fetchForecast(target, undefined);
 }
