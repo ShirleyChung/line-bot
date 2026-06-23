@@ -4,8 +4,6 @@ import { db } from "./firestore.js";
 const CWA_API_KEY = env.CWA_API_KEY;
 const CWA_36H_ENDPOINT =
   'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001';
-const CWA_WEEKLY_ENDPOINT =
-  'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-003';
 const CWA_DATASTORE_BASE =
   'https://opendata.cwa.gov.tw/api/v1/rest/datastore';
 const CWA_TOWNSHIP_DATASET_BY_CITY = {
@@ -31,6 +29,34 @@ const CWA_TOWNSHIP_DATASET_BY_CITY = {
   臺南市: 'F-D0047-079',
   連江縣: 'F-D0047-083',
   金門縣: 'F-D0047-087',
+};
+
+// CWA 的 F-C0032-003 / F-C0032-005 已不在現行 API 清單中，請求會回傳 404。
+// 縣市層級的後天起預報改用仍受支援的 F-D0047 一週鄉鎮預報。為避免將
+// 單一行政區誤標示為整個縣市，回覆會保留實際採用的代表行政區名稱。
+const CWA_REPRESENTATIVE_TOWN_BY_CITY = {
+  宜蘭縣: '宜蘭市',
+  桃園市: '桃園區',
+  新竹縣: '竹北市',
+  苗栗縣: '苗栗市',
+  彰化縣: '彰化市',
+  南投縣: '南投市',
+  雲林縣: '斗六市',
+  嘉義縣: '太保市',
+  屏東縣: '屏東市',
+  臺東縣: '臺東市',
+  花蓮縣: '花蓮市',
+  澎湖縣: '馬公市',
+  基隆市: '仁愛區',
+  新竹市: '東區',
+  嘉義市: '東區',
+  臺北市: '中正區',
+  高雄市: '苓雅區',
+  新北市: '板橋區',
+  臺中市: '西屯區',
+  臺南市: '中西區',
+  連江縣: '南竿鄉',
+  金門縣: '金城鎮',
 };
 
 const weatherCache = new Map();
@@ -639,9 +665,27 @@ export async function fetchCwa36hWeather(city, options = {}) {
 
   const target = options.target || 'now';
   const dayOffset = options.dayOffset ?? targetDayOffset(target);
-  const useWeeklyDataset = target === 'week' || dayOffset >= 2;
-  const dataset = useWeeklyDataset ? 'F-C0032-003' : 'F-C0032-001';
-  const url = new URL(useWeeklyDataset ? CWA_WEEKLY_ENDPOINT : CWA_36H_ENDPOINT);
+  if (target === 'week' || dayOffset >= 2) {
+    const town = CWA_REPRESENTATIVE_TOWN_BY_CITY[normalizedCity];
+    if (!town) {
+      return {
+        ok: false,
+        reason: 'unsupported_city',
+        city: normalizedCity,
+        message: `目前查不到「${normalizedCity}」後天起的天氣資料。`,
+      };
+    }
+
+    return fetchCwaTownshipWeather({
+      type: 'township',
+      city: normalizedCity,
+      town,
+      label: `${normalizedCity}${town}`,
+    }, options);
+  }
+
+  const dataset = 'F-C0032-001';
+  const url = new URL(CWA_36H_ENDPOINT);
   url.searchParams.set('Authorization', CWA_API_KEY);
   url.searchParams.set('format', 'JSON');
   url.searchParams.set('locationName', normalizedCity);
@@ -751,8 +795,11 @@ export async function fetchCwaTownshipWeather(locationInput, options = {}) {
     const url = new URL(`${CWA_DATASTORE_BASE}/${dataset}`);
     url.searchParams.set('Authorization', CWA_API_KEY);
     url.searchParams.set('format', 'JSON');
+    // 縣市資料集內仍含多個鄉鎮；預先交由 CWA 篩選以減少回應大小。
+    // 第一個候選值為含行政區後綴的正式名稱，符合資料集 LocationName。
+    url.searchParams.set('locationName', townCandidates[0]);
 
-    const cacheKey = `cwaTownship:${dataset}:${city}:all`;
+    const cacheKey = `cwaTownship:${dataset}:${city}:${townCandidates[0]}`;
     const json = await fetchCwaJson(url, cacheKey);
     const groups = getLocationsGroups(json);
     const matchedGroup = groups.find((group) => getLocationsName(group) === city) || groups[0];

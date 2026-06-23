@@ -49,11 +49,21 @@ export async function handleWeatherMessage(event) {
         ? "tomorrow"
         : "now";
 
-  const data = await getWeatherForUser({
-    text,
-    userId,
-    target,
-  });
+  let data;
+  try {
+    data = await getWeatherForUser({
+      text,
+      userId,
+      target,
+    });
+  } catch (error) {
+    // 外部資料源暫時故障時仍要回覆 LINE 使用者，不能讓錯誤一路冒到 webhook。
+    console.error("weather lookup error:", error);
+    data = {
+      ok: false,
+      message: "天氣資料服務暫時無法使用，請稍後再試。",
+    };
+  }
 
   // 沒指定地點且沒有預設地點時，直接由 handler 給提示，
   // 不再退回 LLM 反覆詢問地點。

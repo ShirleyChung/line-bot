@@ -52,7 +52,7 @@ test("weekly weather reply contains one concise line per forecast day", () => {
   );
 });
 
-test("day-after-tomorrow city forecast uses the weekly CWA dataset", async () => {
+test("day-after-tomorrow city forecast uses the supported township weekly dataset", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl;
   const startTime = `${taipeiDate(2)}T06:00:00+08:00`;
@@ -63,15 +63,18 @@ test("day-after-tomorrow city forecast uses the weekly CWA dataset", async () =>
       ok: true,
       json: async () => ({
         records: {
-          location: [{
-            locationName: "臺北市",
-            weatherElement: [
-              { elementName: "Wx", time: [{ startTime, parameter: { parameterName: "晴" } }] },
-              { elementName: "PoP", time: [{ startTime, parameter: { parameterName: "10" } }] },
-              { elementName: "MinT", time: [{ startTime, parameter: { parameterName: "25" } }] },
-              { elementName: "MaxT", time: [{ startTime, parameter: { parameterName: "32" } }] },
-              { elementName: "CI", time: [{ startTime, parameter: { parameterName: "舒適" } }] },
-            ],
+          locations: [{
+            locationsName: "臺北市",
+            location: [{
+              locationName: "中正區",
+              weatherElement: [
+                { elementName: "Wx", time: [{ startTime, elementValue: [{ value: "晴" }] }] },
+                { elementName: "PoP12h", time: [{ startTime, elementValue: [{ value: "10" }] }] },
+                { elementName: "MinT", time: [{ startTime, elementValue: [{ value: "25" }] }] },
+                { elementName: "MaxT", time: [{ startTime, elementValue: [{ value: "32" }] }] },
+                { elementName: "CI", time: [{ startTime, elementValue: [{ value: "舒適" }] }] },
+              ],
+            }],
           }],
         },
       }),
@@ -84,8 +87,9 @@ test("day-after-tomorrow city forecast uses the weekly CWA dataset", async () =>
     });
 
     assert.equal(data.ok, true);
-    assert.equal(data.dataset, "F-C0032-003");
-    assert.match(requestedUrl, /\/F-C0032-003\?/);
+    assert.equal(data.dataset, "F-D0047-063");
+    assert.equal(data.locationName, "臺北市中正區");
+    assert.match(requestedUrl, /\/F-D0047-063\?/);
   } finally {
     globalThis.fetch = originalFetch;
   }
