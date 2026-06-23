@@ -5,7 +5,7 @@ const CWA_API_KEY = env.CWA_API_KEY;
 const CWA_36H_ENDPOINT =
   'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001';
 const CWA_WEEKLY_ENDPOINT =
-  'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-005';
+  'https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-003';
 const CWA_DATASTORE_BASE =
   'https://opendata.cwa.gov.tw/api/v1/rest/datastore';
 const CWA_TOWNSHIP_DATASET_BY_CITY = {
@@ -640,7 +640,7 @@ export async function fetchCwa36hWeather(city, options = {}) {
   const target = options.target || 'now';
   const dayOffset = options.dayOffset ?? targetDayOffset(target);
   const useWeeklyDataset = target === 'week' || dayOffset >= 2;
-  const dataset = useWeeklyDataset ? 'F-C0032-005' : 'F-C0032-001';
+  const dataset = useWeeklyDataset ? 'F-C0032-003' : 'F-C0032-001';
   const url = new URL(useWeeklyDataset ? CWA_WEEKLY_ENDPOINT : CWA_36H_ENDPOINT);
   url.searchParams.set('Authorization', CWA_API_KEY);
   url.searchParams.set('format', 'JSON');
