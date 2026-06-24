@@ -304,7 +304,7 @@ export const botTools = [
   {
     type: "function",
     name: "get_latest_arxiv_papers",
-    description: "抓取最新計算機科學與工程相關 arXiv 論文，篩選最值得看的 5 到 8 篇，並產生繁體中文短摘要。",
+    description: "抓取論文摘要：第 1 篇固定為 Nature Communications RSS 首篇，其餘為最新計算機科學與工程相關 arXiv 論文；只提供 abstract 的繁體中文翻譯，以及原文與 PDF 連結。",
     parameters: {
       type: "object",
       properties: {

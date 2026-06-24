@@ -204,7 +204,7 @@ async function buildWeatherReminderMessage(reminder) {
 }
 
 /**
- * 建構 arXiv 論文提醒訊息
+ * 建構 Nature Communications + arXiv 論文提醒訊息
  * @param {object} reminder - 提醒物件
  * @returns {Promise<string>} 提醒訊息
  */
@@ -214,7 +214,7 @@ async function buildArxivPaperReminderMessage(reminder) {
     ? reminder.payload.categories
     : undefined;
   const digest = await buildLatestArxivPaperDigest({ max, categories });
-  return `最新 CS / Engineering 論文摘要\n${digest}`;
+  return `最新論文摘要（第 1 篇：Nature Communications）\n${digest}`;
 }
 
 async function buildTopHeadlinesReminderMessage(reminder) {
