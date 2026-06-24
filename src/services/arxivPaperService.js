@@ -284,9 +284,9 @@ async function createDigestResponse({ papers, normalizedMax, maxOutputTokens }) 
       "其餘候選為 arXiv 論文；請依既有偏好挑出足量論文，讓總數為指定篇數。",
       "最優先：程式語言（cs.PL）相關論文，例如型別系統、編譯器、程式分析、形式語義、程式驗證、合成、DSL。標記 [PRIORITY: Programming Languages] 的論文只要品質達標就應入選，至少保留 1～2 篇。",
       "次要偏好：新穎方法、強實驗、實用系統、重要基準、工程落地價值、AI/ML/系統/軟體工程/安全/人機互動相關性。",
-      "每篇只翻譯提供的 abstract 為繁體中文，不要自行摘要、評論、延伸、加入重點或翻譯標題。",
-      "若某篇沒有 Abstract，請寫「此篇未提供可翻譯的 abstract。」不得以標題、導語或猜測補寫。",
-      "每篇格式固定為：序號. 原標題\n中文 abstract：{繁體中文完整翻譯}\n原文：{Article URL}\nPDF：{PDF URL}。",
+      "每篇只翻譯提供的 abstract 為繁體中文，不要自行摘要、評論、延伸或加入重點。",
+      "若某篇沒有 Abstract，改為翻譯其 Title 為繁體中文；不得以導語或猜測補寫 abstract。",
+      "每篇格式固定為：有 Abstract 時為「序號. 原標題\n中文 abstract：{繁體中文完整翻譯}\n原文：{Article URL}\nPDF：{PDF URL}」；沒有 Abstract 時為「序號. 原標題\n中文標題：{繁體中文標題翻譯}\n原文：{Article URL}\nPDF：{PDF URL}」。",
       "最後加一行：資料來源：第 1 篇為 Nature Communications RSS 首篇；其餘為 arXiv submittedDate 排序。",
     ].join("\n"),
     input: [

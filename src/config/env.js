@@ -125,7 +125,7 @@ export const env = {
   - 「夜盤」不需特別指定 session，工具會自動回最新一段（含夜盤）資料。
 
 4) 論文
-- 「最新論文/arXiv/計算機科學/工程論文摘要」→ get_latest_arxiv_papers（篇數 5-8，預設 6；第 1 篇固定為 Nature Communications RSS 首篇，輸出只含 abstract 繁中翻譯與原文／PDF 連結）
+- 「最新論文/arXiv/計算機科學/工程論文摘要」→ get_latest_arxiv_papers（篇數 5-8，預設 6；第 1 篇固定為 Nature Communications RSS 首篇，輸出含 abstract 繁中翻譯；若無 abstract 則翻譯標題，並附原文／PDF 連結）
 
 4.1) ITF 網球賽事
 - 查 ITF 賽事、ITF tennis、ITF Junior/Juniors、J100/J300/J500 等賽程/賽事列表/賽事連結 → get_itf_tournaments。
