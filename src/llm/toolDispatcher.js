@@ -1,5 +1,6 @@
 import { createReminder, listReminders, deleteReminderByOwner } from "../services/reminderService.js";
 import { sendEmail } from "../services/emailService.js";
+import { normalizeEmailRecipients } from "../utils/emailRecipients.js";
 import { getNextReminderTime, normalizeReminderData, normalizeWeekDays } from "../services/reminderContentService.js";
 import { buildSessionKey } from "../services/conversationStateService.js";
 import { getTodayLinkFromSheet } from "../services/sheetLinkService.js";
@@ -461,7 +462,7 @@ export async function executeTool(name, args = {}, context = {}) {
         payload.bookName = book.name;
         payload.currentIndex = 0;
       }
-      const emailRecipient = String(args.emailRecipient || "").trim();
+      const emailRecipient = normalizeEmailRecipients(args.emailRecipient);
       if (emailRecipient) payload.emailRecipient = emailRecipient;
 
       const reminderData = normalizeReminderData({
@@ -1293,7 +1294,7 @@ export async function executeTool(name, args = {}, context = {}) {
     }
 
     case "send_email": {
-      const to = String(args.to || "").trim();
+      const to = normalizeEmailRecipients(args.to);
       const subject = String(args.subject || "").trim();
       const body = String(args.body || "").trim();
 

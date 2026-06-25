@@ -20,6 +20,7 @@ import { normalizeTeamsActivity, pushTeamsReminder, verifyTeamsRequest } from ".
 import { getDueReminders, deleteReminder, rescheduleReminder } from "./services/reminderService.js";
 import { buildReminderMessage, getNextReminderTime } from "./services/reminderContentService.js";
 import { sendEmail } from "./services/emailService.js";
+import { normalizeEmailRecipients } from "./utils/emailRecipients.js";
 
 const app = express();
 app.set("trust proxy", true);
@@ -209,7 +210,8 @@ function toMetaRecipientId(owner, platform) {
  * @returns {Promise<object>} 推送結果，包含 platform 和 targetId
  */
 async function pushReminder(owner, text, options = {}) {
-  const { emailRecipient, subject } = options;
+  const { subject } = options;
+  const emailRecipient = normalizeEmailRecipients(options.emailRecipient);
 
   if (emailRecipient) {
     await sendEmail({

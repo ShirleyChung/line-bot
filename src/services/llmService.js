@@ -11,6 +11,7 @@ import { env } from "../config/env.js";
 import { botTools } from "../llm/tools.js";
 import { executeTool } from "../llm/toolDispatcher.js";
 import { sendEmail } from "./emailService.js";
+import { normalizeEmailRecipients } from "../utils/emailRecipients.js";
 import { getUserMemory } from "./userMemoryService.js";
 import {
   buildSessionKey,
@@ -91,7 +92,7 @@ function parseToolArguments(argumentsText) {
 }
 
 async function deliverDirectResult(text, userText, context = {}) {
-  const emailRecipient = String(context.emailRecipient || "").trim();
+  const emailRecipient = normalizeEmailRecipients(context.emailRecipient);
   if (!emailRecipient) {
     return {
       type: "text",

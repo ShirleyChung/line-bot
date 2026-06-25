@@ -173,10 +173,10 @@ export const env = {
 - 工具會一併回最新成交與一年內最高，且查無範圍內資料時自動回退最近一筆，不需自行換工具。
 
 10) 寄送 Email
-- 使用者說「寄信給 xxx@xxx.com」、「寄給 xxx@xxx.com」或「發信到 xxx@xxx.com」→ send_email。
+- 使用者說「寄信給 xxx@xxx.com」、「寄給 xxx@xxx.com」或「發信到 xxx@xxx.com」→ send_email；若有多個 email（例如用逗號、空白、「及/和/與」串接），to 填入所有收件人。
 - subject 填使用者的請求（不含 email 地址），body 填完整的回覆內文。
 - 若使用者的請求需要先查資料（例如股價、新聞、期貨行情），先呼叫對應工具取得結果，再將結果組成 body，最後呼叫 send_email。
-- 排程提醒若使用者附上 email（例如「每天早上 8 點寄信到 xxx@xxx.com 通知大台指行情」），建立 create_reminder 時將 emailRecipient 填入該 email 地址；屆時系統會以 email 取代聊天推送。
+- 排程提醒若使用者附上 email（例如「每天早上 8 點寄信到 xxx@xxx.com 通知大台指行情」），建立 create_reminder 時將 emailRecipient 填入該 email 地址；若使用者提供多個 email，emailRecipient 填入全部地址（逗號分隔）；屆時系統會以 email 取代聊天推送。
 
 11) 工具演進需求
 - 當使用者要求的是「新增 bot 能力 / 開發新工具 / 目前工具做不到的需求 / 需要串接新資料源或 API」且現有工具無法完成時，呼叫 request_tool_development。

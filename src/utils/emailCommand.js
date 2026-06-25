@@ -1,4 +1,4 @@
-const EMAIL_ADDRESS_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+import { extractEmailRecipients, removeEmailRecipients } from "./emailRecipients.js";
 
 const EMAIL_COMMAND_PATTERNS = [
   /^寄信給\s*/u,
@@ -23,23 +23,21 @@ function stripLeadingEmailCommand(text) {
  * 解析「寄給 xxx@example.com 今天天氣」這類 email 指令。
  *
  * @param {string} text
- * @returns {{to:string, requestText:string, rewrittenPrompt:string}|null}
+ * @returns {{to:string, recipients:string[], requestText:string, rewrittenPrompt:string}|null}
  */
 export function parseEmailCommand(text) {
   const remainder = stripLeadingEmailCommand(text);
   if (!remainder) return null;
 
-  const match = remainder.match(EMAIL_ADDRESS_PATTERN);
-  if (!match) return null;
+  const recipients = extractEmailRecipients(remainder);
+  if (recipients.length === 0) return null;
 
-  const to = match[0].trim();
-  const requestText = remainder
-    .slice(match.index + match[0].length)
-    .replace(/^[\s,，:：\-]+/u, "")
-    .trim();
+  const to = recipients.join(", ");
+  const requestText = removeEmailRecipients(remainder);
 
   return {
     to,
+    recipients,
     requestText,
     rewrittenPrompt: requestText
       ? `請先處理這個請求，然後把完整結果寄到 ${to}：${requestText}`

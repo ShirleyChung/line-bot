@@ -137,7 +137,7 @@ export const botTools = [
         },
         emailRecipient: {
           type: "string",
-          description: "若希望以 email 取代聊天推送，填入收件人 email 地址，例如 user@example.com；否則填空字串。",
+          description: "若希望以 email 取代聊天推送，填入一個或多個收件人 email 地址，例如 user@example.com 或 a@example.com, b@example.com；否則填空字串。",
         },
       },
       required: ["target", "action", "time", "recurrence", "weekDays", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount", "newsQuery", "newsCount", "bibleBookName", "emailRecipient"],
@@ -154,7 +154,7 @@ export const botTools = [
       properties: {
         to: {
           type: "string",
-          description: "收件人 email 地址，例如 user@example.com",
+          description: "收件人 email 地址；可填多個地址，例如 user@example.com, team@example.com",
         },
         subject: {
           type: "string",
