@@ -117,7 +117,7 @@ export const botTools = [
         },
         paperCount: {
           type: "number",
-          description: "arXiv 論文摘要要挑選的篇數，建議 5 到 8；非論文提醒填 0。",
+          description: "論文摘要篇數；固定配方推送填 11；非論文提醒填 0。",
         },
         headlineCount: {
           type: "number",
@@ -304,13 +304,13 @@ export const botTools = [
   {
     type: "function",
     name: "get_latest_arxiv_papers",
-    description: "抓取論文摘要：第 1 篇固定為 Nature Communications RSS 首篇，其餘為最新計算機科學與工程相關 arXiv 論文；提供 abstract 的繁體中文翻譯，若未提供 abstract 則翻譯標題，並附原文與 PDF 連結。",
+    description: "抓取固定配方論文摘要：Nature Communications 1 篇、arXiv AI/IC-Design/FPGA/通訊/控制/Robotics/Computer-Architecture 各 1 篇、ChemRxiv 1 篇、臺灣博碩士論文知識加值系統國文 1 篇、DOAJ archaeology 1 篇；提供 abstract 的繁體中文翻譯，若未提供 abstract 則翻譯標題，並附原文與 PDF 連結。",
     parameters: {
       type: "object",
       properties: {
         max: {
           type: "number",
-          description: "要挑選幾篇論文，範圍 5 到 8；未指定時填 6。",
+          description: "固定配方論文篇數，填 11。",
         },
       },
       required: ["max"],

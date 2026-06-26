@@ -97,7 +97,7 @@ export const env = {
   - futures：台指期/大台/小台/微台/電子期/金融期/非金電/櫃買期等期貨行情提醒（commodity / contract）
   - watch_prices：自選股股價
   - today_link：今日/每日連結
-  - arxiv_papers：論文提醒（第 1 篇固定為 Nature Communications RSS 首篇，其餘為 arXiv；paperCount 預設 6，限制 5-8）
+  - arxiv_papers：論文提醒（固定 11 篇：Nature Communications 1 篇、arXiv AI/IC-Design/FPGA/通訊/控制/Robotics/Computer-Architecture 各 1 篇、ChemRxiv 1 篇、臺灣博碩士論文知識加值系統國文 1 篇、DOAJ archaeology 1 篇；paperCount 填 11）
   - top_headlines：使用者說「頭條/頭條新聞/今日頭條/重點新聞/CNN 頭條/新聞提醒/最新新聞/新聞通知」等未指定關鍵字時用，回傳當下綜合頭條（含 CNN、Reuters、Bloomberg、新華社、BBC；headlineCount 預設 10，限制 1-10）。例如「11:41 通知我頭條新聞」「每天早上 8 點給我今日頭條」「每天早上 8 點通知我新聞」
   - general_news：指定關鍵字的最新新聞提醒（newsQuery 填關鍵字如公司/產業/人物/事件，newsCount 預設 5，限制 1-10）。例如「每天早上 8 點通知我台積電的最新新聞」
   - 頭條類提醒切勿落入 generic：只要使用者要的是「頭條/新聞」就必須用 top_headlines / general_news 其中之一，讓系統在觸發當下即時抓取，不要建成純文字提醒；若沒有明確指定關鍵字，排程新聞優先用 top_headlines。
@@ -125,7 +125,7 @@ export const env = {
   - 「夜盤」不需特別指定 session，工具會自動回最新一段（含夜盤）資料。
 
 4) 論文
-- 「最新論文/arXiv/計算機科學/工程論文摘要」→ get_latest_arxiv_papers（篇數 5-8，預設 6；第 1 篇固定為 Nature Communications RSS 首篇，輸出含 abstract 繁中翻譯；若無 abstract 則翻譯標題，並附原文／PDF 連結）
+- 「最新論文/arXiv/計算機科學/工程論文摘要」→ get_latest_arxiv_papers（固定 11 篇；固定配方為 Nature Communications 1 篇、arXiv AI/IC-Design/FPGA/通訊/控制/Robotics/Computer-Architecture 各 1 篇、ChemRxiv 1 篇、臺灣博碩士論文知識加值系統國文 1 篇、DOAJ archaeology 1 篇；輸出含 abstract 繁中翻譯；若無 abstract 則翻譯標題，並附原文／PDF 連結）
 
 4.1) ITF 網球賽事
 - 查 ITF 賽事、ITF tennis、ITF Junior/Juniors、J100/J300/J500 等賽程/賽事列表/賽事連結 → get_itf_tournaments。

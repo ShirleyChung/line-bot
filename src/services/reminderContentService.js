@@ -204,17 +204,14 @@ async function buildWeatherReminderMessage(reminder) {
 }
 
 /**
- * 建構 Nature Communications + arXiv 論文提醒訊息
+ * 建構固定配方論文提醒訊息
  * @param {object} reminder - 提醒物件
  * @returns {Promise<string>} 提醒訊息
  */
 async function buildArxivPaperReminderMessage(reminder) {
-  const max = reminder.payload?.max || 6;
-  const categories = Array.isArray(reminder.payload?.categories)
-    ? reminder.payload.categories
-    : undefined;
-  const digest = await buildLatestArxivPaperDigest({ max, categories });
-  return `最新論文摘要（第 1 篇：Nature Communications）\n${digest}`;
+  const max = reminder.payload?.max || 11;
+  const digest = await buildLatestArxivPaperDigest({ max });
+  return `最新論文摘要（固定 11 篇來源配方）\n${digest}`;
 }
 
 async function buildTopHeadlinesReminderMessage(reminder) {

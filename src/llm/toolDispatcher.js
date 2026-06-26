@@ -445,7 +445,7 @@ export async function executeTool(name, args = {}, context = {}) {
       if (args.contract) payload.contract = args.contract;
       if (args.weatherTarget) payload.target = args.weatherTarget;
       if (reminderType === "arxiv_papers") {
-        payload.max = Math.min(Math.max(Number(args.paperCount) || 6, 5), 8);
+        payload.max = 11;
       }
       if (reminderType === "top_headlines") {
         payload.max = Math.min(Math.max(Number(args.headlineCount) || 10, 1), 10);
@@ -761,7 +761,7 @@ export async function executeTool(name, args = {}, context = {}) {
 
     case "get_latest_arxiv_papers": {
       const text = await buildLatestArxivPaperDigest({
-        max: args.max || 6,
+        max: args.max || 11,
       });
 
       return {
