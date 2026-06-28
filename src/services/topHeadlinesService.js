@@ -3,6 +3,7 @@
 // 不使用 Google News RSS，因其文章連結是不可逆的轉址 token，無法還原成原始媒體網址。
 import OpenAI from "openai";
 import { env } from "../config/env.js";
+import { isAllowedNewsArticle } from "../utils/newsFilter.js";
 
 const SOURCES = [
   { name: "CNN", url: "https://rss.cnn.com/rss/cnn_topstories.rss" },
@@ -61,6 +62,7 @@ function normalizeItem(itemXml, sourceName) {
   const title = extractTagContent(itemXml, "title");
   const url = extractTagContent(itemXml, "link");
   if (!title || !url) return null;
+  if (!isAllowedNewsArticle({ url })) return null;
 
   return {
     title,
@@ -238,6 +240,8 @@ function mergeHeadlines(items, max) {
   // 先依來源分組，各組內部新到舊排序。
   const groups = new Map();
   for (const item of items) {
+    if (!isAllowedNewsArticle(item)) continue;
+
     const urlKey = item.url.trim().replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
     const key = urlKey || item.title.trim().toLowerCase();
     if (seen.has(key)) continue;

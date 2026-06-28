@@ -1,3 +1,5 @@
+import { isAllowedNewsArticle } from "../utils/newsFilter.js";
+
 const NEWS_CACHE_TTL_MS = 10 * 60 * 1000;
 const newsCache = new Map();
 
@@ -74,6 +76,10 @@ function dedupeArticles(articles, max) {
   const result = [];
 
   for (const article of articles) {
+    if (!isAllowedNewsArticle(article)) {
+      continue;
+    }
+
     const titleKey = article.title.trim().toLowerCase();
     const urlKey = article.url.trim().replace(/^https?:\/\/(www\.)?/i, "");
     const key = urlKey || titleKey;

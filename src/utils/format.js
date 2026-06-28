@@ -1,6 +1,7 @@
 /**
  * 這裡放一些格式化相關的小工具
  */
+import { isAllowedNewsArticle } from "./newsFilter.js";
 
 /**
  * 將日期格式化成 M/D
@@ -343,7 +344,7 @@ export function buildFuturesQuoteMessage(quote, request = {}) {
 }
 
 export function buildNewsMessage(news, query = "") {
-  const items = Array.isArray(news) ? news : [];
+  const items = Array.isArray(news) ? news.filter(isAllowedNewsArticle) : [];
 
   if (items.length === 0) {
     return `目前查不到「${query}」相關新聞。`;
