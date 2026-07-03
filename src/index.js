@@ -272,6 +272,33 @@ async function pushReminder(owner, text, options = {}) {
   return { platform: "line", targetId };
 }
 
+async function pushWorldCupBroadcasts() {
+  const subscriptions = await listActiveTelegramBroadcasts();
+  if (!subscriptions.length) {
+    return { pushed: 0, subscriptions: 0 };
+  }
+
+  const broadcast = await buildWorldCupBroadcastText();
+  const now = new Date();
+  let pushed = 0;
+
+  for (const subscription of subscriptions) {
+    if (!shouldPushWorldCupBroadcast(subscription, broadcast.digest, now)) {
+      continue;
+    }
+
+    try {
+      await sendTelegramText(subscription.telegramChatId, broadcast.text);
+      await markBroadcastPushed(subscription.id, broadcast.digest);
+      pushed++;
+    } catch (error) {
+      console.error("[cron] worldcup broadcast push failed:", subscription.id, error);
+    }
+  }
+
+  return { pushed, subscriptions: subscriptions.length };
+}
+
 app.get("/cron/check-reminders", async (req, res) => {
   try {
     const now = new Date();
@@ -326,6 +353,13 @@ app.get("/cron/check-reminders", async (req, res) => {
       }
     }
 
+    try {
+      const worldCupResult = await pushWorldCupBroadcasts();
+      console.log("[cron] worldcup broadcasts:", worldCupResult);
+    } catch (err) {
+      console.error("[cron] worldcup broadcast failed:", err);
+    }
+
     res.send("ok");
   } catch (err) {
     console.error("[cron] error:", err);
@@ -335,30 +369,8 @@ app.get("/cron/check-reminders", async (req, res) => {
 
 app.get("/cron/check-worldcup-broadcasts", async (req, res) => {
   try {
-    const subscriptions = await listActiveTelegramBroadcasts();
-    if (!subscriptions.length) {
-      return res.send("ok");
-    }
-
-    const broadcast = await buildWorldCupBroadcastText();
-    const now = new Date();
-    let pushed = 0;
-
-    for (const subscription of subscriptions) {
-      if (!shouldPushWorldCupBroadcast(subscription, broadcast.digest, now)) {
-        continue;
-      }
-
-      try {
-        await sendTelegramText(subscription.telegramChatId, broadcast.text);
-        await markBroadcastPushed(subscription.id, broadcast.digest);
-        pushed++;
-      } catch (error) {
-        console.error("[cron] worldcup broadcast push failed:", subscription.id, error);
-      }
-    }
-
-    res.send(`ok pushed=${pushed}`);
+    const result = await pushWorldCupBroadcasts();
+    res.send(`ok pushed=${result.pushed} subscriptions=${result.subscriptions}`);
   } catch (error) {
     console.error("[cron] worldcup broadcast error:", error);
     res.status(500).send("error");
