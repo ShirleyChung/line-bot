@@ -32,6 +32,13 @@ export const env = {
   // ===== Finnhub (US Stock) =====
   FINNHUB_API_KEY: required("FINNHUB_API_KEY"),
 
+  // ===== Football live scores =====
+  FOOTBALL_DATA_API_KEY: process.env.FOOTBALL_DATA_API_KEY || "",
+  FOOTBALL_DATA_BASE_URL: process.env.FOOTBALL_DATA_BASE_URL || "https://api.football-data.org/v4",
+  FOOTBALL_WORLD_CUP_COMPETITION_CODE: process.env.FOOTBALL_WORLD_CUP_COMPETITION_CODE || "WC",
+  FOOTBALL_BROADCAST_POLL_MINUTES: Number(process.env.FOOTBALL_BROADCAST_POLL_MINUTES || 2),
+  FOOTBALL_BROADCAST_USE_LLM: process.env.FOOTBALL_BROADCAST_USE_LLM || "true",
+
   // ===== LINE =====
   LINE_CHANNEL_SECRET: required("LINE_CHANNEL_SECRET"),
   LINE_CHANNEL_ACCESS_TOKEN: required("LINE_CHANNEL_ACCESS_TOKEN"),

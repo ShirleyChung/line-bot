@@ -32,6 +32,7 @@ import {
 } from "../services/sessionStateService.js";
 import { handleWeatherMessage } from "../handlers/weatherHandler.js";
 import { handleNearbyFacilityMessage } from "../handlers/parkingHandler.js";
+import { handleWorldCupBroadcastMessage } from "../handlers/worldCupBroadcastHandler.js";
 import {
   isSorLogFileEvent,
   parseSorLogQuery,
@@ -140,6 +141,13 @@ export async function routeMessageEvent(event) {
 
     const handledByNearbyFacility = await handleNearbyFacilityMessage(event, userText || rawText);
     if (handledByNearbyFacility) return;
+
+    const handledByWorldCupBroadcast = await handleWorldCupBroadcastMessage(
+      event,
+      userText || rawText,
+      context
+    );
+    if (handledByWorldCupBroadcast) return;
 
     if (shouldHandleWebpageSummary(userText)) {
       return await handleWebpageSummary(event, userText);

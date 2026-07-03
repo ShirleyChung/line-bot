@@ -21,6 +21,12 @@ import { getDueReminders, deleteReminder, rescheduleReminder } from "./services/
 import { buildReminderMessage, getNextReminderTime } from "./services/reminderContentService.js";
 import { sendEmail } from "./services/emailService.js";
 import { normalizeEmailRecipients } from "./utils/emailRecipients.js";
+import {
+  buildWorldCupBroadcastText,
+  listActiveTelegramBroadcasts,
+  markBroadcastPushed,
+  shouldPushWorldCupBroadcast,
+} from "./services/worldCupBroadcastService.js";
 
 const app = express();
 app.set("trust proxy", true);
@@ -323,6 +329,38 @@ app.get("/cron/check-reminders", async (req, res) => {
     res.send("ok");
   } catch (err) {
     console.error("[cron] error:", err);
+    res.status(500).send("error");
+  }
+});
+
+app.get("/cron/check-worldcup-broadcasts", async (req, res) => {
+  try {
+    const subscriptions = await listActiveTelegramBroadcasts();
+    if (!subscriptions.length) {
+      return res.send("ok");
+    }
+
+    const broadcast = await buildWorldCupBroadcastText();
+    const now = new Date();
+    let pushed = 0;
+
+    for (const subscription of subscriptions) {
+      if (!shouldPushWorldCupBroadcast(subscription, broadcast.digest, now)) {
+        continue;
+      }
+
+      try {
+        await sendTelegramText(subscription.telegramChatId, broadcast.text);
+        await markBroadcastPushed(subscription.id, broadcast.digest);
+        pushed++;
+      } catch (error) {
+        console.error("[cron] worldcup broadcast push failed:", subscription.id, error);
+      }
+    }
+
+    res.send(`ok pushed=${pushed}`);
+  } catch (error) {
+    console.error("[cron] worldcup broadcast error:", error);
     res.status(500).send("error");
   }
 });
