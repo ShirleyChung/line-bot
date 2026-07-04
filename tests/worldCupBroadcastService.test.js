@@ -10,6 +10,7 @@ process.env.OPENAI_API_KEY ||= "x";
 process.env.FOOTBALL_BROADCAST_USE_LLM = "false";
 
 const service = await import("../src/services/worldCupBroadcastService.js");
+const { env } = await import("../src/config/env.js");
 
 test("world cup broadcast commands are recognized", () => {
   assert.equal(service.isWorldCupBroadcastStartCommand("我要看目前世足戰況"), true);
@@ -81,4 +82,58 @@ test("telegram broadcast push respects digest and poll interval", () => {
     }, "b", now),
     true,
   );
+});
+
+test("api-football empty live response falls back to football-data", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalApiFootballKey = env.API_FOOTBALL_KEY;
+  const originalFootballDataKey = env.FOOTBALL_DATA_API_KEY;
+  const requestedUrls = [];
+
+  env.API_FOOTBALL_KEY = "api-football-test-key";
+  env.FOOTBALL_DATA_API_KEY = "football-data-test-key";
+
+  globalThis.fetch = async (url) => {
+    const textUrl = String(url);
+    requestedUrls.push(textUrl);
+    if (textUrl.includes("live=all")) {
+      return {
+        ok: true,
+        json: async () => ({ response: [] }),
+      };
+    }
+    if (textUrl.includes("football-data.org")) {
+      return {
+        ok: true,
+        json: async () => ({
+          matches: [
+            {
+              id: 99,
+              utcDate: "2026-07-04T01:30:00Z",
+              status: "IN_PLAY",
+              minute: 45,
+              homeTeam: { shortName: "Colombia" },
+              awayTeam: { shortName: "Ghana" },
+              score: { fullTime: { home: 1, away: 0 } },
+            },
+          ],
+        }),
+      };
+    }
+    throw new Error(`unexpected url ${textUrl}`);
+  };
+
+  try {
+    const matches = await service.fetchWorldCupMatches(new Date("2026-07-04T02:00:00Z"));
+
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0].homeTeam.shortName, "Colombia");
+    assert.equal(matches[0].awayTeam.shortName, "Ghana");
+    assert.equal(requestedUrls.some((url) => url.includes("live=all")), true);
+    assert.equal(requestedUrls.some((url) => url.includes("football-data.org")), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    env.API_FOOTBALL_KEY = originalApiFootballKey;
+    env.FOOTBALL_DATA_API_KEY = originalFootballDataKey;
+  }
 });

@@ -348,10 +348,95 @@ async function fetchApiFootballWorldCupMatches(now = new Date()) {
   }));
 }
 
+function isWorldCupApiFootballFixture(fixture = {}) {
+  const leagueId = Number(fixture.league?.id || 0);
+  const leagueName = String(fixture.league?.name || "");
+  return leagueId === env.API_FOOTBALL_WORLD_CUP_LEAGUE_ID
+    || /world cup|fifa world cup|coupe du monde|copa mundial/i.test(leagueName);
+}
+
+async function fetchApiFootballLiveWorldCupMatches() {
+  const url = new URL(`${env.API_FOOTBALL_BASE_URL.replace(/\/+$/, "")}/fixtures`);
+  url.searchParams.set("live", "all");
+
+  let data;
+  try {
+    data = await fetchJson(url, {
+      "x-apisports-key": env.API_FOOTBALL_KEY,
+      "Accept": "application/json",
+    });
+  } catch (error) {
+    throw new Error(`取得世足即時戰況失敗：API-FOOTBALL live ${error.message}`);
+  }
+
+  const liveFixtures = (Array.isArray(data.response) ? data.response : [])
+    .filter(isWorldCupApiFootballFixture);
+
+  if (!liveFixtures.length) return [];
+
+  const fixturesById = new Map();
+  for (const fixture of liveFixtures) {
+    const id = String(fixture.fixture?.id || "");
+    if (id) fixturesById.set(id, fixture);
+  }
+
+  const matches = await fetchApiFootballWorldCupMatches();
+  const matchesById = new Map(matches.map((match) => [String(match.id), match]));
+
+  for (const [id, fixture] of fixturesById.entries()) {
+    if (matchesById.has(id)) continue;
+    const status = apiFootballStatus(fixture.fixture?.status);
+    let enriched = {
+      id,
+      provider: "api-football",
+      utcDate: fixture.fixture?.date || "",
+      status,
+      minute: fixture.fixture?.status?.elapsed ?? null,
+      injuryTime: fixture.fixture?.status?.extra ?? null,
+      stage: fixture.league?.round || "",
+      group: fixture.league?.round || "",
+      homeTeam: fixture.teams?.home || {},
+      awayTeam: fixture.teams?.away || {},
+      score: {
+        fullTime: {
+          home: fixture.goals?.home ?? 0,
+          away: fixture.goals?.away ?? 0,
+        },
+      },
+    };
+    try {
+      const [events, statistics] = await Promise.all([
+        fetchApiFootballDetail("/fixtures/events", id),
+        fetchApiFootballDetail("/fixtures/statistics", id),
+      ]);
+      enriched = {
+        ...enriched,
+        goals: events
+          .filter((event) => event.type === "Goal")
+          .map(normalizeApiFootballEvent),
+        bookings: events
+          .filter((event) => event.type === "Card")
+          .map(normalizeApiFootballEvent),
+        substitutions: events
+          .filter((event) => event.type === "subst")
+          .map(normalizeApiFootballEvent),
+        stats: normalizeApiFootballStatistics(statistics),
+      };
+    } catch (error) {
+      console.error("[worldCupBroadcast] API-FOOTBALL live detail failed:", id, error);
+    }
+    matchesById.set(id, enriched);
+  }
+
+  return Array.from(matchesById.values());
+}
+
 export async function fetchWorldCupMatches(now = new Date()) {
   if (env.API_FOOTBALL_KEY) {
     try {
-      return await fetchApiFootballWorldCupMatches(now);
+      const matches = await fetchApiFootballLiveWorldCupMatches();
+      if (matches.length) return matches;
+      console.warn("[worldCupBroadcast] API-FOOTBALL returned no World Cup matches, fallback to football-data");
     } catch (error) {
       if (!env.FOOTBALL_DATA_API_KEY) throw error;
       console.error("[worldCupBroadcast] API-FOOTBALL failed, fallback to football-data:", error);
