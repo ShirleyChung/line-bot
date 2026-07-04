@@ -42,16 +42,24 @@ test("snapshot formatter keeps score, minute and goal events", () => {
           minute: 49,
           team: { name: "Argentina" },
           scorer: { name: "Messi" },
+          assist: { name: "Di Maria" },
           type: "REGULAR",
         },
       ],
+      stats: {
+        shotsTotal: { home: "12", away: "8" },
+        shotsOnGoal: { home: "5", away: "3" },
+        fouls: { home: "10", away: "14" },
+        possession: { home: "56%", away: "44%" },
+      },
     },
   ], new Date("2026-07-03T12:30:00Z"));
 
   const text = service.formatWorldCupSnapshot(snapshot);
   assert.match(text, /世足即時戰況/);
   assert.match(text, /Argentina 2 - 1 Japan｜進行中｜52'/);
-  assert.match(text, /進球：49' Argentina Messi/);
+  assert.match(text, /進球：49' Argentina Messi（助攻：Di Maria）/);
+  assert.match(text, /數據：射門 12-8｜射正 5-3｜犯規 10-14｜控球 56%-44%/);
 });
 
 test("telegram broadcast push respects digest and poll interval", () => {

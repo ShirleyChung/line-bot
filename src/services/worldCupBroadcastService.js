@@ -5,6 +5,7 @@ import { env } from "../config/env.js";
 const SUBSCRIPTIONS_COLLECTION = "worldcup_broadcasts";
 const LIVE_STATUSES = new Set(["LIVE", "IN_PLAY", "PAUSED"]);
 const RECENT_STATUSES = new Set(["FINISHED", "IN_PLAY", "PAUSED", "LIVE"]);
+const API_FOOTBALL_LIVE_STATUS = new Set(["1H", "2H", "ET", "BT", "P", "LIVE"]);
 
 const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
@@ -62,8 +63,74 @@ function eventLine(event) {
   const minute = event.minute ? `${event.minute}'` : "";
   const team = event.team?.name ? ` ${event.team.name}` : "";
   const scorer = event.scorer?.name ? ` ${event.scorer.name}` : "";
+  const assist = event.assist?.name ? `（助攻：${event.assist.name}）` : "";
   const type = event.type && event.type !== "REGULAR" ? ` (${event.type})` : "";
-  return `${minute}${team}${scorer}${type}`.trim();
+  return `${minute}${team}${scorer}${assist}${type}`.trim();
+}
+
+function statValue(statistics = [], type) {
+  const item = statistics.find((entry) => entry.type === type);
+  if (!item) return null;
+  if (item.value === null || item.value === undefined) return null;
+  return String(item.value);
+}
+
+function apiFootballStatus(status = {}) {
+  const short = status.short || "";
+  if (API_FOOTBALL_LIVE_STATUS.has(short)) return "IN_PLAY";
+  if (short === "HT") return "PAUSED";
+  if (["FT", "AET", "PEN"].includes(short)) return "FINISHED";
+  if (["NS", "TBD"].includes(short)) return "TIMED";
+  if (short === "PST") return "POSTPONED";
+  if (["CANC", "ABD", "AWD", "WO"].includes(short)) return "CANCELLED";
+  return short || "";
+}
+
+function normalizeApiFootballEvent(event = {}) {
+  const minute = event.time?.elapsed || null;
+  return {
+    minute,
+    extraTime: event.time?.extra || null,
+    type: event.detail || event.type || "",
+    team: event.team || null,
+    scorer: event.player?.name ? event.player : null,
+    assist: event.assist?.name ? event.assist : null,
+  };
+}
+
+function normalizeApiFootballStatistics(statistics = []) {
+  const [home, away] = statistics || [];
+  if (!home || !away) return null;
+  return {
+    homeTeam: home.team?.name || "",
+    awayTeam: away.team?.name || "",
+    shotsTotal: {
+      home: statValue(home.statistics || [], "Total Shots"),
+      away: statValue(away.statistics || [], "Total Shots"),
+    },
+    shotsOnGoal: {
+      home: statValue(home.statistics || [], "Shots on Goal"),
+      away: statValue(away.statistics || [], "Shots on Goal"),
+    },
+    fouls: {
+      home: statValue(home.statistics || [], "Fouls"),
+      away: statValue(away.statistics || [], "Fouls"),
+    },
+    possession: {
+      home: statValue(home.statistics || [], "Ball Possession"),
+      away: statValue(away.statistics || [], "Ball Possession"),
+    },
+  };
+}
+
+function hasAnyStat(stats) {
+  if (!stats) return false;
+  return Boolean(
+    stats.shotsTotal?.home || stats.shotsTotal?.away ||
+    stats.shotsOnGoal?.home || stats.shotsOnGoal?.away ||
+    stats.fouls?.home || stats.fouls?.away ||
+    stats.possession?.home || stats.possession?.away
+  );
 }
 
 export function isWorldCupBroadcastStartCommand(text = "") {
@@ -170,7 +237,16 @@ export function shouldPushWorldCupBroadcast(subscription = {}, digest, now = new
   return now.getTime() - lastPushedAt.getTime() >= intervalMs;
 }
 
-export async function fetchWorldCupMatches(now = new Date()) {
+async function fetchJson(url, headers) {
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`${url} 回應 ${response.status} ${body.slice(0, 200)}`);
+  }
+  return response.json();
+}
+
+async function fetchFootballDataWorldCupMatches(now = new Date()) {
   if (!env.FOOTBALL_DATA_API_KEY) {
     throw new Error("尚未設定 FOOTBALL_DATA_API_KEY，無法取得世足即時戰況。請先申請 football-data.org API token 並設定環境變數。");
   }
@@ -181,20 +257,107 @@ export async function fetchWorldCupMatches(now = new Date()) {
   url.searchParams.set("dateFrom", getTaipeiDate(dateFrom));
   url.searchParams.set("dateTo", getTaipeiDate(dateTo));
 
-  const response = await fetch(url, {
-    headers: {
+  try {
+    const data = await fetchJson(url, {
       "X-Auth-Token": env.FOOTBALL_DATA_API_KEY,
       "Accept": "application/json",
-    },
-  });
+    });
+    return Array.isArray(data.matches) ? data.matches : [];
+  } catch (error) {
+    throw new Error(`取得世足戰況失敗：football-data.org ${error.message}`);
+  }
+}
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`取得世足戰況失敗：football-data.org 回應 ${response.status} ${body.slice(0, 200)}`);
+async function fetchApiFootballDetail(path, fixtureId) {
+  const url = new URL(`${env.API_FOOTBALL_BASE_URL.replace(/\/+$/, "")}${path}`);
+  url.searchParams.set("fixture", fixtureId);
+  const data = await fetchJson(url, {
+    "x-apisports-key": env.API_FOOTBALL_KEY,
+    "Accept": "application/json",
+  });
+  return Array.isArray(data.response) ? data.response : [];
+}
+
+async function fetchApiFootballWorldCupMatches(now = new Date()) {
+  const url = new URL(`${env.API_FOOTBALL_BASE_URL.replace(/\/+$/, "")}/fixtures`);
+  const dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const dateTo = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  url.searchParams.set("league", String(env.API_FOOTBALL_WORLD_CUP_LEAGUE_ID));
+  url.searchParams.set("season", String(env.API_FOOTBALL_WORLD_CUP_SEASON));
+  url.searchParams.set("from", getTaipeiDate(dateFrom));
+  url.searchParams.set("to", getTaipeiDate(dateTo));
+
+  let data;
+  try {
+    data = await fetchJson(url, {
+      "x-apisports-key": env.API_FOOTBALL_KEY,
+      "Accept": "application/json",
+    });
+  } catch (error) {
+    throw new Error(`取得世足戰況失敗：API-FOOTBALL ${error.message}`);
   }
 
-  const data = await response.json();
-  return Array.isArray(data.matches) ? data.matches : [];
+  const rawFixtures = Array.isArray(data.response) ? data.response : [];
+  const baseMatches = rawFixtures.map((fixture) => {
+    const status = apiFootballStatus(fixture.fixture?.status);
+    return {
+      id: String(fixture.fixture?.id || ""),
+      provider: "api-football",
+      utcDate: fixture.fixture?.date || "",
+      status,
+      minute: fixture.fixture?.status?.elapsed ?? null,
+      injuryTime: fixture.fixture?.status?.extra ?? null,
+      stage: fixture.league?.round || "",
+      group: fixture.league?.round || "",
+      homeTeam: fixture.teams?.home || {},
+      awayTeam: fixture.teams?.away || {},
+      score: {
+        fullTime: {
+          home: fixture.goals?.home ?? 0,
+          away: fixture.goals?.away ?? 0,
+        },
+      },
+    };
+  });
+  const relevantIds = new Set(selectRelevantMatches(baseMatches).map((match) => match.id));
+
+  return Promise.all(baseMatches.map(async (match) => {
+    if (!relevantIds.has(match.id)) return match;
+    try {
+      const [events, statistics] = await Promise.all([
+        fetchApiFootballDetail("/fixtures/events", match.id),
+        fetchApiFootballDetail("/fixtures/statistics", match.id),
+      ]);
+      return {
+        ...match,
+        goals: events
+          .filter((event) => event.type === "Goal")
+          .map(normalizeApiFootballEvent),
+        bookings: events
+          .filter((event) => event.type === "Card")
+          .map(normalizeApiFootballEvent),
+        substitutions: events
+          .filter((event) => event.type === "subst")
+          .map(normalizeApiFootballEvent),
+        stats: normalizeApiFootballStatistics(statistics),
+      };
+    } catch (error) {
+      console.error("[worldCupBroadcast] API-FOOTBALL detail failed:", match.id, error);
+      return match;
+    }
+  }));
+}
+
+export async function fetchWorldCupMatches(now = new Date()) {
+  if (env.API_FOOTBALL_KEY) {
+    try {
+      return await fetchApiFootballWorldCupMatches(now);
+    } catch (error) {
+      if (!env.FOOTBALL_DATA_API_KEY) throw error;
+      console.error("[worldCupBroadcast] API-FOOTBALL failed, fallback to football-data:", error);
+    }
+  }
+  return fetchFootballDataWorldCupMatches(now);
 }
 
 export function selectRelevantMatches(matches = []) {
@@ -236,6 +399,7 @@ export function buildWorldCupSnapshot(matches = [], now = new Date()) {
         goals: (match.goals || []).map(eventLine).filter(Boolean).slice(-6),
         bookings: (match.bookings || []).map(eventLine).filter(Boolean).slice(-4),
         substitutions: (match.substitutions || []).map(eventLine).filter(Boolean).slice(-4),
+        stats: hasAnyStat(match.stats) ? match.stats : null,
       };
     }),
   };
@@ -252,7 +416,13 @@ export function snapshotDigest(snapshot = {}) {
     goals: match.goals,
     bookings: match.bookings,
     substitutions: match.substitutions,
+    stats: match.stats,
   })));
+}
+
+function statPair(label, pair) {
+  if (!pair?.home && !pair?.away) return "";
+  return `${label} ${pair.home ?? "-"}-${pair.away ?? "-"}`;
 }
 
 export function formatWorldCupSnapshot(snapshot = {}) {
@@ -273,6 +443,15 @@ export function formatWorldCupSnapshot(snapshot = {}) {
     if (match.bookings.length) {
       lines.push(`牌證：${match.bookings.join("；")}`);
     }
+    if (match.stats) {
+      const stats = [
+        statPair("射門", match.stats.shotsTotal),
+        statPair("射正", match.stats.shotsOnGoal),
+        statPair("犯規", match.stats.fouls),
+        statPair("控球", match.stats.possession),
+      ].filter(Boolean);
+      if (stats.length) lines.push(`數據：${stats.join("｜")}`);
+    }
   }
 
   return lines.join("\n");
@@ -286,7 +465,7 @@ async function summarizeWithLlm(snapshot) {
   const response = await client.responses.create({
     model: env.OPENAI_MODEL,
     max_output_tokens: 700,
-    instructions: "你是即時足球文字主播。請把提供的 JSON 戰況改寫成繁體中文播報，保留比分、分鐘、進球、牌證與狀態；不要新增資料，不要猜測。語氣精準、短句、有臨場感，最多 8 行。",
+    instructions: "你是即時足球文字主播。請把提供的 JSON 戰況改寫成繁體中文播報，保留比分、分鐘、進球者、助攻、牌證、射門、射正、犯規、控球與狀態；不要新增資料，不要猜測。語氣精準、短句、有臨場感，最多 10 行。",
     input: JSON.stringify(snapshot),
   });
 
