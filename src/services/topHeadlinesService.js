@@ -9,13 +9,15 @@ const SOURCES = [
   { name: "CNN", url: "https://rss.cnn.com/rss/cnn_topstories.rss" },
   { name: "Reuters", url: "https://feeds.feedburner.com/Reuters/topNews" },
   { name: "Bloomberg", url: "https://feeds.bloomberg.com/markets/news.rss" },
-  { name: "新華社", url: "http://www.xinhuanet.com/english/rss/worldrss.xml" },
+  { name: "新華社", url: "https://english.news.cn/world/index.htm", type: "xinhuaWorldPage" },
   { name: "BBC", url: "https://feeds.bbci.co.uk/news/rss.xml" },
 ];
 const TOP_HEADLINES_CACHE_TTL_MS = 10 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_PER_SOURCE = 2;
 const MAX_HEADLINES = 10;
+const MAX_HEADLINE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_HEADLINE_FUTURE_SKEW_MS = 6 * 60 * 60 * 1000;
 const MIN_HEADLINE_OUTPUT_TOKENS = 3000;
 const RETRY_HEADLINE_OUTPUT_TOKENS = 4500;
 const RSS_HEADERS = {
@@ -58,6 +60,29 @@ function toIso(pubDate) {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }
 
+function toIsoWithTaipeiOffset(value) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) return toIso(normalized);
+  const [, year, month, day, hour, minute, second = "00"] = match;
+  return toIso(`${year}-${month}-${day}T${hour}:${minute}:${second}+08:00`);
+}
+
+function isRecentHeadlineDate(publishedAt, now = Date.now()) {
+  if (!publishedAt) return true;
+  const time = Date.parse(publishedAt);
+  if (Number.isNaN(time)) return true;
+  return now - time <= MAX_HEADLINE_AGE_MS && time - now <= MAX_HEADLINE_FUTURE_SKEW_MS;
+}
+
+function resolveNewsUrl(value, baseUrl) {
+  try {
+    return new URL(String(value || "").trim(), baseUrl).href;
+  } catch {
+    return "";
+  }
+}
+
 function normalizeItem(itemXml, sourceName) {
   const title = extractTagContent(itemXml, "title");
   const url = extractTagContent(itemXml, "link");
@@ -76,6 +101,30 @@ function normalizeItem(itemXml, sourceName) {
     source: sourceName,
     provider: `${sourceName} RSS`,
   };
+}
+
+export function parseXinhuaWorldPageItems(html, sourceName = "新華社") {
+  const items = [];
+  const itemRegex =
+    /<div class="item(?:\s+item-pic)?">[\s\S]*?<div class="tit"><a href="([^"]+)"[^>]*>([\s\S]*?)<\/a><span class="time">([^<]+)<\/span>/gi;
+
+  for (const match of String(html || "").matchAll(itemRegex)) {
+    const [, href, rawTitle, rawTime] = match;
+    const title = decodeHtmlEntities(rawTitle.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+    const url = resolveNewsUrl(href, "https://english.news.cn/world/index.htm");
+    if (!title || !url || !isAllowedNewsArticle({ url })) continue;
+
+    items.push({
+      title,
+      url,
+      publishedAt: toIsoWithTaipeiOffset(rawTime),
+      description: "",
+      source: sourceName,
+      provider: `${sourceName} World`,
+    });
+  }
+
+  return items;
 }
 
 async function fetchText(url) {
@@ -98,8 +147,12 @@ async function fetchText(url) {
   }
 }
 
-async function fetchSource({ name, url }) {
+async function fetchSource({ name, url, type }) {
   const xml = await fetchText(url);
+  if (type === "xinhuaWorldPage") {
+    return parseXinhuaWorldPageItems(xml, name);
+  }
+
   const itemMatches = String(xml || "").match(/<item\b[\s\S]*?<\/item>/gi) || [];
   return itemMatches
     .map((itemXml) => normalizeItem(itemXml, name))
@@ -234,13 +287,14 @@ function recencyDesc(a, b) {
   return tb - ta;
 }
 
-function mergeHeadlines(items, max) {
+export function mergeHeadlines(items, max) {
   const seen = new Set();
 
   // 先依來源分組，各組內部新到舊排序。
   const groups = new Map();
   for (const item of items) {
     if (!isAllowedNewsArticle(item)) continue;
+    if (!isRecentHeadlineDate(item.publishedAt)) continue;
 
     const urlKey = item.url.trim().replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
     const key = urlKey || item.title.trim().toLowerCase();
