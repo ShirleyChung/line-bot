@@ -91,6 +91,21 @@ for (const book of BOOKS) {
   }
 }
 
+const FALLBACK_RANDOM_VERSES = [
+  { bookNo: 43, chapter: 3, verse: 16, text: "神愛世人，甚至將祂的獨生子賜給他們，叫一切信入祂的，不至滅亡，反得永遠的生命。" },
+  { bookNo: 19, chapter: 23, verse: 1, text: "耶和華是我的牧者；我必不至缺乏。" },
+  { bookNo: 19, chapter: 119, verse: 105, text: "你的話是我腳前的燈，是我路上的光。" },
+  { bookNo: 20, chapter: 3, verse: 5, text: "你要全心信靠耶和華，不可倚靠自己的聰明。" },
+  { bookNo: 23, chapter: 40, verse: 31, text: "但那等候耶和華的必重新得力；他們必如鷹展翅上騰。" },
+  { bookNo: 40, chapter: 11, verse: 28, text: "凡勞苦擔重擔的，可以到我這裡來，我必使你們得安息。" },
+  { bookNo: 45, chapter: 8, verse: 28, text: "萬有都互相效力，叫愛神的人得益處，就是按祂旨意被召的人。" },
+  { bookNo: 50, chapter: 4, verse: 6, text: "應當一無罣慮，只要凡事藉著禱告、祈求，帶著感謝，將你們所要的告訴神。" },
+  { bookNo: 50, chapter: 4, verse: 13, text: "我在那加我能力者的裡面，凡事都能作。" },
+  { bookNo: 58, chapter: 11, verse: 1, text: "信就是所望之事的質實，是未見之事的確證。" },
+  { bookNo: 60, chapter: 5, verse: 7, text: "你們要將一切的憂慮卸給神，因為祂顧念你們。" },
+  { bookNo: 66, chapter: 21, verse: 4, text: "神要從他們眼中擦去一切的眼淚，不再有死亡，也不再有悲哀、哭號、疼痛。" },
+];
+
 function normalizeBookAlias(value = "") {
   return String(value)
     .toLowerCase()
@@ -446,13 +461,18 @@ function buildVerseReplyText(reference, verses) {
   return lines.join("\n");
 }
 
-function buildRandomVerseReply(reference, verseText, sourceUrl) {
-  return [
+function buildRandomVerseReply(reference, verseText, sourceUrl, options = {}) {
+  const lines = [
     `今日經節 ${reference.displayRef}`,
     `${reference.displayRef} ${verseText}`,
-    "",
-    `來源：${sourceUrl}`,
-  ].join("\n");
+  ];
+
+  if (options.notice) {
+    lines.push("", options.notice);
+  }
+
+  lines.push("", `來源：${sourceUrl}`);
+  return lines.join("\n");
 }
 
 function buildKeywordVerseReply(keyword, rows) {
@@ -779,10 +799,44 @@ export async function getRandomRecoveryBibleVerse(options = {}) {
   }
 
   if (lastError) {
-    throw new Error(`隨機挑選經節失敗：${lastError.message}`);
+    return buildFallbackRandomBibleVerse(lastError);
   }
 
-  throw new Error("暫時找不到可用的隨機經節，請稍後再試");
+  return buildFallbackRandomBibleVerse();
+}
+
+function buildFallbackRandomBibleVerse(error = null) {
+  if (error) {
+    console.warn("recovery bible random verse fallback:", error.message);
+  }
+
+  const item = FALLBACK_RANDOM_VERSES[Math.floor(Math.random() * FALLBACK_RANDOM_VERSES.length)];
+  const book = BOOK_BY_NO.get(item.bookNo);
+  const displayRef = `${book.shortName}${item.chapter}:${item.verse}`;
+  const sourceUrl = buildRecoveryUrl("read_01.php", {
+    KB: `${item.bookNo}_${item.chapter}_${item.verse}`,
+  });
+  const notice = "恢復本網站暫時無法提供隨機經節，先提供本地備援經節。";
+
+  return {
+    ok: true,
+    mode: "fallback_random",
+    fallback: true,
+    reference: {
+      book,
+      chapter: item.chapter,
+      verseStart: item.verse,
+      verseEnd: item.verse,
+      displayRef,
+    },
+    verse: {
+      verse: item.verse,
+      text: item.text,
+      noteRefs: [],
+    },
+    sourceUrl,
+    replyText: buildRandomVerseReply({ displayRef }, item.text, sourceUrl, { notice }),
+  };
 }
 
 export async function queryRecoveryBibleVerses(query, options = {}) {
