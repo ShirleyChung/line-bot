@@ -259,8 +259,9 @@ function formatParkingToolReply(locationQuery, result) {
       `距離：約 ${formatDistance(place.distanceMeters)}`
     );
 
-    if (place.googleMapsUri) {
-      lines.push(`地圖：${place.googleMapsUri}`);
+    const mapUri = getPlaceMapUri(place);
+    if (mapUri) {
+      lines.push(`地圖：${mapUri}`);
     }
 
     if (index !== result.parkingLots.length - 1) {
@@ -269,6 +270,10 @@ function formatParkingToolReply(locationQuery, result) {
   }
 
   return lines.join("\n");
+}
+
+function getPlaceMapUri(place) {
+  return place.mapUri || place.googleMapsUri || "";
 }
 
 function formatNearbyFacilityToolReply(locationQuery, facilityQuery, result) {
@@ -296,8 +301,9 @@ function formatNearbyFacilityToolReply(locationQuery, facilityQuery, result) {
       lines.push(`評分：${place.rating}${count}`);
     }
 
-    if (place.googleMapsUri) {
-      lines.push(`地圖：${place.googleMapsUri}`);
+    const mapUri = getPlaceMapUri(place);
+    if (mapUri) {
+      lines.push(`地圖：${mapUri}`);
     }
 
     if (index !== result.facilities.length - 1) {
@@ -1180,8 +1186,9 @@ export async function executeTool(name, args = {}, context = {}) {
             lines.push(`   評分：${landmark.rating}${count}`);
           }
           
-          if (landmark.googleMapsUri) {
-            lines.push(`   地圖：${landmark.googleMapsUri}`);
+          const mapUri = getPlaceMapUri(landmark);
+          if (mapUri) {
+            lines.push(`   地圖：${mapUri}`);
           }
           
           if (index !== result.landmarks.length - 1) {
@@ -1266,8 +1273,9 @@ export async function executeTool(name, args = {}, context = {}) {
             lines.push(`   評分：${facility.rating}${count}`);
           }
           
-          if (facility.googleMapsUri) {
-            lines.push(`   地圖：${facility.googleMapsUri}`);
+          const mapUri = getPlaceMapUri(facility);
+          if (mapUri) {
+            lines.push(`   地圖：${mapUri}`);
           }
           
           if (index !== result.facilities.length - 1) {

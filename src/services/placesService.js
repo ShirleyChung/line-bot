@@ -4,6 +4,8 @@ const GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json";
 const PLACES_NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby";
 const PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 const DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json";
+const AMAP_GEOCODING_URL = "https://restapi.amap.com/v3/geocode/geo";
+const AMAP_PLACE_AROUND_URL = "https://restapi.amap.com/v3/place/around";
 const DEFAULT_RADIUS_METERS = 1000;
 const DEFAULT_LIMIT = 5;
 const LODGING_RADIUS_METERS = 2000;
@@ -23,6 +25,20 @@ function getGoogleMapsApiKey() {
   return apiKey;
 }
 
+function getAmapApiKey() {
+  const apiKey = env.AMAP_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("大陸地區地點查詢需要設定 AMAP_API_KEY 環境變數");
+  }
+
+  return apiKey;
+}
+
+function hasAmapApiKey() {
+  return Boolean(env.AMAP_API_KEY);
+}
+
 async function fetchJson(url, options = {}) {
   const res = await fetch(url, options);
   const text = await res.text();
@@ -36,6 +52,82 @@ async function fetchJson(url, options = {}) {
   } catch (err) {
     throw new Error(`Google Maps API 回傳內容不是 JSON：${text.slice(0, 300)}`);
   }
+}
+
+async function fetchAmapJson(url) {
+  const json = await fetchJson(url);
+
+  if (json.status !== "1") {
+    throw new Error(`高德地圖 API 查詢失敗：${json.info || "未知錯誤"}`);
+  }
+
+  return json;
+}
+
+function parseAmapLocation(location) {
+  const [lngText, latText] = String(location || "").split(",");
+  const lng = Number(lngText);
+  const lat = Number(latText);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return { lat, lng };
+}
+
+function normalizeAmapText(value) {
+  return String(value || "")
+    .replace(/臺/g, "台")
+    .replace(/體/g, "体")
+    .replace(/館/g, "馆")
+    .replace(/場/g, "场")
+    .replace(/園/g, "园")
+    .replace(/區/g, "区")
+    .replace(/縣/g, "县")
+    .replace(/鄉/g, "乡")
+    .replace(/鎮/g, "镇")
+    .replace(/廣/g, "广")
+    .replace(/連/g, "连")
+    .replace(/陽/g, "阳")
+    .replace(/飯店/g, "酒店")
+    .replace(/旅館/g, "旅馆")
+    .replace(/餐廳/g, "餐厅")
+    .replace(/停車/g, "停车")
+    .trim();
+}
+
+function buildAmapMarkerUri(place) {
+  if (!Number.isFinite(place?.lat) || !Number.isFinite(place?.lng)) return "";
+  const position = `${place.lng},${place.lat}`;
+  const name = encodeURIComponent(place.name || "地點");
+  return `https://uri.amap.com/marker?position=${position}&name=${name}`;
+}
+
+function buildAmapFacilityKeyword(facility) {
+  const text = normalizeAmapText(facility);
+
+  if (/(住宿|酒店|宾馆|旅馆|旅店|旅社|民宿|hotel|lodging)/i.test(text)) return "酒店";
+  if (/(停车场|停车位|停车|parking)/i.test(text)) return "停车场";
+
+  return text;
+}
+
+function isMainlandChinaGoogleResult(result) {
+  const components = result?.address_components || [];
+  const country = components.find((component) => component.types?.includes("country"));
+  const countryCode = country?.short_name || "";
+
+  if (countryCode !== "CN") return false;
+
+  const formatted = result?.formatted_address || "";
+  const adminText = components
+    .map((component) => component.long_name || component.short_name || "")
+    .join(" ");
+
+  return !/(香港|Hong Kong|澳門|澳门|Macau|臺灣|台灣|Taiwan)/i.test(
+    `${formatted} ${adminText}`
+  );
 }
 
 async function geocodePlace(query) {
@@ -64,6 +156,31 @@ async function geocodePlace(query) {
     name: result.formatted_address || query,
     lat: location.lat,
     lng: location.lng,
+    provider: "google",
+    isMainlandChina: isMainlandChinaGoogleResult(result),
+  };
+}
+
+async function geocodeAmapPlace(query) {
+  const apiKey = getAmapApiKey();
+  const url = new URL(AMAP_GEOCODING_URL);
+
+  url.searchParams.set("address", normalizeAmapText(query));
+  url.searchParams.set("key", apiKey);
+
+  const json = await fetchAmapJson(url);
+  const geocode = json.geocodes?.[0];
+  const location = parseAmapLocation(geocode?.location);
+
+  if (!location) {
+    return null;
+  }
+
+  return {
+    name: geocode.formatted_address || query,
+    lat: location.lat,
+    lng: location.lng,
+    provider: "amap",
   };
 }
 
@@ -207,6 +324,8 @@ function normalizeParkingPlaces(places, origin, radiusMeters, limit) {
         name: place.displayName?.text || "未命名停車場",
         address: place.formattedAddress || "地址未提供",
         distanceMeters: distance,
+        mapProvider: "google",
+        mapUri: place.googleMapsUri || "",
         googleMapsUri: place.googleMapsUri || "",
         businessStatus: place.businessStatus || "",
       };
@@ -222,6 +341,136 @@ function normalizeParkingPlaces(places, origin, radiusMeters, limit) {
       return (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity);
     })
     .slice(0, limit);
+}
+
+async function searchAmapNearby({ origin, keywords, radiusMeters, limit }) {
+  const apiKey = getAmapApiKey();
+  const url = new URL(AMAP_PLACE_AROUND_URL);
+
+  url.searchParams.set("key", apiKey);
+  url.searchParams.set("location", `${origin.lng},${origin.lat}`);
+  url.searchParams.set("keywords", normalizeAmapText(keywords));
+  url.searchParams.set("radius", String(radiusMeters));
+  url.searchParams.set("offset", String(Math.min(Math.max(limit, 1), 25)));
+  url.searchParams.set("page", "1");
+  url.searchParams.set("extensions", "all");
+
+  const json = await fetchAmapJson(url);
+  return json.pois || [];
+}
+
+function normalizeAmapPlaces(places, origin, radiusMeters, limit, fallbackName) {
+  return places
+    .map((place) => {
+      const location = parseAmapLocation(place.location);
+      const distance = Number(place.distance);
+      const address = Array.isArray(place.address) ? "" : place.address;
+      const normalized = {
+        name: place.name || `未命名${fallbackName}`,
+        address: address || "地址未提供",
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
+        distanceMeters: Number.isFinite(distance)
+          ? distance
+          : location
+            ? distanceMeters(origin, location)
+            : null,
+        mapProvider: "amap",
+        businessStatus: "",
+        rating: Number.isFinite(Number(place.biz_ext?.rating)) ? Number(place.biz_ext.rating) : null,
+        userRatingCount: null,
+      };
+
+      return {
+        ...normalized,
+        mapUri: buildAmapMarkerUri(normalized),
+        googleMapsUri: "",
+      };
+    })
+    .filter((place) => (place.distanceMeters ?? Infinity) <= radiusMeters)
+    .slice(0, limit);
+}
+
+async function findNearbyParkingWithAmap(locationQuery, googleOrigin, options) {
+  const radiusMeters = options.radiusMeters || DEFAULT_RADIUS_METERS;
+  const limit = options.limit || DEFAULT_LIMIT;
+  const origin = await geocodeAmapPlace(locationQuery);
+
+  if (!origin) {
+    return {
+      ok: false,
+      reason: "location_not_found",
+      message: `找不到「${locationQuery}」的位置，請提供更完整的地點或地址。`,
+    };
+  }
+
+  const places = await searchAmapNearby({
+    origin,
+    keywords: "停车场",
+    radiusMeters,
+    limit: Math.min(Math.max(limit * 2, 5), 20),
+  });
+
+  const parkingLots = normalizeAmapPlaces(places, origin, radiusMeters, limit, "停車場")
+    .filter((place) => !isProbablyPrivateParking(place))
+    .sort((a, b) => {
+      const preferenceDiff = parkingPreferenceScore(a) - parkingPreferenceScore(b);
+      if (preferenceDiff !== 0) return preferenceDiff;
+      return (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity);
+    })
+    .slice(0, limit);
+
+  return {
+    ok: true,
+    origin: {
+      ...origin,
+      detectedByGoogle: googleOrigin,
+    },
+    radiusMeters,
+    mapProvider: "amap",
+    parkingLots,
+  };
+}
+
+async function findNearbyFacilitiesWithAmap(locationQuery, facility, googleOrigin, options) {
+  const isLodging = isLodgingFacilityQuery(facility);
+  const requestedRadiusMeters = Number(options.radiusMeters) || 0;
+  const radiusMeters = isLodging
+    ? Math.max(requestedRadiusMeters || LODGING_RADIUS_METERS, LODGING_RADIUS_METERS)
+    : requestedRadiusMeters || DEFAULT_RADIUS_METERS;
+  const limit = options.limit || DEFAULT_LIMIT;
+  const origin = await geocodeAmapPlace(locationQuery);
+
+  if (!origin) {
+    return {
+      ok: false,
+      reason: "location_not_found",
+      message: `找不到「${locationQuery}」的位置，請提供更完整的地點或地址。`,
+    };
+  }
+
+  const places = await searchAmapNearby({
+    origin,
+    keywords: buildAmapFacilityKeyword(facility),
+    radiusMeters,
+    limit: isLodging ? Math.min(Math.max(limit * 3, 10), 20) : limit,
+  });
+
+  const facilities = normalizeAmapPlaces(places, origin, radiusMeters, limit, facility)
+    .sort((a, b) => compareFacilities(a, b, isLodging))
+    .slice(0, limit);
+
+  return {
+    ok: true,
+    origin: {
+      ...origin,
+      detectedByGoogle: googleOrigin,
+    },
+    radiusMeters,
+    facility,
+    mapProvider: "amap",
+    facilities,
+  };
 }
 
 function compareFacilities(a, b, isLodging) {
@@ -265,6 +514,10 @@ export async function findNearbyParking(locationQuery, options = {}) {
       reason: "location_not_found",
       message: `找不到「${locationQuery}」的位置，請提供更完整的地點或地址。`,
     };
+  }
+
+  if (origin.isMainlandChina && hasAmapApiKey()) {
+    return findNearbyParkingWithAmap(locationQuery, origin, { radiusMeters, limit });
   }
 
   const textPlaces = await searchNearbyParkingByText({
@@ -317,6 +570,13 @@ export async function findNearbyFacilities(locationQuery, facilityQuery, options
     };
   }
 
+  if (origin.isMainlandChina && hasAmapApiKey()) {
+    return findNearbyFacilitiesWithAmap(locationQuery, facility, origin, {
+      radiusMeters,
+      limit,
+    });
+  }
+
   const places = await searchNearbyByText({
     locationQuery,
     facilityQuery: facility,
@@ -340,6 +600,8 @@ export async function findNearbyFacilities(locationQuery, facilityQuery, options
         name: place.displayName?.text || `未命名${facility}`,
         address: place.formattedAddress || "地址未提供",
         distanceMeters: distance,
+        mapProvider: "google",
+        mapUri: place.googleMapsUri || "",
         googleMapsUri: place.googleMapsUri || "",
         businessStatus: place.businessStatus || "",
         rating: Number.isFinite(place.rating) ? place.rating : null,

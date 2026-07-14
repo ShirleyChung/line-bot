@@ -60,6 +60,10 @@ function cleanupFacility(facility) {
     .trim();
 }
 
+function getMapUri(place) {
+  return place.mapUri || place.googleMapsUri || "";
+}
+
 export function isNearbyFacilityIntent(text) {
   const value = String(text || "").trim();
   if (isItfTournamentQuery(value)) return false;
@@ -120,8 +124,9 @@ export function formatParkingReply(locationQuery, result) {
       `距離：約 ${formatDistance(place.distanceMeters)}`
     );
 
-    if (place.googleMapsUri) {
-      lines.push(`地圖：${place.googleMapsUri}`);
+    const mapUri = getMapUri(place);
+    if (mapUri) {
+      lines.push(`地圖：${mapUri}`);
     }
 
     if (index !== result.parkingLots.length - 1) {
@@ -157,8 +162,9 @@ export function formatNearbyFacilityReply(locationQuery, facilityQuery, result) 
       lines.push(`評分：${place.rating}${count}`);
     }
 
-    if (place.googleMapsUri) {
-      lines.push(`地圖：${place.googleMapsUri}`);
+    const mapUri = getMapUri(place);
+    if (mapUri) {
+      lines.push(`地圖：${mapUri}`);
     }
 
     if (index !== result.facilities.length - 1) {

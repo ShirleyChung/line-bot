@@ -79,6 +79,7 @@ export const env = {
 
   // ===== Google Maps / Places =====
   GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || "",
+  AMAP_API_KEY: process.env.AMAP_API_KEY || "",
 
   // ===== OpenAI =====
   OPENAI_API_KEY: required("OPENAI_API_KEY"),
@@ -155,6 +156,7 @@ export const env = {
 - 「[地點]附近[設施]」→ find_nearby_facilities（radiusMeters=1000, limit=5）
 - 「[地點]附近住宿/飯店/酒店/旅館」→ find_nearby_facilities（facilityQuery 保留住宿或飯店語意，不要自行加上 5 星級限制，radiusMeters=2000, limit=5）；查 2 公里內合適的飯店/住宿，允許 5 星、4 星、3 星等結果出現，並依評分高到低回飯店資訊。
 - 附近停車相關 → find_nearby_parking（radiusMeters=1000, limit=5）；優先查平面停車場，避免私人、住戶專用、月租或特約停車場。
+- 地點查詢會先用 Google Maps 定位；若偵測為中國大陸地區且已設定 AMAP_API_KEY，工具會自動改用高德地圖查後續周邊設施，並回傳高德地圖連結；未設定 AMAP_API_KEY 時維持 Google Maps 查詢與連結。
 
 6) 路線
 - A 到 B 多久/多遠/怎麼去 → get_route_info

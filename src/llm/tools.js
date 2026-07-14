@@ -421,7 +421,7 @@ export const botTools = [
   {
     type: "function",
     name: "find_nearby_parking",
-    description: "查詢某個地點附近的停車場，優先找平面停車場並避開私人、住戶專用、月租或特約停車場，回傳停車場名稱、地址、距離與 Google Maps 連結。適合回答「某地附近是否有停車場」「好不好停車」「附近哪裡可以停車」。",
+    description: "查詢某個地點附近的停車場，優先找平面停車場並避開私人、住戶專用、月租或特約停車場，回傳停車場名稱、地址、距離與地圖連結；若 Google Maps 偵測地點在中國大陸且已設定 AMAP_API_KEY，會改用高德地圖並回傳高德連結，否則維持 Google Maps。適合回答「某地附近是否有停車場」「好不好停車」「附近哪裡可以停車」。",
     parameters: {
       type: "object",
       properties: {
@@ -446,7 +446,7 @@ export const botTools = [
   {
     type: "function",
     name: "find_nearby_facilities",
-    description: "查詢某個地點附近的任意設施或店家類型，回傳名稱、地址、距離、評分與 Google Maps 連結。適合回答「[地點]附近有什麼[設施]」「[地點]附近的[設施]」「找[地點]附近的[設施]」。住宿/飯店查詢會找 2 公里內合適的飯店/住宿，允許 5 星、4 星、3 星等結果出現，並依評分高到低排序；停車場專問可沿用 find_nearby_parking。",
+    description: "查詢某個地點附近的任意設施或店家類型，回傳名稱、地址、距離、評分與地圖連結；若 Google Maps 偵測地點在中國大陸且已設定 AMAP_API_KEY，會改用高德地圖並回傳高德連結，否則維持 Google Maps。適合回答「[地點]附近有什麼[設施]」「[地點]附近的[設施]」「找[地點]附近的[設施]」。住宿/飯店查詢會找 2 公里內合適的飯店/住宿，允許 5 星、4 星、3 星等結果出現，並依評分高到低排序；停車場專問可沿用 find_nearby_parking。",
     parameters: {
       type: "object",
       properties: {
