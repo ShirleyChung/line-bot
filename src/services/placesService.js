@@ -10,7 +10,6 @@ const LODGING_RADIUS_METERS = 2000;
 const DEFAULT_ROUTE_SEARCH_RADIUS = 2000;
 const ROUTE_SAMPLE_POINTS = 10;
 const LODGING_WORDS = /(住宿|飯店|酒店|旅館|旅店|旅社|民宿|hotel|lodging)/i;
-const FIVE_STAR_LODGING_WORDS = /(5\s*星|五星|五星級|five\s*star)/i;
 const PRIVATE_PARKING_WORDS = /(私人|私有|住戶|住客|住戶專用|社區|大樓|月租|長租|員工|會員|特約|專用|reserved|private|residents?|monthly)/i;
 const FLAT_PARKING_WORDS = /(平面|露天|戶外|地面|surface|open[- ]?air)/i;
 
@@ -182,16 +181,6 @@ function isLodgingFacilityQuery(facilityQuery) {
   return LODGING_WORDS.test(String(facilityQuery || ""));
 }
 
-function buildFacilitySearchQuery(facilityQuery) {
-  const facility = String(facilityQuery || "").trim();
-
-  if (isLodgingFacilityQuery(facility) && !FIVE_STAR_LODGING_WORDS.test(facility)) {
-    return `5星級 飯店 住宿 ${facility}`;
-  }
-
-  return facility;
-}
-
 function isProbablyPrivateParking(place) {
   const text = `${place.name || ""} ${place.address || ""}`;
   return PRIVATE_PARKING_WORDS.test(text);
@@ -233,6 +222,18 @@ function normalizeParkingPlaces(places, origin, radiusMeters, limit) {
       return (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity);
     })
     .slice(0, limit);
+}
+
+function compareFacilities(a, b, isLodging) {
+  if (isLodging) {
+    const ratingDiff = (b.rating ?? -1) - (a.rating ?? -1);
+    if (ratingDiff !== 0) return ratingDiff;
+
+    const ratingCountDiff = (b.userRatingCount ?? 0) - (a.userRatingCount ?? 0);
+    if (ratingCountDiff !== 0) return ratingCountDiff;
+  }
+
+  return (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity);
 }
 
 function toRadians(value) {
@@ -302,7 +303,6 @@ export async function findNearbyFacilities(locationQuery, facilityQuery, options
     ? Math.max(requestedRadiusMeters || LODGING_RADIUS_METERS, LODGING_RADIUS_METERS)
     : requestedRadiusMeters || DEFAULT_RADIUS_METERS;
   const limit = options.limit || DEFAULT_LIMIT;
-  const searchQuery = buildFacilitySearchQuery(facility);
   const origin = await geocodePlace(locationQuery);
 
   if (!facility) {
@@ -319,11 +319,11 @@ export async function findNearbyFacilities(locationQuery, facilityQuery, options
 
   const places = await searchNearbyByText({
     locationQuery,
-    facilityQuery: searchQuery,
+    facilityQuery: facility,
     lat: origin.lat,
     lng: origin.lng,
     radiusMeters,
-    limit,
+    limit: isLodging ? Math.min(Math.max(limit * 3, 10), 20) : limit,
   });
 
   const facilities = places
@@ -348,7 +348,7 @@ export async function findNearbyFacilities(locationQuery, facilityQuery, options
     })
     .filter((place) => place.businessStatus !== "CLOSED_PERMANENTLY")
     .filter((place) => (place.distanceMeters ?? Infinity) <= radiusMeters)
-    .sort((a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity))
+    .sort((a, b) => compareFacilities(a, b, isLodging))
     .slice(0, limit);
 
   return {

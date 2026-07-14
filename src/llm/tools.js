@@ -446,7 +446,7 @@ export const botTools = [
   {
     type: "function",
     name: "find_nearby_facilities",
-    description: "查詢某個地點附近的任意設施或店家類型，回傳名稱、地址、距離、評分與 Google Maps 連結。適合回答「[地點]附近有什麼[設施]」「[地點]附近的[設施]」「找[地點]附近的[設施]」。住宿/飯店查詢會優先找 2 公里內的 5 星級飯店並依距離排序；停車場專問可沿用 find_nearby_parking。",
+    description: "查詢某個地點附近的任意設施或店家類型，回傳名稱、地址、距離、評分與 Google Maps 連結。適合回答「[地點]附近有什麼[設施]」「[地點]附近的[設施]」「找[地點]附近的[設施]」。住宿/飯店查詢會找 2 公里內合適的飯店/住宿，允許 5 星、4 星、3 星等結果出現，並依評分高到低排序；停車場專問可沿用 find_nearby_parking。",
     parameters: {
       type: "object",
       properties: {
@@ -456,7 +456,7 @@ export const botTools = [
         },
         facilityQuery: {
           type: "string",
-          description: "要查詢的設施、店家或地點類型，例如：餐廳、咖啡廳、便利商店、加油站、景點、藥局、住宿、飯店。住宿/飯店請保留使用者語意，工具會優先查 5 星級飯店。",
+          description: "要查詢的設施、店家或地點類型，例如：餐廳、咖啡廳、便利商店、加油站、景點、藥局、住宿、飯店。住宿/飯店請保留使用者語意，不要自行加上 5 星級限制。",
         },
         radiusMeters: {
           type: "number",
