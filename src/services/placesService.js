@@ -6,8 +6,13 @@ const PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchTe
 const DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json";
 const DEFAULT_RADIUS_METERS = 1000;
 const DEFAULT_LIMIT = 5;
+const LODGING_RADIUS_METERS = 2000;
 const DEFAULT_ROUTE_SEARCH_RADIUS = 2000;
 const ROUTE_SAMPLE_POINTS = 10;
+const LODGING_WORDS = /(住宿|飯店|酒店|旅館|旅店|旅社|民宿|hotel|lodging)/i;
+const FIVE_STAR_LODGING_WORDS = /(5\s*星|五星|五星級|five\s*star)/i;
+const PRIVATE_PARKING_WORDS = /(私人|私有|住戶|住客|住戶專用|社區|大樓|月租|長租|員工|會員|特約|專用|reserved|private|residents?|monthly)/i;
+const FLAT_PARKING_WORDS = /(平面|露天|戶外|地面|surface|open[- ]?air)/i;
 
 function getGoogleMapsApiKey() {
   const apiKey = env.GOOGLE_MAPS_API_KEY;
@@ -99,6 +104,42 @@ async function searchNearbyParking({ lat, lng, radiusMeters, limit }) {
   return json.places || [];
 }
 
+async function searchNearbyParkingByText({ locationQuery, lat, lng, radiusMeters, limit }) {
+  const apiKey = getGoogleMapsApiKey();
+
+  const json = await fetchJson(PLACES_TEXT_SEARCH_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": [
+        "places.displayName",
+        "places.formattedAddress",
+        "places.location",
+        "places.businessStatus",
+        "places.googleMapsUri",
+      ].join(","),
+    },
+    body: JSON.stringify({
+      textQuery: `${locationQuery} 附近 平面停車場 公共停車場`,
+      maxResultCount: limit,
+      languageCode: "zh-TW",
+      regionCode: "TW",
+      locationBias: {
+        circle: {
+          center: {
+            latitude: lat,
+            longitude: lng,
+          },
+          radius: radiusMeters,
+        },
+      },
+    }),
+  });
+
+  return json.places || [];
+}
+
 async function searchNearbyByText({ locationQuery, facilityQuery, lat, lng, radiusMeters, limit }) {
   const apiKey = getGoogleMapsApiKey();
 
@@ -137,6 +178,63 @@ async function searchNearbyByText({ locationQuery, facilityQuery, lat, lng, radi
   return json.places || [];
 }
 
+function isLodgingFacilityQuery(facilityQuery) {
+  return LODGING_WORDS.test(String(facilityQuery || ""));
+}
+
+function buildFacilitySearchQuery(facilityQuery) {
+  const facility = String(facilityQuery || "").trim();
+
+  if (isLodgingFacilityQuery(facility) && !FIVE_STAR_LODGING_WORDS.test(facility)) {
+    return `5星級 飯店 住宿 ${facility}`;
+  }
+
+  return facility;
+}
+
+function isProbablyPrivateParking(place) {
+  const text = `${place.name || ""} ${place.address || ""}`;
+  return PRIVATE_PARKING_WORDS.test(text);
+}
+
+function parkingPreferenceScore(place) {
+  if (isProbablyPrivateParking(place)) return 2;
+  if (FLAT_PARKING_WORDS.test(`${place.name || ""} ${place.address || ""}`)) return 0;
+  return 1;
+}
+
+function normalizeParkingPlaces(places, origin, radiusMeters, limit) {
+  return places
+    .map((place) => {
+      const placeLocation = place.location;
+      const lat = placeLocation?.latitude;
+      const lng = placeLocation?.longitude;
+      const distance =
+        Number.isFinite(lat) && Number.isFinite(lng)
+          ? distanceMeters(origin, { lat, lng })
+          : null;
+
+      return {
+        name: place.displayName?.text || "未命名停車場",
+        address: place.formattedAddress || "地址未提供",
+        distanceMeters: distance,
+        googleMapsUri: place.googleMapsUri || "",
+        businessStatus: place.businessStatus || "",
+      };
+    })
+    .filter((place) => place.businessStatus !== "CLOSED_PERMANENTLY")
+    .filter((place) => {
+      const distance = place.distanceMeters ?? Infinity;
+      return distance <= radiusMeters && !isProbablyPrivateParking(place);
+    })
+    .sort((a, b) => {
+      const preferenceDiff = parkingPreferenceScore(a) - parkingPreferenceScore(b);
+      if (preferenceDiff !== 0) return preferenceDiff;
+      return (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity);
+    })
+    .slice(0, limit);
+}
+
 function toRadians(value) {
   return (value * Math.PI) / 180;
 }
@@ -168,33 +266,25 @@ export async function findNearbyParking(locationQuery, options = {}) {
     };
   }
 
-  const places = await searchNearbyParking({
+  const textPlaces = await searchNearbyParkingByText({
+    locationQuery,
     lat: origin.lat,
     lng: origin.lng,
     radiusMeters,
-    limit,
+    limit: Math.min(Math.max(limit * 2, 5), 20),
   });
 
-  const parkingLots = places
-    .map((place) => {
-      const placeLocation = place.location;
-      const lat = placeLocation?.latitude;
-      const lng = placeLocation?.longitude;
-      const distance =
-        Number.isFinite(lat) && Number.isFinite(lng)
-          ? distanceMeters(origin, { lat, lng })
-          : null;
+  let parkingLots = normalizeParkingPlaces(textPlaces, origin, radiusMeters, limit);
 
-      return {
-        name: place.displayName?.text || "未命名停車場",
-        address: place.formattedAddress || "地址未提供",
-        distanceMeters: distance,
-        googleMapsUri: place.googleMapsUri || "",
-        businessStatus: place.businessStatus || "",
-      };
-    })
-    .filter((place) => place.businessStatus !== "CLOSED_PERMANENTLY")
-    .sort((a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity));
+  if (!parkingLots.length) {
+    const nearbyPlaces = await searchNearbyParking({
+      lat: origin.lat,
+      lng: origin.lng,
+      radiusMeters,
+      limit: Math.min(Math.max(limit * 2, 5), 20),
+    });
+    parkingLots = normalizeParkingPlaces(nearbyPlaces, origin, radiusMeters, limit);
+  }
 
   return {
     ok: true,
@@ -205,9 +295,14 @@ export async function findNearbyParking(locationQuery, options = {}) {
 }
 
 export async function findNearbyFacilities(locationQuery, facilityQuery, options = {}) {
-  const radiusMeters = options.radiusMeters || DEFAULT_RADIUS_METERS;
-  const limit = options.limit || DEFAULT_LIMIT;
   const facility = String(facilityQuery || "").trim();
+  const isLodging = isLodgingFacilityQuery(facility);
+  const requestedRadiusMeters = Number(options.radiusMeters) || 0;
+  const radiusMeters = isLodging
+    ? Math.max(requestedRadiusMeters || LODGING_RADIUS_METERS, LODGING_RADIUS_METERS)
+    : requestedRadiusMeters || DEFAULT_RADIUS_METERS;
+  const limit = options.limit || DEFAULT_LIMIT;
+  const searchQuery = buildFacilitySearchQuery(facility);
   const origin = await geocodePlace(locationQuery);
 
   if (!facility) {
@@ -224,7 +319,7 @@ export async function findNearbyFacilities(locationQuery, facilityQuery, options
 
   const places = await searchNearbyByText({
     locationQuery,
-    facilityQuery: facility,
+    facilityQuery: searchQuery,
     lat: origin.lat,
     lng: origin.lng,
     radiusMeters,
@@ -252,6 +347,7 @@ export async function findNearbyFacilities(locationQuery, facilityQuery, options
       };
     })
     .filter((place) => place.businessStatus !== "CLOSED_PERMANENTLY")
+    .filter((place) => (place.distanceMeters ?? Infinity) <= radiusMeters)
     .sort((a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity))
     .slice(0, limit);
 

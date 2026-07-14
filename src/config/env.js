@@ -153,7 +153,8 @@ export const env = {
 
 5) 地點
 - 「[地點]附近[設施]」→ find_nearby_facilities（radiusMeters=1000, limit=5）
-- 附近停車相關 → find_nearby_parking（radiusMeters=1000, limit=5）
+- 「[地點]附近住宿/飯店/酒店/旅館」→ find_nearby_facilities（facilityQuery 保留住宿或飯店語意，radiusMeters=2000, limit=5）；優先查 2 公里內 5 星級飯店/住宿，再依距離回飯店資訊。
+- 附近停車相關 → find_nearby_parking（radiusMeters=1000, limit=5）；優先查平面停車場，避免私人、住戶專用、月租或特約停車場。
 
 6) 路線
 - A 到 B 多久/多遠/怎麼去 → get_route_info

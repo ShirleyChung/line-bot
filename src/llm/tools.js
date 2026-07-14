@@ -421,7 +421,7 @@ export const botTools = [
   {
     type: "function",
     name: "find_nearby_parking",
-    description: "查詢某個地點附近的停車場，回傳停車場名稱、地址、距離與 Google Maps 連結。適合回答「某地附近是否有停車場」「好不好停車」「附近哪裡可以停車」。",
+    description: "查詢某個地點附近的停車場，優先找平面停車場並避開私人、住戶專用、月租或特約停車場，回傳停車場名稱、地址、距離與 Google Maps 連結。適合回答「某地附近是否有停車場」「好不好停車」「附近哪裡可以停車」。",
     parameters: {
       type: "object",
       properties: {
@@ -431,7 +431,7 @@ export const botTools = [
         },
         radiusMeters: {
           type: "number",
-          description: "查詢半徑，單位公尺。一般附近停車場填 1000。",
+          description: "查詢半徑，單位公尺。一般附近停車場填 1000，工具會優先排序平面停車場並排除私人停車場。",
         },
         limit: {
           type: "number",
@@ -446,7 +446,7 @@ export const botTools = [
   {
     type: "function",
     name: "find_nearby_facilities",
-    description: "查詢某個地點附近的任意設施或店家類型，回傳名稱、地址、距離、評分與 Google Maps 連結。適合回答「[地點]附近有什麼[設施]」「[地點]附近的[設施]」「找[地點]附近的[設施]」。停車場也可使用，但停車場專問可沿用 find_nearby_parking。",
+    description: "查詢某個地點附近的任意設施或店家類型，回傳名稱、地址、距離、評分與 Google Maps 連結。適合回答「[地點]附近有什麼[設施]」「[地點]附近的[設施]」「找[地點]附近的[設施]」。住宿/飯店查詢會優先找 2 公里內的 5 星級飯店並依距離排序；停車場專問可沿用 find_nearby_parking。",
     parameters: {
       type: "object",
       properties: {
@@ -456,11 +456,11 @@ export const botTools = [
         },
         facilityQuery: {
           type: "string",
-          description: "要查詢的設施、店家或地點類型，例如：餐廳、咖啡廳、便利商店、加油站、景點、藥局。",
+          description: "要查詢的設施、店家或地點類型，例如：餐廳、咖啡廳、便利商店、加油站、景點、藥局、住宿、飯店。住宿/飯店請保留使用者語意，工具會優先查 5 星級飯店。",
         },
         radiusMeters: {
           type: "number",
-          description: "查詢半徑，單位公尺。一般附近設施填 1000。",
+          description: "查詢半徑，單位公尺。一般附近設施填 1000；住宿/飯店填 2000。",
         },
         limit: {
           type: "number",
