@@ -9,6 +9,16 @@ RUN cargo build --release --no-default-features
 # 使用 Node 20，因為 Cloud Run 很適合這種 HTTP 服務
 FROM node:20-slim
 
+# 安裝 Chromium 以支援 puppeteer
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-noto-cjk \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# 設定 Puppeteer 執行檔路徑
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
 # 設定工作目錄
 WORKDIR /app
 

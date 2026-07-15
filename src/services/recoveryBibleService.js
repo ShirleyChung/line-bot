@@ -1,10 +1,11 @@
-const RECOVERY_BASE_URL = "https://recoveryversion.com.tw/Style0A/026";
+const RECOVERY_NEW_BASE_URL = "https://recoveryversion.com.tw";
 const LIFE_STUDY_BASE_URL = "https://line.twgbr.org/life-study";
-const REQUEST_TIMEOUT_MS = 12_000;
+const REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RESULTS = 5;
 const MAX_VERSE_RESULTS = 8;
 const MAX_NOTE_RESULTS = 6;
 const MAX_LIFE_STUDY_PAGES = 12;
+const BROWSER_TIMEOUT_MS = 15_000;
 
 const BIBLE_CHAPTER_COUNTS = [
   0,
@@ -284,13 +285,81 @@ function parseReferenceFromText(text = "") {
   return null;
 }
 
-function buildRecoveryUrl(path, params = {}) {
-  const url = new URL(`${RECOVERY_BASE_URL}/${path}`);
-  for (const [key, value] of Object.entries(params)) {
-    if (value == null || value === "") continue;
-    url.searchParams.set(key, String(value));
+async function fetchVersesFromNewSite(bookNo, chapter) {
+  let browser;
+  try {
+    const puppeteer = await import("puppeteer-core");
+    browser = await puppeteer.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/google-chrome-stable",
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    });
+
+    const page = await browser.newPage();
+    await page.setUserAgent("Mozilla/5.0 line-bot recovery-bible-service");
+
+    const url = `${RECOVERY_NEW_BASE_URL}/verse/${bookNo}/${chapter}`;
+    await page.goto(url, { waitUntil: "networkidle0", timeout: BROWSER_TIMEOUT_MS });
+    
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    const verses = await page.evaluate((chapterNum) => {
+      const results = new Map();
+      const pattern = new RegExp(`^(${chapterNum}):(\\d+)\\s*(.+)$`);
+      
+      const allDivs = document.querySelectorAll("div");
+      
+      for (const div of allDivs) {
+        const text = div.textContent?.trim();
+        if (!text) continue;
+        
+        const match = text.match(pattern);
+        if (match) {
+          const verseNum = Number(match[2]);
+          let verseText = match[3].trim();
+          
+          verseText = verseText.replace(/[a-z][\u4e00-\u9fff]{2,6}記\d+:\d+[串註][a-z0-9\s×\u4e00-\u9fff，～]+/g, (m) => {
+            const afterComma = m.match(/，([\u4e00-\u9fff]{1,10})$/);
+            return afterComma ? afterComma[1] : "";
+          });
+          verseText = verseText.replace(/[a-z][\u4e00-\u9fff]{2,6}記\d+:\d+:?[串註]?[a-z0-9\s]*$/g, "");
+          verseText = verseText.replace(/\d+[\u4e00-\u9fff]{2,6}記\d+:\d+:?[串註]?[a-z0-9\s]*$/g, "");
+          
+          const noteIndex = verseText.search(/\d+[註串]/);
+          if (noteIndex > 5) {
+            verseText = verseText.substring(0, noteIndex);
+          }
+          
+          verseText = verseText.replace(/[記書]\d+:\d*$/g, "");
+          verseText = verseText.replace(/\d+[\u4e00-\u9fff]{1,6}$/g, "");
+          verseText = verseText.replace(/[a-z]+$/g, "");
+          verseText = verseText.replace(/,+/g, "，");
+          verseText = verseText.replace(/\s{2,}/g, " ");
+          verseText = verseText.replace(/^[a-z\s]+/, "");
+          verseText = verseText.replace(/[a-z\s]+$/, "");
+          verseText = verseText.trim();
+          
+          if (verseNum && verseText && verseText.length > 3) {
+            if (!results.has(verseNum) || results.get(verseNum).text.length > verseText.length) {
+              results.set(verseNum, {
+                verse: verseNum,
+                text: verseText,
+                noteRefs: [],
+              });
+            }
+          }
+        }
+      }
+      
+      return Array.from(results.values()).sort((a, b) => a.verse - b.verse);
+    }, chapter);
+
+    return verses;
+  } catch (error) {
+    throw new Error(`無法從新版網站獲取經文: ${error.message}`);
+  } finally {
+    if (browser) await browser.close();
   }
-  return url.toString();
 }
 
 async function fetchText(url, options = {}) {
@@ -426,10 +495,12 @@ function normalizeResultCount(value, maxLimit = MAX_VERSE_RESULTS) {
 }
 
 async function fetchChapterPage(bookNo, chapter, verseAnchor = 1) {
-  const url = buildRecoveryUrl("read_01.php", {
-    KB: `${bookNo}_${chapter}_${Math.max(1, Number(verseAnchor) || 1)}`,
-  });
-  return fetchText(url);
+  try {
+    return await fetchVersesFromNewSite(bookNo, chapter);
+  } catch (newSiteError) {
+    console.warn("新版網站失敗，改用備援經文:", newSiteError.message);
+    return [];
+  }
 }
 
 async function fetchKeywordSearch(mode, keyword) {
@@ -644,38 +715,7 @@ function parseOutlineVerseRanges(rangeText, defaultChapter) {
 }
 
 async function fetchBookOutlineItems(bookNo) {
-  const url = `${RECOVERY_BASE_URL}/outline_List.php?Bx=${bookNo}`;
-  const html = await fetchText(url);
-  const items = [];
-  const rowRegex = /<tr[^>]*height=10[^>]*>([\s\S]*?)<\/tr>/gi;
-  let m;
-  while ((m = rowRegex.exec(html)) !== null) {
-    const row = m[1];
-    const levelM = row.match(/title='(\d+)'/i);
-    if (!levelM) continue;
-    const level = Number(levelM[1]);
-    if (level < 1 || level > 3) continue;
-    const hrefM = row.match(/href='read_01\.php\?KB=\d+_(\d+)_\d+'/i);
-    if (!hrefM) continue;
-    const chapter = Number(hrefM[1]);
-    const tdTexts = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
-      .map((td) => htmlToText(td[1]).trim())
-      .filter((t) => t && !/^\s+$/.test(t));
-    const titleText = tdTexts[tdTexts.length - 1] || "";
-    const spaceIdx = titleText.lastIndexOf("　");
-    const rangeText = spaceIdx >= 0 ? titleText.slice(spaceIdx + 1).trim() : "";
-    const titleOnly = spaceIdx >= 0 ? titleText.slice(0, spaceIdx).trim() : titleText;
-    const verseRanges = parseOutlineVerseRanges(rangeText, chapter);
-    items.push({
-      level,
-      chapter,
-      title: titleOnly,
-      verseRange: verseRanges[0] || null,
-      verseRanges,
-      bookNo,
-    });
-  }
-  return items;
+  throw new Error("綱目列表功能暫時無法使用，恢復本網站已改版。");
 }
 
 function extractLeafItems(items) {
@@ -713,8 +753,8 @@ export async function getOutlineItemContent(item) {
   for (const range of verseRanges) {
     const { startChapter, startVerse, endChapter, endVerse } = range;
     for (let ch = startChapter; ch <= endChapter; ch++) {
-      const html = await fetchChapterPage(book.no, ch, ch === startChapter ? startVerse : 1);
-      const chVerses = parseChapterVerses(html, ch).filter((v) => {
+      const verses = await fetchChapterPage(book.no, ch, ch === startChapter ? startVerse : 1);
+      const chVerses = verses.filter((v) => {
         if (ch === startChapter && v.verse < startVerse) return false;
         if (ch === endChapter && v.verse > endVerse) return false;
         return true;
@@ -746,11 +786,9 @@ export async function getOutlineItemContent(item) {
     })
     .join("，");
 
-  const sourceUrl = buildRecoveryUrl("read_01.php", {
-    KB: `${book.no}_${startChapter}_${startVerse}`,
-  });
+  const sourceUrl = `${RECOVERY_NEW_BASE_URL}/verse/${book.no}/${startChapter}`;
 
-  const lines = [`網目：${title}`, `經文：${displayRef}`, ""];
+  const lines = [`綱目：${title}`, `經文：${displayRef}`, ""];
   for (const v of allVerses) {
     lines.push(`${book.shortName}${v.chapter}:${v.verse} ${v.text}`);
   }
@@ -760,7 +798,7 @@ export async function getOutlineItemContent(item) {
 }
 
 export async function getRandomRecoveryBibleVerse(options = {}) {
-  const maxAttempts = Math.min(Math.max(Math.floor(Number(options.maxAttempts) || 12), 1), 30);
+  const maxAttempts = Math.min(Math.max(Math.floor(Number(options.maxAttempts) || 3), 1), 10);
   let lastError = null;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -769,15 +807,12 @@ export async function getRandomRecoveryBibleVerse(options = {}) {
     const chapter = Math.floor(Math.random() * maxChapter) + 1;
 
     try {
-      const chapterHtml = await fetchChapterPage(randomBook.no, chapter, 1);
-      const verses = parseChapterVerses(chapterHtml, chapter).filter((item) => item.text);
-      if (!verses.length) continue;
+      const verses = await fetchChapterPage(randomBook.no, chapter, 1);
+      if (!verses || verses.length === 0) continue;
 
       const verse = verses[Math.floor(Math.random() * verses.length)];
       const displayRef = `${randomBook.shortName}${chapter}:${verse.verse}`;
-      const sourceUrl = buildRecoveryUrl("read_01.php", {
-        KB: `${randomBook.no}_${chapter}_${verse.verse}`,
-      });
+      const sourceUrl = `${RECOVERY_NEW_BASE_URL}/verse/${randomBook.no}/${chapter}`;
 
       return {
         ok: true,
@@ -813,9 +848,7 @@ function buildFallbackRandomBibleVerse(error = null) {
   const item = FALLBACK_RANDOM_VERSES[Math.floor(Math.random() * FALLBACK_RANDOM_VERSES.length)];
   const book = BOOK_BY_NO.get(item.bookNo);
   const displayRef = `${book.shortName}${item.chapter}:${item.verse}`;
-  const sourceUrl = buildRecoveryUrl("read_01.php", {
-    KB: `${item.bookNo}_${item.chapter}_${item.verse}`,
-  });
+  const sourceUrl = `${RECOVERY_NEW_BASE_URL}/verse/${item.bookNo}/${item.chapter}`;
   const notice = "恢復本網站暫時無法提供隨機經節，先提供本地備援經節。";
 
   return {
@@ -849,221 +882,40 @@ export async function queryRecoveryBibleVerses(query, options = {}) {
   const parsedRef = parseReferenceFromText(normalizedQuery);
 
   if (parsedRef) {
-    const chapterHtml = await fetchChapterPage(parsedRef.book.no, parsedRef.chapter, parsedRef.verseStart);
-    const verses = parseChapterVerses(chapterHtml, parsedRef.chapter)
+    const verses = await fetchChapterPage(parsedRef.book.no, parsedRef.chapter, parsedRef.verseStart);
+    const filtered = verses
       .filter((item) => item.verse >= parsedRef.verseStart && item.verse <= parsedRef.verseEnd)
       .slice(0, maxResults);
 
-    if (!verses.length) {
+    if (!filtered.length) {
       throw new Error(`找不到 ${parsedRef.displayRef} 的經文內容`);
     }
 
+    const displayRef = `${parsedRef.book.shortName}${parsedRef.chapter}:${parsedRef.verseStart}${parsedRef.verseStart === parsedRef.verseEnd ? "" : `-${parsedRef.verseEnd}`}`;
+    const sourceUrl = `${RECOVERY_NEW_BASE_URL}/verse/${parsedRef.book.no}/${parsedRef.chapter}`;
+    const lines = [`恢復本經文 ${displayRef}`];
+    for (const item of filtered) {
+      lines.push(`${parsedRef.book.shortName}${parsedRef.chapter}:${item.verse} ${item.text}`);
+    }
+    lines.push("", `來源：${sourceUrl}`);
+
     return {
       ok: true,
       mode: "reference",
       query: normalizedQuery,
-      reference: parsedRef,
-      verses,
-      replyText: buildVerseReplyText(parsedRef, verses),
+      reference: { ...parsedRef, displayRef },
+      verses: filtered,
+      replyText: lines.join("\n"),
     };
   }
 
-  const keyword = extractSearchKeyword(normalizedQuery);
-  const searchHtml = await fetchKeywordSearch("v1", keyword);
-  const rows = parseSearchRows(searchHtml).slice(0, maxResults);
-  if (!rows.length) {
-    throw new Error(`找不到「${keyword}」的恢復本經文`);
-  }
-
-  return {
-    ok: true,
-    mode: "keyword",
-    query: normalizedQuery,
-    keyword,
-    rows,
-    replyText: buildKeywordVerseReply(keyword, rows),
-  };
+  throw new Error("目前僅支援明確經節查詢（例如：創1:1、羅8:28），關鍵字搜尋暫時無法使用。");
 }
 
 export async function queryRecoveryBibleNotes(query, options = {}) {
-  const normalizedQuery = normalizeQueryText(query);
-  if (!normalizedQuery) {
-    throw new Error("請提供要查詢的經節或關鍵字");
-  }
-
-  const maxResults = normalizeResultCount(options.maxResults, MAX_NOTE_RESULTS);
-  const parsedRef = parseReferenceFromText(normalizedQuery);
-
-  if (parsedRef) {
-    const chapterHtml = await fetchChapterPage(parsedRef.book.no, parsedRef.chapter, parsedRef.verseStart);
-    const verses = parseChapterVerses(chapterHtml, parsedRef.chapter).filter(
-      (item) => item.verse >= parsedRef.verseStart && item.verse <= parsedRef.verseEnd
-    );
-
-    const noteRefs = uniqueValues(
-      verses.flatMap((item) => (item.noteRefs || []).map((ref) => ref.id))
-    ).slice(0, maxResults);
-
-    if (!noteRefs.length) {
-      throw new Error(`找不到 ${parsedRef.displayRef} 的註解`);
-    }
-
-    const notes = [];
-    for (const noteId of noteRefs) {
-      const url = buildRecoveryUrl("FunShow011.php", { B: noteId });
-      const html = await fetchText(url);
-      const parsed = parseNotePopup(html);
-      if (!parsed.text) continue;
-      notes.push({
-        id: noteId,
-        title: parsed.title,
-        text: parsed.text,
-        url,
-      });
-    }
-
-    if (!notes.length) {
-      throw new Error(`找不到 ${parsedRef.displayRef} 的註解內容`);
-    }
-
-    return {
-      ok: true,
-      mode: "reference",
-      query: normalizedQuery,
-      reference: parsedRef,
-      notes,
-      replyText: buildNoteReplyByReference(parsedRef, notes),
-    };
-  }
-
-  const keyword = extractSearchKeyword(normalizedQuery);
-  const searchHtml = await fetchKeywordSearch("v2", keyword);
-  const rows = parseSearchRows(searchHtml).slice(0, maxResults);
-  if (!rows.length) {
-    throw new Error(`找不到「${keyword}」的恢復本註解`);
-  }
-
-  return {
-    ok: true,
-    mode: "keyword",
-    query: normalizedQuery,
-    keyword,
-    rows,
-    replyText: buildNoteReplyByKeyword(keyword, rows),
-  };
+  throw new Error("註解查詢功能暫時無法使用，恢復本網站已改版。請直接前往 https://recoveryversion.com.tw 查詢。");
 }
 
 export async function queryLifeStudyExcerpt({ query = "", keyword = "" } = {}) {
-  const mergedQuery = normalizeQueryText(`${query || ""} ${keyword || ""}`.trim());
-  if (!mergedQuery) {
-    throw new Error("請提供經節或關鍵字，以便查詢生命讀經");
-  }
-
-  const reference = parseReferenceFromText(mergedQuery);
-  const book = reference?.book || detectBookFromText(mergedQuery);
-  if (!book) {
-    throw new Error("生命讀經查詢需要書卷資訊，例如：士 15:18 生命讀經");
-  }
-
-  const chapter = reference?.chapter || extractChapterHint(mergedQuery) || null;
-  const chapterCn = chapter ? toChineseChapterNumber(chapter) : "";
-  const keywordTokens = splitKeywordTokens(extractSearchKeyword(mergedQuery));
-
-  const firstPagePath = `${book.no}.html`;
-  const firstPageUrl = `${LIFE_STUDY_BASE_URL}/${firstPagePath}`;
-  const firstHtml = await fetchText(firstPageUrl);
-  const allPaths = extractLifeStudyPagePaths(firstHtml, book.no).slice(0, MAX_LIFE_STUDY_PAGES);
-  if (!allPaths.length) {
-    throw new Error("生命讀經頁面目前無法取得");
-  }
-
-  const totalBookChapters = BIBLE_CHAPTER_COUNTS[book.no] || 1;
-  const estimatedIndex =
-    chapter && allPaths.length > 1
-      ? Math.round(((chapter - 1) / Math.max(totalBookChapters - 1, 1)) * (allPaths.length - 1))
-      : 0;
-  const candidateIndexes = uniqueValues([
-    estimatedIndex,
-    estimatedIndex - 1,
-    estimatedIndex + 1,
-    0,
-  ]).filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < allPaths.length);
-
-  const pageCache = new Map();
-  pageCache.set(firstPagePath, firstHtml);
-
-  async function getPageHtml(path) {
-    if (pageCache.has(path)) return pageCache.get(path);
-    const html = await fetchText(`${LIFE_STUDY_BASE_URL}/${path}`);
-    pageCache.set(path, html);
-    return html;
-  }
-
-  let best = null;
-
-  async function evaluatePaths(paths) {
-    for (const path of paths) {
-      const html = await getPageHtml(path);
-      const { title, paragraphs } = extractLifeStudyParagraphs(html);
-      for (const paragraph of paragraphs) {
-        const score = scoreLifeStudyParagraph({
-          paragraph,
-          title,
-          chapter,
-          chapterCn,
-          keywordTokens,
-          book,
-        });
-        if (!best || score > best.score) {
-          best = {
-            score,
-            path,
-            title,
-            paragraph,
-          };
-        }
-      }
-    }
-  }
-
-  await evaluatePaths(candidateIndexes.map((idx) => allPaths[idx]));
-
-  if ((!best || best.score <= 0) && allPaths.length > candidateIndexes.length) {
-    const remainingPaths = allPaths.filter((path) => !candidateIndexes.map((idx) => allPaths[idx]).includes(path));
-    await evaluatePaths(remainingPaths.slice(0, MAX_LIFE_STUDY_PAGES));
-  }
-
-  if (!best || !best.paragraph) {
-    throw new Error("找不到對應的生命讀經段落");
-  }
-
-  const focusTokens = [];
-  if (chapter) {
-    focusTokens.push(`${chapter}章`);
-    if (chapterCn) focusTokens.push(`${chapterCn}章`);
-  }
-  focusTokens.push(...keywordTokens);
-
-  const sourceUrl = `${LIFE_STUDY_BASE_URL}/${best.path}`;
-  const excerpt = buildLifeStudyExcerpt(best.paragraph, focusTokens, 240);
-  const chapterLabel = chapter ? ` ${chapter}章` : "";
-  const title = best.title || "生命讀經";
-
-  return {
-    ok: true,
-    query: mergedQuery,
-    bookNo: book.no,
-    bookName: book.name,
-    chapter,
-    title,
-    excerpt,
-    sourceUrl,
-    replyText: [
-      `生命讀經擷取（${book.name}${chapterLabel}）`,
-      `${title}`,
-      excerpt,
-      "",
-      `來源：${sourceUrl}`,
-    ].join("\n"),
-  };
+  throw new Error("生命讀經查詢功能暫時無法使用，恢復本網站已改版。請直接前往 https://line.twgbr.org/life-study 查詢。");
 }
