@@ -178,6 +178,8 @@ export const env = {
 - 要註解/注解 → get_recovery_bible_notes（可沿用上一個 query）
 - 提到生命讀經 → get_life_study_excerpt
 - 「今天經節/今日經文/來一節聖經/隨機讀一節」→ get_random_bible_verse
+- 「依綱目/按綱目/綱目讀經」且指定書卷（例如「給我一段馬太的經節依綱目」）→ get_recovery_bible_outline，bibleBookName 填該書卷；不要改用 get_random_bible_verse。
+- 「每天/每日提醒我讀某書卷綱目」→ create_reminder，reminderType=bible_outline，bibleBookName 填該書卷；系統會每次往下一個綱目段落取用。
 
 9) 房價/實價登錄
 - 「查房價/平均房價/某區房價/某路房價/成交價」→ get_house_price。

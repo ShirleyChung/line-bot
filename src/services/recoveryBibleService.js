@@ -125,6 +125,10 @@ function normalizeQueryText(value = "") {
     .trim();
 }
 
+function normalizeDigits(value = "") {
+  return String(value).replace(/[０-９]/g, (ch) => String(ch.charCodeAt(0) - 0xff10));
+}
+
 function decodeHtmlEntities(text = "") {
   const named = {
     amp: "&",
@@ -285,7 +289,22 @@ function parseReferenceFromText(text = "") {
   return null;
 }
 
-async function fetchVersesFromNewSite(bookNo, chapter) {
+async function fetchVersesFromApi(bookNo, chapter) {
+  const url = `${RECOVERY_NEW_BASE_URL}/api/getVerses?VERSION=1&refs=${Number(bookNo)}.${Number(chapter)}.-1`;
+  const rows = JSON.parse(await fetchText(url));
+  if (!Array.isArray(rows)) return [];
+
+  return rows
+    .map((row) => ({
+      verse: Number(row.segment_code),
+      text: String(row.content || "").trim(),
+      noteRefs: [],
+    }))
+    .filter((row) => Number.isInteger(row.verse) && row.verse > 0 && row.text)
+    .sort((a, b) => a.verse - b.verse);
+}
+
+async function fetchVersesFromRenderedSite(bookNo, chapter) {
   let browser;
   try {
     const puppeteer = await import("puppeteer-core");
@@ -496,7 +515,14 @@ function normalizeResultCount(value, maxLimit = MAX_VERSE_RESULTS) {
 
 async function fetchChapterPage(bookNo, chapter, verseAnchor = 1) {
   try {
-    return await fetchVersesFromNewSite(bookNo, chapter);
+    const verses = await fetchVersesFromApi(bookNo, chapter);
+    if (verses.length) return verses;
+  } catch (apiError) {
+    console.warn("新版 API 失敗，改用瀏覽器讀取經文:", apiError.message);
+  }
+
+  try {
+    return await fetchVersesFromRenderedSite(bookNo, chapter);
   } catch (newSiteError) {
     console.warn("新版網站失敗，改用備援經文:", newSiteError.message);
     return [];
@@ -689,10 +715,11 @@ function fromChineseNumber(s) {
 }
 
 function parseOutlineVerseSegment(segmentText, defaultChapter) {
-  const text = String(segmentText || "")
+  const text = normalizeDigits(segmentText)
     .replace(/[上下]/g, "")
     .replace(/[：﹕]/g, ":")
     .replace(/[～﹣－—–]/g, "∼")
+    .replace(/\s+/g, "")
     .trim();
   if (!text) return null;
   const CN = "[一二三四五六七八九十百零]+";
@@ -714,8 +741,49 @@ function parseOutlineVerseRanges(rangeText, defaultChapter) {
     .filter(Boolean);
 }
 
+function extractOutlineRangeText(text = "") {
+  const value = normalizeDigits(text)
+    .replace(/[～﹣－—–]/g, "～")
+    .replace(/\s+/g, " ")
+    .trim();
+  const CN = "一二三四五六七八九十百零";
+  const segment = `[${CN}]?\\d+(?:[上下])?(?:\\s*～\\s*[${CN}]?\\d+(?:[上下])?)?`;
+  const match = value.match(new RegExp(`(${segment}(?:\\s*[，,、；;]\\s*${segment})*)\\s*$`));
+  return match?.[1] || "";
+}
+
 async function fetchBookOutlineItems(bookNo) {
-  throw new Error("綱目列表功能暫時無法使用，恢復本網站已改版。");
+  const book = BOOK_BY_NO.get(Number(bookNo));
+  if (!book) throw new Error(`找不到書卷編號 ${bookNo}`);
+
+  const url = `${RECOVERY_NEW_BASE_URL}/api/getOutlines?VERSION=1`;
+  const rows = JSON.parse(await fetchText(url));
+  if (!Array.isArray(rows)) throw new Error("恢復本綱目資料格式錯誤");
+
+  return rows
+    .filter((row) => Number(row.chapter_code) === Number(bookNo))
+    .map((row) => {
+      const title = String(row.outline_content || "").trim();
+      const defaultChapter = Number(row.related_chapters) || null;
+      const rangeText = extractOutlineRangeText(title);
+      const verseRanges = parseOutlineVerseRanges(rangeText, defaultChapter);
+
+      return {
+        id: row.id,
+        bookNo: Number(bookNo),
+        bookName: book.name,
+        level: Number(row.level) || 0,
+        order: Number(row.volume_order) || 0,
+        title,
+        verseRange: verseRanges[0] || null,
+        verseRanges,
+        relatedChapter: defaultChapter,
+        relatedVerse: Number(row.related_number) || null,
+        sourceUrl: `${RECOVERY_NEW_BASE_URL}/verse/${book.no}/${defaultChapter || 1}`,
+      };
+    })
+    .filter((item) => item.title)
+    .sort((a, b) => a.order - b.order);
 }
 
 function extractLeafItems(items) {
@@ -734,6 +802,32 @@ export async function getBookOutlineReminderItems(bookNo) {
   const items = await fetchBookOutlineItems(Number(bookNo));
   const levelTwoItems = items.filter((item) => item.level === 2 && item.verseRange);
   return levelTwoItems.length ? levelTwoItems : extractLeafItems(items);
+}
+
+export async function getRandomBookOutlineContent(bookNameOrNo, options = {}) {
+  const book =
+    typeof bookNameOrNo === "number" || /^\d+$/.test(String(bookNameOrNo || ""))
+      ? BOOK_BY_NO.get(Number(bookNameOrNo))
+      : detectBookFromText(bookNameOrNo);
+  if (!book) throw new Error(`找不到聖經書卷「${bookNameOrNo}」`);
+
+  const items = await getBookOutlineReminderItems(book.no);
+  if (!items.length) throw new Error(`找不到 ${book.name} 的讀經綱目`);
+
+  const requestedIndex = Number(options.index);
+  const index = Number.isInteger(requestedIndex) && requestedIndex >= 0
+    ? requestedIndex % items.length
+    : Math.floor(Math.random() * items.length);
+  const content = await getOutlineItemContent(items[index]);
+
+  return {
+    ...content,
+    mode: "bible_outline",
+    book,
+    index,
+    total: items.length,
+    replyText: `恢復本綱目讀經 ${book.name}（第 ${index + 1} / ${items.length} 段）\n${content.replyText}`,
+  };
 }
 
 export async function getOutlineItemContent(item) {

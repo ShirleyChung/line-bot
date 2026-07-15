@@ -63,7 +63,7 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項。可建立一次性提醒、每日排程，或每週特定星期的排程（例如每個星期五，或除了星期四外每天）。內容可為天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN/綜合頭條新聞、指定關鍵字的最新新聞、每日經節。",
+    description: "建立提醒事項。可建立一次性提醒、每日排程，或每週特定星期的排程（例如每個星期五，或除了星期四外每天）。內容可為天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN/綜合頭條新聞、指定關鍵字的最新新聞、每日經節、依恢復本綱目循序讀經。",
     parameters: {
       type: "object",
       properties: {
@@ -664,6 +664,31 @@ export const botTools = [
         },
       },
       required: ["query", "maxResults"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: "function",
+    name: "get_recovery_bible_outline",
+    description: "依恢復本綱目從指定書卷隨機挑選一段，回傳該綱目標題與完整經文。適合回答「給我一段馬太的經節依綱目」「來一段加拉太書綱目讀經」。",
+    parameters: {
+      type: "object",
+      properties: {
+        bibleBookName: {
+          type: "string",
+          description: "聖經書卷名稱，例如：馬太福音、馬太、加拉太書、約翰福音。",
+        },
+        query: {
+          type: ["string", "null"],
+          description: "使用者原始查詢；若 bibleBookName 已填可傳 null。",
+        },
+        index: {
+          type: ["number", "null"],
+          description: "指定第幾段（0-based）；一般隨機取一段時傳 null。",
+        },
+      },
+      required: ["bibleBookName", "query", "index"],
       additionalProperties: false,
     },
     strict: true,

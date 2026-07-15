@@ -52,6 +52,7 @@ import {
 } from "../services/placesService.js";
 import {
   detectBookFromText,
+  getRandomBookOutlineContent,
   getRandomRecoveryBibleVerse,
   queryLifeStudyExcerpt,
   queryRecoveryBibleNotes,
@@ -160,6 +161,7 @@ const QUERY_TOOL_NAMES = new Set([
   "find_nearby_facilities",
   "get_house_price",
   "get_recovery_bible_verses",
+  "get_recovery_bible_outline",
   "get_random_bible_verse",
   "get_recovery_bible_notes",
   "get_life_study_excerpt",
@@ -949,6 +951,35 @@ export async function executeTool(name, args = {}, context = {}) {
           reference: result.reference?.displayRef || "",
           keyword: "",
           mode: "random_verse",
+        });
+      }
+
+      return {
+        ok: true,
+        tool: name,
+        ...result,
+      };
+    }
+
+    case "get_recovery_bible_outline": {
+      const sessionKey = context.sessionKey || buildSessionKey(context.source);
+      const hasSessionContext = sessionKey && sessionKey !== "unknown";
+      const bookName = String(args.bibleBookName || args.query || "").trim();
+
+      if (!bookName) {
+        throw new Error("get_recovery_bible_outline 缺少書卷名稱，例如：馬太福音");
+      }
+
+      const result = await getRandomBookOutlineContent(bookName, {
+        index: args.index,
+      });
+
+      if (hasSessionContext) {
+        await setLastBibleContext(sessionKey, {
+          query: result.displayRef || result.book?.name || bookName,
+          reference: result.displayRef || "",
+          keyword: result.title || "",
+          mode: "bible_outline",
         });
       }
 
