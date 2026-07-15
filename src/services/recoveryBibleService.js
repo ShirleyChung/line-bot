@@ -4,7 +4,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RESULTS = 5;
 const MAX_VERSE_RESULTS = 8;
 const MAX_NOTE_RESULTS = 6;
-const MAX_LIFE_STUDY_PAGES = 12;
+const MAX_LIFE_STUDY_PAGES = 80;
 const BROWSER_TIMEOUT_MS = 15_000;
 
 const BIBLE_CHAPTER_COUNTS = [
@@ -606,6 +606,100 @@ function buildNoteReplyByKeyword(keyword, rows) {
   return lines.join("\n");
 }
 
+function buildRecoveryVerseUrl(bookNo, chapter, verse = null) {
+  const params = verse ? `?verse=${Number(verse)}` : "";
+  return `${RECOVERY_NEW_BASE_URL}/verse/${Number(bookNo)}/${Number(chapter)}${params}`;
+}
+
+function extractNoteNumber(text = "") {
+  const match = normalizeQueryText(text).match(/[註注]\s*(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
+function normalizeFootnoteRows(rows = []) {
+  const byRef = new Map();
+  for (const row of rows) {
+    const key = [
+      Number(row.chapter_code),
+      Number(row.section_code),
+      Number(row.segment_code),
+      Number(row.note_num),
+    ].join(".");
+    const text = String(row.note_content || "").trim();
+    const existing = byRef.get(key);
+    if (!existing || (!existing.note_content && text)) {
+      byRef.set(key, { ...row, note_content: text });
+    }
+  }
+
+  return [...byRef.values()]
+    .filter((row) => String(row.note_content || "").trim())
+    .sort((a, b) =>
+      Number(a.chapter_code) - Number(b.chapter_code) ||
+      Number(a.section_code) - Number(b.section_code) ||
+      Number(a.segment_code) - Number(b.segment_code) ||
+      Number(a.note_num) - Number(b.note_num)
+    );
+}
+
+function mapFootnoteRow(row) {
+  const book = BOOK_BY_NO.get(Number(row.chapter_code));
+  const chapter = Number(row.section_code);
+  const verse = Number(row.segment_code);
+  const noteNum = Number(row.note_num);
+  const source = `${book?.shortName || row.chapter_code}${chapter}:${verse} 註${noteNum}`;
+  return {
+    id: row.id,
+    bookNo: Number(row.chapter_code),
+    bookName: book?.name || "",
+    chapter,
+    verse,
+    noteNum,
+    title: source,
+    source,
+    text: String(row.note_content || "").trim(),
+    url: buildRecoveryVerseUrl(row.chapter_code, row.section_code, row.segment_code),
+  };
+}
+
+async function fetchFootnotesByReference(reference, noteNumber = null) {
+  const params = new URLSearchParams({ VERSION: "1" });
+  if (noteNumber) {
+    params.set(
+      "note_refs",
+      `${reference.book.no}.${reference.chapter}.${reference.verseStart}.${noteNumber}`
+    );
+  } else {
+    params.set("chapter_code", String(reference.book.no));
+    params.set("section_code", String(reference.chapter));
+  }
+
+  const rows = JSON.parse(await fetchText(`${RECOVERY_NEW_BASE_URL}/api/getFootnotes?${params}`));
+  if (!Array.isArray(rows)) throw new Error("恢復本註解資料格式錯誤");
+
+  return normalizeFootnoteRows(rows)
+    .filter((row) => {
+      const verse = Number(row.segment_code);
+      if (verse < reference.verseStart || verse > reference.verseEnd) return false;
+      if (noteNumber && Number(row.note_num) !== noteNumber) return false;
+      return true;
+    })
+    .map(mapFootnoteRow);
+}
+
+async function fetchFootnotesByKeyword(keyword, maxResults) {
+  const tokens = splitKeywordTokens(keyword);
+  const searchTokens = tokens.length ? tokens : [keyword];
+  const params = new URLSearchParams({ VERSION: "1" });
+  for (const token of searchTokens) {
+    params.append("note_content~[]", token);
+  }
+
+  const rows = JSON.parse(await fetchText(`${RECOVERY_NEW_BASE_URL}/api/getFootnotes?${params}`));
+  if (!Array.isArray(rows)) throw new Error("恢復本註解搜尋資料格式錯誤");
+  return normalizeFootnoteRows(rows).map(mapFootnoteRow).slice(0, maxResults);
+}
+
 function extractLifeStudyPagePaths(html, bookNo) {
   const result = new Set([`${bookNo}.html`]);
   const hrefRegex = /href="([^"]+)"/gi;
@@ -644,6 +738,31 @@ function extractLifeStudyParagraphs(html) {
   };
 }
 
+function buildLifeStudyUrl(path) {
+  return `${LIFE_STUDY_BASE_URL}/${path}`;
+}
+
+async function fetchLifeStudyPage(path) {
+  const url = buildLifeStudyUrl(path);
+  const html = await fetchText(url);
+  const extracted = extractLifeStudyParagraphs(html);
+  return {
+    ...extracted,
+    path,
+    url,
+  };
+}
+
+function buildLifeStudyReply(result) {
+  const lines = [
+    `生命讀經 ${result.bookName}${result.title ? ` - ${result.title}` : ""}`,
+    result.excerpt,
+    "",
+    `來源：${result.sourceUrl}`,
+  ];
+  return lines.join("\n");
+}
+
 function scoreLifeStudyParagraph({ paragraph, title, chapter, chapterCn, keywordTokens, book }) {
   let score = 0;
   const text = String(paragraph || "");
@@ -651,8 +770,12 @@ function scoreLifeStudyParagraph({ paragraph, title, chapter, chapterCn, keyword
 
   if (chapter) {
     if (new RegExp(`${chapter}\\s*章`).test(text)) score += 80;
+    if (new RegExp(`${chapter}\\s*章`).test(heading)) score += 100;
     if (chapterCn && new RegExp(`第?${chapterCn}\\s*章`).test(text)) score += 80;
+    if (chapterCn && new RegExp(`第?${chapterCn}\\s*章`).test(heading)) score += 100;
     if (new RegExp(`${chapter}\\s*[:：]`).test(text)) score += 30;
+    if (containsChapterRange(text, chapter)) score += 60;
+    if (containsChapterRange(heading, chapter)) score += 90;
   }
 
   if (book?.name && text.includes(book.name)) score += 8;
@@ -663,7 +786,35 @@ function scoreLifeStudyParagraph({ paragraph, title, chapter, chapterCn, keyword
     if (heading.includes(token)) score += 20;
   }
 
+  if (text.length < 30) score -= 25;
+
   return score;
+}
+
+function containsChapterRange(text = "", chapter) {
+  const value = normalizeDigits(text);
+  const target = Number(chapter);
+  if (!Number.isInteger(target)) return false;
+
+  const cn = "[一二三四五六七八九十百零]+";
+  const cnRange = new RegExp(`(${cn})\\s*[至到～~-]\\s*(${cn})\\s*章`, "g");
+  let match;
+  while ((match = cnRange.exec(value)) !== null) {
+    const start = fromChineseNumber(match[1]);
+    const end = fromChineseNumber(match[2]);
+    if (Number.isFinite(start) && Number.isFinite(end) && target >= start && target <= end) {
+      return true;
+    }
+  }
+
+  const numberRange = /(\d{1,3})\s*[至到～~-]\s*(\d{1,3})\s*章/g;
+  while ((match = numberRange.exec(value)) !== null) {
+    const start = Number(match[1]);
+    const end = Number(match[2]);
+    if (target >= start && target <= end) return true;
+  }
+
+  return false;
 }
 
 function buildLifeStudyExcerpt(text, focusTokens = [], maxLength = 220) {
@@ -1007,9 +1158,136 @@ export async function queryRecoveryBibleVerses(query, options = {}) {
 }
 
 export async function queryRecoveryBibleNotes(query, options = {}) {
-  throw new Error("註解查詢功能暫時無法使用，恢復本網站已改版。請直接前往 https://recoveryversion.com.tw 查詢。");
+  const normalizedQuery = normalizeQueryText(query);
+  if (!normalizedQuery) {
+    throw new Error("請提供要查詢註解的經節或關鍵字，例如：約 3:16 註2 或 神愛");
+  }
+
+  const maxResults = normalizeResultCount(options.maxResults, MAX_NOTE_RESULTS);
+  const parsedRef = parseReferenceFromText(normalizedQuery);
+
+  if (parsedRef) {
+    const noteNumber = extractNoteNumber(normalizedQuery);
+    const notes = (await fetchFootnotesByReference(parsedRef, noteNumber)).slice(0, maxResults);
+    if (!notes.length) {
+      const suffix = noteNumber ? `註${noteNumber}` : "註解";
+      throw new Error(`找不到 ${parsedRef.displayRef} 的${suffix}`);
+    }
+
+    const displayRef = `${parsedRef.book.shortName}${parsedRef.chapter}:${parsedRef.verseStart}${parsedRef.verseStart === parsedRef.verseEnd ? "" : `-${parsedRef.verseEnd}`}`;
+    return {
+      ok: true,
+      mode: "reference",
+      query: normalizedQuery,
+      reference: { ...parsedRef, displayRef },
+      noteNumber,
+      notes,
+      replyText: buildNoteReplyByReference({ ...parsedRef, displayRef }, notes),
+    };
+  }
+
+  const keyword = extractSearchKeyword(normalizedQuery);
+  if (!keyword) {
+    throw new Error("請提供要搜尋的註解關鍵字");
+  }
+
+  const rows = await fetchFootnotesByKeyword(keyword, maxResults);
+  if (!rows.length) {
+    throw new Error(`找不到包含「${keyword}」的恢復本註解`);
+  }
+
+  return {
+    ok: true,
+    mode: "keyword",
+    query: normalizedQuery,
+    keyword,
+    notes: rows,
+    replyText: buildNoteReplyByKeyword(keyword, rows),
+  };
 }
 
 export async function queryLifeStudyExcerpt({ query = "", keyword = "" } = {}) {
-  throw new Error("生命讀經查詢功能暫時無法使用，恢復本網站已改版。請直接前往 https://line.twgbr.org/life-study 查詢。");
+  const normalizedQuery = normalizeQueryText(query);
+  const normalizedKeyword = normalizeQueryText(keyword);
+  const combined = [normalizedQuery, normalizedKeyword].filter(Boolean).join(" ");
+  if (!combined) {
+    throw new Error("請提供生命讀經查詢內容，例如：馬太 1章 生命讀經 或 國度");
+  }
+
+  const parsedRef = parseReferenceFromText(combined);
+  const book = parsedRef?.book || detectBookFromText(combined);
+  if (!book) {
+    throw new Error("請在生命讀經查詢中提供書卷名稱，例如：馬太、約翰、創世記");
+  }
+
+  const chapter = parsedRef?.chapter || extractChapterHint(combined);
+  const chapterCn = chapter ? toChineseChapterNumber(chapter) : "";
+  const rawKeyword = normalizedKeyword || extractSearchKeyword(combined);
+  const keywordTokens = uniqueValues([
+    ...splitKeywordTokens(rawKeyword),
+    ...(chapter ? [`${chapter}章`, chapterCn ? `${chapterCn}章` : ""] : []),
+  ]).filter((token) => !/^(生命讀經|讀經)$/.test(token) && !/^\S+\d+:\d+$/.test(token));
+
+  const firstPath = `${book.no}.html`;
+  const firstHtml = await fetchText(buildLifeStudyUrl(firstPath));
+  const paths = extractLifeStudyPagePaths(firstHtml, book.no).slice(0, MAX_LIFE_STUDY_PAGES);
+  if (!paths.length) {
+    throw new Error(`找不到 ${book.name} 的生命讀經頁面`);
+  }
+
+  const pages = await Promise.all(
+    paths.map(async (path) => {
+      if (path === firstPath) {
+        return { ...extractLifeStudyParagraphs(firstHtml), path, url: buildLifeStudyUrl(path) };
+      }
+      return fetchLifeStudyPage(path);
+    })
+  );
+
+  const candidates = [];
+  for (const page of pages) {
+    for (const [index, paragraph] of page.paragraphs.entries()) {
+      const score = scoreLifeStudyParagraph({
+        paragraph,
+        title: page.title,
+        chapter,
+        chapterCn,
+        keywordTokens,
+        book,
+      });
+      candidates.push({ page, paragraph, paragraphIndex: index, score });
+    }
+  }
+
+  candidates.sort((a, b) =>
+    b.score - a.score ||
+    Math.min(String(b.paragraph || "").length, 260) - Math.min(String(a.paragraph || "").length, 260) ||
+    a.page.path.localeCompare(b.page.path, undefined, { numeric: true }) ||
+    a.paragraphIndex - b.paragraphIndex
+  );
+  const best = candidates.find((item) => item.score > 0) || candidates[0];
+  if (!best) {
+    throw new Error(`找不到 ${book.name} 的生命讀經內容`);
+  }
+
+  const focusTokens = keywordTokens.length ? keywordTokens : [book.name, book.shortName].filter(Boolean);
+  const excerpt = buildLifeStudyExcerpt(best.paragraph, focusTokens, 260);
+  const result = {
+    ok: true,
+    mode: "life_study",
+    query: normalizedQuery,
+    keyword: rawKeyword,
+    bookNo: book.no,
+    bookName: book.name,
+    chapter,
+    title: best.page.title,
+    score: best.score,
+    excerpt,
+    sourceUrl: best.page.url,
+  };
+
+  return {
+    ...result,
+    replyText: buildLifeStudyReply(result),
+  };
 }
