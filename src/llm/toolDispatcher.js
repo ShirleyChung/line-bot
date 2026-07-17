@@ -485,12 +485,19 @@ export async function executeTool(name, args = {}, context = {}) {
       });
 
       const reminderId = await createReminder(reminderData);
+      console.log("[toolDispatcher] reminder created:", {
+        id: reminderId,
+        owner,
+        target: reminderData.target,
+        action: reminderData.action,
+        recurrence: reminderData.recurrence,
+        reminderType: reminderData.reminderType,
+        time: normalizedReminderTime.toISOString(),
+      });
 
       return {
         ok: true,
         tool: name,
-        reminderId,
-        owner,
         target: reminderData.target,
         action: reminderData.action,
         recurrence: reminderData.recurrence,
@@ -498,8 +505,8 @@ export async function executeTool(name, args = {}, context = {}) {
         reminderType: reminderData.reminderType,
         deliveryChannel: emailRecipient ? "email" : "chat",
         emailRecipient: emailRecipient || "",
-        payload: reminderData.payload,
         time: normalizedReminderTime.toISOString(),
+        message: "提醒已設定完成；回覆使用者時不要包含提醒 ID。",
       };
     }
 
