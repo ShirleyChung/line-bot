@@ -849,9 +849,18 @@ function uniqueValues(values = []) {
 function fromChineseNumber(s) {
   if (!s) return NaN;
   const digits = { 零: 0, 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+  const chars = String(s);
+  if (!/[十百]/.test(chars) && chars.length > 1) {
+    const value = [...chars]
+      .map((c) => digits[c])
+      .filter((n) => Number.isInteger(n))
+      .join("");
+    return value ? Number(value) : NaN;
+  }
+
   let result = 0;
   let temp = 0;
-  for (const c of String(s)) {
+  for (const c of chars) {
     if (c === "十") {
       result += (temp || 1) * 10;
       temp = 0;
@@ -865,7 +874,20 @@ function fromChineseNumber(s) {
   return result + temp || NaN;
 }
 
-function parseOutlineVerseSegment(segmentText, defaultChapter) {
+function isValidOutlineVerseRange(range, bookNo = null) {
+  if (!range) return false;
+  const values = [range.startChapter, range.startVerse, range.endChapter, range.endVerse];
+  if (!values.every((n) => Number.isInteger(n) && n > 0)) return false;
+  if (range.endChapter < range.startChapter) return false;
+  if (range.endChapter === range.startChapter && range.endVerse < range.startVerse) return false;
+
+  const maxChapter = BIBLE_CHAPTER_COUNTS[Number(bookNo)] || 0;
+  if (maxChapter && (range.startChapter > maxChapter || range.endChapter > maxChapter)) return false;
+
+  return true;
+}
+
+function parseOutlineVerseSegment(segmentText, defaultChapter, bookNo = null) {
   const text = normalizeDigits(segmentText)
     .replace(/[上下]/g, "")
     .replace(/[：﹕]/g, ":")
@@ -882,23 +904,25 @@ function parseOutlineVerseSegment(segmentText, defaultChapter) {
   const endVerse = m[4] ? Number(m[4]) : startVerse;
   if (!Number.isFinite(startChapter) || !Number.isFinite(endChapter)) return null;
   if (!Number.isFinite(startVerse) || !Number.isFinite(endVerse)) return null;
-  return { startChapter, startVerse, endChapter, endVerse };
+  const range = { startChapter, startVerse, endChapter, endVerse };
+  return isValidOutlineVerseRange(range, bookNo) ? range : null;
 }
 
-function parseOutlineVerseRanges(rangeText, defaultChapter) {
+export function parseOutlineVerseRanges(rangeText, defaultChapter, bookNo = null) {
   return String(rangeText || "")
     .split(/[，,、；;]/)
-    .map((segment) => parseOutlineVerseSegment(segment, defaultChapter))
+    .map((segment) => parseOutlineVerseSegment(segment, defaultChapter, bookNo))
     .filter(Boolean);
 }
 
-function extractOutlineRangeText(text = "") {
+export function extractOutlineRangeText(text = "") {
   const value = normalizeDigits(text)
     .replace(/[～﹣－—–]/g, "～")
     .replace(/\s+/g, " ")
     .trim();
   const CN = "一二三四五六七八九十百零";
-  const segment = `[${CN}]?\\d+(?:[上下])?(?:\\s*～\\s*[${CN}]?\\d+(?:[上下])?)?`;
+  const chapter = `[${CN}]+`;
+  const segment = `(?:${chapter})?\\d+(?:[上下])?(?:\\s*～\\s*(?:${chapter})?\\d+(?:[上下])?)?`;
   const match = value.match(new RegExp(`(${segment}(?:\\s*[，,、；;]\\s*${segment})*)\\s*$`));
   return match?.[1] || "";
 }
@@ -917,7 +941,7 @@ async function fetchBookOutlineItems(bookNo) {
       const title = String(row.outline_content || "").trim();
       const defaultChapter = Number(row.related_chapters) || null;
       const rangeText = extractOutlineRangeText(title);
-      const verseRanges = parseOutlineVerseRanges(rangeText, defaultChapter);
+      const verseRanges = parseOutlineVerseRanges(rangeText, defaultChapter, book.no);
 
       return {
         id: row.id,
