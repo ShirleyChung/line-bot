@@ -4,6 +4,7 @@ import {
   fetchTpexListedLatestClose,
 } from "./tpexStockService.js";
 import { fetchTaiwanEtfPremium } from "./yahooEtfPremiumService.js";
+import { fetchTaiwanForeignTrading } from "./taiwanInstitutionalService.js";
 
 function isFound(price) {
   return Boolean(price && price.found);
@@ -38,6 +39,28 @@ async function withEtfPremium(price) {
   return price;
 }
 
+async function withForeignTrading(price) {
+  if (!isFound(price) || (price.market !== "TWSE" && price.market !== "TPEX")) {
+    return price;
+  }
+
+  try {
+    const foreignTrading = await fetchTaiwanForeignTrading(
+      price.symbol,
+      price.market,
+      price.date
+    );
+    return foreignTrading ? { ...price, foreignTrading } : price;
+  } catch (err) {
+    console.warn("[fetchTaiwanStockLatest] 外資買賣量查詢失敗：", price.symbol, err);
+    return price;
+  }
+}
+
+async function enrichTaiwanStock(price) {
+  return withForeignTrading(await withEtfPremium(price));
+}
+
 export async function fetchTaiwanStockLatest(symbol, dateYmd) {
   const code = String(symbol).trim().toUpperCase();
   const attempts = [];
@@ -45,7 +68,7 @@ export async function fetchTaiwanStockLatest(symbol, dateYmd) {
   const twse = await fetchTwseLatestClose(code, dateYmd);
   attempts.push(twse);
   if (isFound(twse)) {
-    return withEtfPremium({
+    return enrichTaiwanStock({
       ...twse,
       market: "TWSE",
     });
@@ -64,7 +87,7 @@ export async function fetchTaiwanStockLatest(symbol, dateYmd) {
   }
   attempts.push(tpexListed);
   if (isFound(tpexListed)) {
-    return withEtfPremium(tpexListed);
+    return enrichTaiwanStock(tpexListed);
   }
 
   let tpexEmerging;
@@ -80,7 +103,7 @@ export async function fetchTaiwanStockLatest(symbol, dateYmd) {
   }
   attempts.push(tpexEmerging);
   if (isFound(tpexEmerging)) {
-    return withEtfPremium(tpexEmerging);
+    return enrichTaiwanStock(tpexEmerging);
   }
 
   return {

@@ -116,6 +116,24 @@ function formatFundamentalLines(fundamentals) {
   return lines;
 }
 
+function formatForeignTradingLines(foreignTrading) {
+  if (!foreignTrading) return [];
+
+  const { buy, sell, net, date } = foreignTrading;
+  if (buy == null && sell == null && net == null) return [];
+
+  const direction = net == null ? "買賣超" : net >= 0 ? "買超" : "賣超";
+  const absoluteNet = net == null ? null : Math.abs(net);
+  const lines = [
+    `外資買進/賣出：${formatNumber(buy)} / ${formatNumber(sell)} 股`,
+    `外資${direction}：${formatNumber(absoluteNet)} 股`,
+  ];
+  if (date) {
+    lines.push(`外資資料日：${date}`);
+  }
+  return lines;
+}
+
 export function buildWatchPricesMessage(prices) {
   if (!prices || prices.length === 0) {
     return "你目前還沒有自選股。";
@@ -160,6 +178,7 @@ export function buildWatchPricesMessage(prices) {
       }
       lines.push(...formatFundamentalLines(p.fundamentals));
       lines.push(`成交量：${formatNumber(p.volume)}`);
+      lines.push(...formatForeignTradingLines(p.foreignTrading));
     }
 
     lines.push("");
@@ -195,6 +214,7 @@ export function buildWatchPricesMessage(prices) {
       }
       lines.push(...formatFundamentalLines(p.fundamentals));
       lines.push(`成交量：${formatNumber(p.volume)}`);
+      lines.push(...formatForeignTradingLines(p.foreignTrading));
     }
 
     lines.push("");
