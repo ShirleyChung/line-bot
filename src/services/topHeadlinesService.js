@@ -3,6 +3,7 @@
 // 不使用 Google News RSS，因其文章連結是不可逆的轉址 token，無法還原成原始媒體網址。
 import OpenAI from "openai";
 import { env } from "../config/env.js";
+import { createResponseWithUsage } from "./openaiResponseService.js";
 import { isAllowedNewsArticle } from "../utils/newsFilter.js";
 
 const SOURCES = [
@@ -198,7 +199,7 @@ function toSummaryMap(response) {
 }
 
 async function createChineseSummaryResponse(input, maxOutputTokens) {
-  return client.responses.create({
+  return createResponseWithUsage(client, {
     model: env.OPENAI_MODEL,
     // 頭條翻譯不需要複雜推理，降低推理強度可保留足夠 token 給結構化輸出。
     reasoning: { effort: "low" },
@@ -236,7 +237,7 @@ async function createChineseSummaryResponse(input, maxOutputTokens) {
         },
       },
     },
-  });
+  }, { purpose: "top_headlines_summary" });
 }
 
 async function addChineseSummaries(headlines) {

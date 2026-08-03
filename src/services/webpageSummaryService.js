@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import OpenAI from "openai";
 import { env } from "../config/env.js";
+import { createResponseWithUsage } from "./openaiResponseService.js";
 
 const client = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
@@ -322,7 +323,7 @@ export async function summarizeWebpageTargets(targets = []) {
     })
     .join("\n\n---\n\n");
 
-  const response = await client.responses.create({
+  const response = await createResponseWithUsage(client, {
     model: env.OPENAI_MODEL,
     max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
     instructions: [
@@ -333,7 +334,7 @@ export async function summarizeWebpageTargets(targets = []) {
       "回覆要適合 LINE 訊息閱讀，簡潔但保留關鍵細節。",
     ].join("\n"),
     input,
-  });
+  }, { purpose: "webpage_summary" });
 
   const summary = response.output_text?.trim() || "我暫時無法產生網頁摘要。";
   const failureText = failures.length

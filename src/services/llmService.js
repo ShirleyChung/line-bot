@@ -13,6 +13,7 @@ import { executeTool } from "../llm/toolDispatcher.js";
 import { sendEmail } from "./emailService.js";
 import { normalizeEmailRecipients } from "../utils/emailRecipients.js";
 import { getUserMemory } from "./userMemoryService.js";
+import { createResponseWithUsage } from "./openaiResponseService.js";
 import {
   buildSessionKey,
   getConversationState,
@@ -173,14 +174,14 @@ export async function askLlmWithTools(userText, context = {}) {
   請優先呼叫 extract_image_data 工具，不要要求再次上傳圖片。）
   `;
   }
-  let response = await client.responses.create({
+  let response = await createResponseWithUsage(client, {
     model: env.OPENAI_MODEL,
     max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
     instructions: instructions,
     input: userText,
     previous_response_id: savedState?.lastResponseId || undefined,
     tools: botTools,
-  });
+  }, { purpose: "llm_chat_initial" });
 
   // 最多允許幾輪工具呼叫，避免模型陷入無限循環
   for (let round = 0; round < 5; round++) {
@@ -290,13 +291,13 @@ export async function askLlmWithTools(userText, context = {}) {
     }
 
     // 把工具執行結果再送回模型，讓模型產生下一步或最終回答
-    response = await client.responses.create({
+    response = await createResponseWithUsage(client, {
       model: env.OPENAI_MODEL,
       max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
       previous_response_id: response.id,
       input: toolOutputs,
       tools: botTools,
-    });
+    }, { purpose: "llm_chat_tool_followup" });
   }
   // 即使超過迴圈，也盡量保存最後一次 response.id
   if (response?.id) {

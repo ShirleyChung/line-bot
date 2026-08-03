@@ -2,6 +2,7 @@
 
 import OpenAI from "openai";
 import { env } from "../config/env.js";
+import { createResponseWithUsage } from "./openaiResponseService.js";
 
 const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
@@ -12,7 +13,7 @@ const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
  * @returns {Promise<object>} 結構化的 JSON 物件
  */
 export async function parseOCRToJSON(text) {
-  const resp = await client.responses.create({
+  const resp = await createResponseWithUsage(client, {
     model: env.OPENAI_MODEL,
     max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
     input: `
@@ -20,7 +21,7 @@ export async function parseOCRToJSON(text) {
 
 ${text}
 `,
-  });
+  }, { purpose: "ocr_structure_extraction" });
 
   try {
     return JSON.parse(resp.output_text);

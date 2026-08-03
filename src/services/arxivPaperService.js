@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { env } from "../config/env.js";
+import { createResponseWithUsage } from "./openaiResponseService.js";
 import { db } from "./firestore.js";
 
 const ARXIV_API_URL = "https://export.arxiv.org/api/query";
@@ -521,7 +522,7 @@ function buildFallbackDigest(papers, max) {
 }
 
 async function createDigestResponse({ papers, normalizedMax, maxOutputTokens }) {
-  return openai.responses.create({
+  return createResponseWithUsage(openai, {
     model: env.OPENAI_MODEL,
     max_output_tokens: maxOutputTokens,
     instructions: [
@@ -539,7 +540,7 @@ async function createDigestResponse({ papers, normalizedMax, maxOutputTokens }) 
       "候選論文如下：",
       buildPaperContext(papers),
     ].join("\n\n"),
-  });
+  }, { purpose: "arxiv_digest" });
 }
 
 export async function buildLatestArxivPaperDigest({

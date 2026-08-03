@@ -10,7 +10,10 @@ import {
  * @returns {boolean} 是否包含 HTTP URL
  */
 export function shouldHandleWebpageSummary(text = "") {
-  return containsHttpUrl(text);
+  if (!containsHttpUrl(text)) return false;
+
+  // 單純分享網址不自動花費 LLM token；只有明確要求摘要或整理內容才處理。
+  return /(摘要|總結|整理(?:一下|這篇|內容|重點)?|重點|懶人包|概述|簡述|歸納|幫我看|內容是什麼|在說什麼|說了什麼)/i.test(text);
 }
 
 /**
