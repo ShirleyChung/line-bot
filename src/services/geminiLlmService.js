@@ -13,7 +13,7 @@ import {
 
 const DIRECT_TEXT_TOOLS = new Set([
   "get_watch_prices", "get_stock_price", "get_etf_constituents",
-  "get_futures_price", "get_latest_arxiv_papers", "get_itf_tournaments",
+  "get_futures_price", "get_itf_tournaments",
   "get_itf_tournament_details", "get_top_headlines", "summarize_article_url",
 ]);
 
@@ -21,7 +21,7 @@ const DIRECT_REPLY_TOOLS = new Set([
   "find_nearby_parking", "find_nearby_facilities", "get_house_price",
   "get_random_bible_verse", "get_recovery_bible_verses",
   "get_recovery_bible_outline", "get_recovery_bible_notes",
-  "get_life_study_excerpt", "request_tool_development",
+  "get_life_study_excerpt",
 ]);
 
 const geminiTools = [{

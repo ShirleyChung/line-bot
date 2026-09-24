@@ -63,7 +63,7 @@ export const botTools = [
   {
     type: "function",
     name: "create_reminder",
-    description: "建立提醒事項。可建立一次性提醒、每日排程，或每週特定星期的排程（例如每個星期五，或除了星期四外每天）。內容可為天氣、單一股價、期貨行情、自選股股價、今日連結、arXiv 最新論文摘要、CNN/綜合頭條新聞、指定關鍵字的最新新聞、每日經節、依恢復本綱目循序讀經。",
+    description: "建立提醒事項。可建立一次性提醒、每日排程，或每週特定星期的排程（例如每個星期五，或除了星期四外每天）。內容可為天氣、單一股價、期貨行情、自選股股價、今日連結、CNN/綜合頭條新聞、指定關鍵字的最新新聞、每日經節、依恢復本綱目循序讀經。",
     parameters: {
       type: "object",
       properties: {
@@ -91,8 +91,8 @@ export const botTools = [
         },
         reminderType: {
           type: "string",
-          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "arxiv_papers", "top_headlines", "general_news", "bible_verse", "bible_outline"],
-          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；最新 arXiv 論文摘要用 arxiv_papers；頭條、今日頭條、新聞提醒、最新新聞與指定 CNN 頭條都用 top_headlines；指定關鍵字（公司/產業/人物/事件）的最新新聞用 general_news；每日隨機經節用 bible_verse；依綱目循序讀某書卷用 bible_outline（需同時填 bibleBookName）；一般文字用 generic。",
+          enum: ["generic", "weather", "stock", "futures", "watch_prices", "today_link", "top_headlines", "general_news", "bible_verse", "bible_outline"],
+          description: "提醒內容類型。天氣用 weather；單一股票用 stock；台股期貨/大台小台等行情用 futures；使用者自選股用 watch_prices；每日課程連結用 today_link；頭條、今日頭條、新聞提醒、最新新聞與指定 CNN 頭條都用 top_headlines；指定關鍵字（公司/產業/人物/事件）的最新新聞用 general_news；每日隨機經節用 bible_verse；依綱目循序讀某書卷用 bible_outline（需同時填 bibleBookName）；一般文字用 generic。",
         },
         city: {
           type: "string",
@@ -300,23 +300,6 @@ export const botTools = [
       properties: {},
       additionalProperties: false
     }
-  },
-  {
-    type: "function",
-    name: "get_latest_arxiv_papers",
-    description: "抓取固定配方論文摘要：Nature Communications 1 篇、arXiv AI/IC-Design/FPGA/通訊/控制/Robotics/Computer-Architecture 各 1 篇、ChemRxiv 1 篇、臺灣博碩士論文知識加值系統國文 1 篇、DOAJ archaeology 1 篇；提供 abstract 的繁體中文翻譯，若未提供 abstract 則翻譯標題，並附原文與 PDF 連結。",
-    parameters: {
-      type: "object",
-      properties: {
-        max: {
-          type: "number",
-          description: "固定配方論文篇數，填 11。",
-        },
-      },
-      required: ["max"],
-      additionalProperties: false,
-    },
-    strict: true,
   },
   {
     type: "function",
@@ -850,35 +833,6 @@ export const botTools = [
         },
       },
       required: ["city", "district", "road", "rangeMonths"],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: "function",
-    name: "request_tool_development",
-    description: "當使用者要求新增 bot 能力、開發新工具、串接新資料源，或現有工具無法完成需求時，把需求送交 evolveEngine 評估與排程。",
-    parameters: {
-      type: "object",
-      properties: {
-        userText: {
-          type: "string",
-          description: "使用者原始需求或完整重述。",
-        },
-        reason: {
-          type: "string",
-          description: "為什麼目前做不到，例如沒有對應工具、缺少 API 串接、需要新增資料解析。",
-        },
-        missingCapability: {
-          type: "string",
-          description: "目前缺少的能力，簡短描述。",
-        },
-        expectedBehavior: {
-          type: "string",
-          description: "完成後 bot 應該如何使用這個新能力與回覆使用者。",
-        },
-      },
-      required: ["userText", "reason", "missingCapability", "expectedBehavior"],
       additionalProperties: false,
     },
     strict: true,

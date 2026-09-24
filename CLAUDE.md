@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A multi-platform chat bot (LINE primary, plus Telegram, Facebook Messenger, Instagram) deployed as a Cloud Run service. It exposes webhook endpoints, routes inbound messages through built-in handlers first, and falls back to OpenAI Responses API with a large suite of function tools (reminders, stock prices, weather, places/routes, arXiv summaries, OCR, etc.). Firestore is the only persistent store.
+A multi-platform chat bot (LINE primary, plus Telegram, Facebook Messenger, Instagram) deployed as a Cloud Run service. It exposes webhook endpoints, routes inbound messages through built-in handlers first, and falls back to an LLM with a large suite of function tools (reminders, stock prices, weather, places/routes, OCR, etc.). Firestore is the only persistent store.
 
 ## Commands
 
@@ -13,7 +13,6 @@ A multi-platform chat bot (LINE primary, plus Telegram, Facebook Messenger, Inst
 npm start
 # Deploy to Cloud Run (asia-east1, public).
 ./run
-# Deploy both `line-bot` and `evolve-engine` to Cloud Run.
 # Build the Rust SOR log parser used by sorLogService (also built inside the Dockerfile).
 cd sorlogparser_rust && cargo build --release --no-default-features
 ```
@@ -49,7 +48,7 @@ Each webhook normalizes its inbound payload to a common event shape, then fans o
 
 Up to 5 tool-call rounds are allowed. Inside the loop, `executeTool` (in `src/llm/toolDispatcher.js`) dispatches function calls. Tool schemas are declared separately in `src/llm/tools.js`.
 
-**Important shortcut**: for a small set of tools (`get_watch_prices`, `get_stock_price`, `get_latest_arxiv_papers`, `find_nearby_parking`, `find_nearby_facilities`), `llmService` returns the tool's preformatted `text`/`replyText` **directly to the user** without feeding the result back to the model. This is intentional — it avoids the model paraphrasing numeric/structured output. When adding a new tool whose output is already user-ready, follow the same pattern; otherwise return JSON and let the model summarize.
+**Important shortcut**: for a small set of tools (`get_watch_prices`, `get_stock_price`, `find_nearby_parking`, `find_nearby_facilities`), `llmService` returns the tool's preformatted `text`/`replyText` **directly to the user** without feeding the result back to the model. This is intentional — it avoids the model paraphrasing numeric/structured output. When adding a new tool whose output is already user-ready, follow the same pattern; otherwise return JSON and let the model summarize.
 
 The OPENAI_SYSTEM_PROMPT in `src/config/env.js` is large and contains explicit routing rules (which user phrasings should call which tool, what defaults to use for parameters like `paperCount`, `radiusMeters`, `mode`). When adding or renaming a tool, update both `tools.js` (schema), `toolDispatcher.js` (executor), and the prompt in `env.js` (routing rules) together.
 

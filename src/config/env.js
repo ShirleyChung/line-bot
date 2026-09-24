@@ -69,10 +69,6 @@ export const env = {
   EMAIL_SMTP_PASS: process.env.EMAIL_SMTP_PASS || "",
   EMAIL_FROM: process.env.EMAIL_FROM || "",
 
-  // ===== evolveEngine =====
-  EVOLVE_ENGINE_URL: process.env.EVOLVE_ENGINE_URL || "",
-  EVOLVE_ENGINE_SECRET: process.env.EVOLVE_ENGINE_SECRET || "",
-
   // ===== Google Sheets =====
   START_COLUMN: Number(process.env.START_COLUMN || 6),
   PUBLISHED_SHEET_CSV_URL: required("PUBLISHED_SHEET_CSV_URL"),
@@ -112,14 +108,13 @@ export const env = {
 - weekly 時要填 weekDays（0=星期日 … 6=星期六）：例如「每個星期五」填 [5]；「每週一三五」填 [1,3,5]；「除了星期四外每天」填 [0,1,2,3,5,6]（七天扣掉星期四）；非 weekly 一律填空陣列 []。
 - create_reminder 的 time 必須直接使用 Asia/Taipei 當地時間的 ISO 8601（含 +08:00），不要先換算成 UTC 再把結果寫成 +08:00；例如「今天下午 2 點」要是 2026-05-29T14:00:00+08:00，不是 2026-05-29T06:00:00+08:00。
 - 若 recurrence = daily 且今天該時刻已過，請改成下一次會發生的日期時間。
-- 若 recurrence = weekly，time 填下一個符合 weekDays 星期的日期時間（時刻要對；系統會自動把日期對齊到正確星期）。例如「每個星期五早上 8 點通知我當天論文」→ recurrence=weekly、weekDays=[5]、reminderType=arxiv_papers；「除了星期四外每天 20:00 通知我今天連結」→ recurrence=weekly、weekDays=[0,1,2,3,5,6]、reminderType=today_link。
+- 若 recurrence = weekly，time 填下一個符合 weekDays 星期的日期時間（時刻要對；系統會自動把日期對齊到正確星期）。例如「每個星期五早上 8 點通知我天氣」→ recurrence=weekly、weekDays=[5]、reminderType=weather；「除了星期四外每天 20:00 通知我今天連結」→ recurrence=weekly、weekDays=[0,1,2,3,5,6]、reminderType=today_link。
 - reminderType 對應：
   - weather：天氣提醒（city 填台灣地名）
   - stock：單一股票（symbol）
   - futures：台指期/大台/小台/微台/電子期/金融期/非金電/櫃買期等期貨行情提醒（commodity / contract）
   - watch_prices：自選股股價
   - today_link：今日/每日連結
-  - arxiv_papers：論文提醒（固定 11 篇：Nature Communications 1 篇、arXiv AI/IC-Design/FPGA/通訊/控制/Robotics/Computer-Architecture 各 1 篇、ChemRxiv 1 篇、臺灣博碩士論文知識加值系統國文 1 篇、DOAJ archaeology 1 篇；paperCount 填 11）
   - top_headlines：使用者說「頭條/頭條新聞/今日頭條/重點新聞/CNN 頭條/新聞提醒/最新新聞/新聞通知」等未指定關鍵字時用，回傳當下綜合頭條（含 CNN、Reuters、Bloomberg、新華社、BBC；headlineCount 預設 10，限制 1-10）。例如「11:41 通知我頭條新聞」「每天早上 8 點給我今日頭條」「每天早上 8 點通知我新聞」
   - general_news：指定關鍵字的最新新聞提醒（newsQuery 填關鍵字如公司/產業/人物/事件，newsCount 預設 5，限制 1-10）。例如「每天早上 8 點通知我台積電的最新新聞」
   - 頭條類提醒切勿落入 generic：只要使用者要的是「頭條/新聞」就必須用 top_headlines / general_news 其中之一，讓系統在觸發當下即時抓取，不要建成純文字提醒；若沒有明確指定關鍵字，排程新聞優先用 top_headlines。
@@ -146,10 +141,7 @@ export const env = {
   - 使用者說「近月/這個月」→ contract="近月"，「次月/下個月」→ contract="次月"，指定月份 → 帶 YYYYMM。
   - 「夜盤」不需特別指定 session，工具會自動回最新一段（含夜盤）資料。
 
-4) 論文
-- 「最新論文/arXiv/計算機科學/工程論文摘要」→ get_latest_arxiv_papers（固定 11 篇；固定配方為 Nature Communications 1 篇、arXiv AI/IC-Design/FPGA/通訊/控制/Robotics/Computer-Architecture 各 1 篇、ChemRxiv 1 篇、臺灣博碩士論文知識加值系統國文 1 篇、DOAJ archaeology 1 篇；輸出含 abstract 繁中翻譯；若無 abstract 則翻譯標題，並附原文／PDF 連結）
-
-4.1) ITF 網球賽事
+4) ITF 網球賽事
 - 查 ITF 賽事、ITF tennis、ITF Junior/Juniors、J100/J300/J500 等賽程/賽事列表/賽事連結 → get_itf_tournaments。
 - 預設 tour="juniors"。
 - 預設 region="Asia"；除非使用者指定其他區域或國家，ITF 查詢先查亞洲。
@@ -204,9 +196,5 @@ export const env = {
 - 若使用者的請求需要先查資料（例如股價、新聞、期貨行情），先呼叫對應工具取得結果，再將結果組成 body，最後呼叫 send_email。
 - 排程提醒若使用者附上 email（例如「每天早上 8 點寄信到 xxx@xxx.com 通知大台指行情」），建立 create_reminder 時將 emailRecipient 填入該 email 地址；若使用者提供多個 email，emailRecipient 填入全部地址（逗號分隔）；屆時系統會以 email 取代聊天推送。
 
-11) 工具演進需求
-- 當使用者要求的是「新增 bot 能力 / 開發新工具 / 目前工具做不到的需求 / 需要串接新資料源或 API」且現有工具無法完成時，呼叫 request_tool_development。
-- 不要假裝已經完成新工具開發；只負責把需求送交 evolveEngine。
-- missingCapability 簡短描述目前缺少什麼能力；expectedBehavior 描述完成後使用者應該如何使用、bot 應如何回覆。
 `
 };

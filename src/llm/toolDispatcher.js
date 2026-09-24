@@ -32,7 +32,6 @@ import {
 import { buildWatchPricesMessage, buildFuturesQuoteMessage } from "../utils/format.js";
 import { fetchNews } from "../services/newsService.js";
 import { searchWeb } from "../services/webSearchService.js";
-import { buildLatestArxivPaperDigest } from "../services/arxivPaperService.js";
 import { buildNewsMessage } from "../utils/format.js";
 import { fetchTopHeadlines, buildTopHeadlinesMessage } from "../services/topHeadlinesService.js";
 import { fetchItfTournamentDetails, fetchItfTournaments } from "../services/itfTennisService.js";
@@ -62,7 +61,6 @@ import {
   queryHousePrice,
   formatHousePriceReply,
 } from "../services/realEstateService.js";
-import { submitEvolveRequest } from "../services/evolveClient.js";
 
 function detectMarket(symbol) {
   const code = String(symbol).trim().toUpperCase();
@@ -152,7 +150,6 @@ const QUERY_TOOL_NAMES = new Set([
   "get_stock_price",
   "get_etf_constituents",
   "get_futures_price",
-  "get_latest_arxiv_papers",
   "get_itf_tournaments",
   "get_itf_tournament_details",
   "get_top_headlines",
@@ -401,7 +398,6 @@ export async function executeTool(name, args = {}, context = {}) {
         (reminderType === "weather" && args.city ? `${args.city}天氣` : "") ||
         (reminderType === "watch_prices" ? "自選股股價" : "") ||
         (reminderType === "today_link" ? "今日連結" : "") ||
-        (reminderType === "arxiv_papers" ? "最新 arXiv 論文摘要" : "") ||
         (reminderType === "top_headlines" ? "今日頭條新聞" : "") ||
         (reminderType === "general_news" && args.newsQuery ? `${args.newsQuery} 最新新聞` : "") ||
         (reminderType === "futures" && reminderCommodity ? `${reminderCommodity}${args.contract ? ` ${args.contract}` : ""}行情` : "") ||
@@ -452,9 +448,6 @@ export async function executeTool(name, args = {}, context = {}) {
       if (reminderCommodity) payload.commodity = reminderCommodity;
       if (args.contract) payload.contract = args.contract;
       if (args.weatherTarget) payload.target = args.weatherTarget;
-      if (reminderType === "arxiv_papers") {
-        payload.max = 11;
-      }
       if (reminderType === "top_headlines") {
         payload.max = Math.min(Math.max(Number(args.headlineCount) || 10, 1), 10);
       }
@@ -770,19 +763,6 @@ export async function executeTool(name, args = {}, context = {}) {
         tool: name,
         yahooSymbol: resolved.symbol,
         quote,
-        text,
-      };
-    }
-
-    case "get_latest_arxiv_papers": {
-      const text = await buildLatestArxivPaperDigest({
-        max: args.max || 11,
-      });
-
-      return {
-        ok: true,
-        tool: name,
-        type: "text",
         text,
       };
     }
@@ -1355,34 +1335,6 @@ export async function executeTool(name, args = {}, context = {}) {
         tool: name,
         to,
         subject,
-      };
-    }
-
-    case "request_tool_development": {
-      const userText = String(args.userText || "").trim();
-      const owner = buildSessionKey(context.source);
-
-      if (!userText) {
-        throw new Error("request_tool_development 缺少 userText");
-      }
-
-      const result = await submitEvolveRequest({
-        userText,
-        reason: String(args.reason || "").trim(),
-        missingCapability: String(args.missingCapability || "").trim(),
-        expectedBehavior: String(args.expectedBehavior || "").trim(),
-        source: context.source || null,
-        sessionKey: owner,
-        metadata: {
-          originalUserText: context.originalUserText || "",
-        },
-      });
-
-      return {
-        ok: true,
-        tool: name,
-        ...result,
-        replyText: result.replyText || `已送交 evolveEngine 評估。追蹤 ID：${result.requestId}`,
       };
     }
 

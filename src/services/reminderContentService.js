@@ -6,7 +6,6 @@ import { getWatchPrices } from "./stockSelectService.js";
 import { buildWatchPricesMessage, buildFuturesQuoteMessage } from "../utils/format.js";
 import { fetchYahooFuturesQuote } from "./yahooFuturesService.js";
 import { resolveFuturesSymbol } from "./futuresSymbolService.js";
-import { buildLatestArxivPaperDigest } from "./arxivPaperService.js";
 import {
   getRandomRecoveryBibleVerse,
   getBookOutlineReminderItems,
@@ -24,7 +23,6 @@ export const REMINDER_TYPES = new Set([
   "futures",
   "watch_prices",
   "today_link",
-  "arxiv_papers",
   "cnn_news",
   "top_headlines",
   "general_news",
@@ -208,12 +206,6 @@ async function buildWeatherReminderMessage(reminder) {
  * @param {object} reminder - 提醒物件
  * @returns {Promise<string>} 提醒訊息
  */
-async function buildArxivPaperReminderMessage(reminder) {
-  const max = reminder.payload?.max || 11;
-  const digest = await buildLatestArxivPaperDigest({ max });
-  return `最新論文摘要（固定 11 篇來源配方）\n${digest}`;
-}
-
 async function buildTopHeadlinesReminderMessage(reminder) {
   const max = Math.min(Math.max(Number(reminder.payload?.max) || 10, 1), 10);
   const headlines = await fetchTopHeadlines({ max });
@@ -282,9 +274,6 @@ export async function buildReminderMessage(reminder) {
 
     case "today_link":
       return get_today_link();
-
-    case "arxiv_papers":
-      return buildArxivPaperReminderMessage(normalized);
 
     case "cnn_news":
       // 舊版 CNN 排程保留相容性，改以整合後的多來源頭條執行。

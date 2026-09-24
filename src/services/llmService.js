@@ -258,7 +258,7 @@ async function askOpenAiWithTools(userText, context = {}) {
         };
       }
       // 已經格式化好的工具結果，若有 emailRecipient 則直接寄送；否則回聊天室。
-      if (["get_watch_prices", "get_stock_price", "get_etf_constituents", "get_futures_price", "get_latest_arxiv_papers", "get_itf_tournaments", "get_itf_tournament_details", "get_top_headlines", "summarize_article_url"].includes(call.name) && result?.text) {
+      if (["get_watch_prices", "get_stock_price", "get_etf_constituents", "get_futures_price", "get_itf_tournaments", "get_itf_tournament_details", "get_top_headlines", "summarize_article_url"].includes(call.name) && result?.text) {
         return deliverDirectResult(result.text, userText, context);
       }
       if (
@@ -271,7 +271,6 @@ async function askOpenAiWithTools(userText, context = {}) {
           "get_recovery_bible_outline",
           "get_recovery_bible_notes",
           "get_life_study_excerpt",
-          "request_tool_development",
         ].includes(call.name) &&
         result?.replyText
       ) {

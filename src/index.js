@@ -313,6 +313,13 @@ app.get("/cron/check-reminders", async (req, res) => {
         continue;
       }
 
+      // 論文摘要功能已移除；清掉舊排程，避免被當成 generic 提醒繼續觸發。
+      if (r.reminderType === "arxiv_papers") {
+        await deleteReminder(r.id);
+        console.log("[cron] deleted retired arxiv reminder:", r.id);
+        continue;
+      }
+
       console.log("[cron] pushing reminder:", {
         id: r.id,
         owner: r.owner,
