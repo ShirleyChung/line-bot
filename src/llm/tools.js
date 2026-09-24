@@ -1,5 +1,5 @@
 /**
- * 提供給 OpenAI Responses API 的 tools 定義
+ * LLM 共用的 tools 定義（OpenAI 與 Gemini 會各自轉成供應商格式）
  *
  * 這裡只描述：
  * - 工具名稱

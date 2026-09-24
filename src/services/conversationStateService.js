@@ -113,6 +113,29 @@ export async function setConversationState(sessionKey, lastResponseId) {
 }
 
 /**
+ * Gemini 沒有 previous_response_id，因此只保存有固定上限的文字對話。
+ * tool call / tool response 不寫入 Firestore，避免大型結果讓文件持續膨脹。
+ *
+ * @param {string} sessionKey
+ * @param {Array<{role:string,parts:Array<{text:string}>}>} history
+ * @returns {Promise<void>}
+ */
+export async function setGeminiConversationState(sessionKey, history) {
+  if (!sessionKey) {
+    throw new Error("setGeminiConversationState 需要 sessionKey");
+  }
+
+  const docRef = getCollection().doc(sessionKey);
+  await docRef.set(
+    {
+      geminiHistory: Array.isArray(history) ? history : [],
+      geminiUpdatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+}
+
+/**
   * 刪除指定 session 的對話狀態
  * @param {string} sessionKey
  * @returns {Promise<void>}

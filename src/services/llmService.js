@@ -19,6 +19,7 @@ import {
   getConversationState,
   setConversationState,
 } from "./conversationStateService.js";
+import { askGeminiWithTools } from "./geminiLlmService.js";
 
 // 初始化 OpenAI client
 const client = new OpenAI({
@@ -125,7 +126,7 @@ async function deliverDirectResult(text, userText, context = {}) {
  * @param {object} context - 可傳入 replyToken、source、userId 等上下文
  * @returns {Promise<{type:string,text?:string,toolUsed?:boolean}>}
  */
-export async function askLlmWithTools(userText, context = {}) {
+async function askOpenAiWithTools(userText, context = {}) {
   // 如果尚未設定 OpenAI key，直接回固定訊息，避免整個流程失敗
   if (!env.OPENAI_API_KEY) {
     return {
@@ -308,5 +309,19 @@ export async function askLlmWithTools(userText, context = {}) {
     type: "text",
     text: "工具處理次數過多，已停止。",
     toolUsed: true,
+  };
+}
+
+export async function askLlmWithTools(userText, context = {}) {
+  if (env.LLM_PROVIDER === "gemini") {
+    return askGeminiWithTools(userText, context);
+  }
+  if (env.LLM_PROVIDER === "openai") {
+    return askOpenAiWithTools(userText, context);
+  }
+
+  return {
+    type: "text",
+    text: `不支援的 LLM_PROVIDER：${env.LLM_PROVIDER}，請設定為 gemini 或 openai。`,
   };
 }

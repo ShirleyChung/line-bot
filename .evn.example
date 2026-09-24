@@ -22,8 +22,15 @@ GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 AMAP_API_KEY=your_amap_api_key
 
 # =========================
-# OpenAI 設定
+# LLM 設定（預設 Gemini；改成 openai 可切回 GPT）
 # =========================
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MAX_OUTPUT_TOKENS=1500
+GEMINI_HISTORY_MAX_MESSAGES=12
+
+# 保留既有 GPT 接口與其他仍使用 OpenAI 的摘要功能
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-5.5
 OPENAI_SYSTEM_PROMPT=你是一個親切、準確、簡潔的 LINE 助手。遇到已知工具型問題時，不要捏造資料。

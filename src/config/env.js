@@ -85,6 +85,16 @@ export const env = {
   OPENAI_API_KEY: required("OPENAI_API_KEY"),
   OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5-mini",
   OPENAI_MAX_OUTPUT_TOKENS: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 1500),
+  // ===== LLM / Gemini =====
+  // 設定 Gemini key 後預設使用 Gemini；也可明確設成 openai 切回 Responses API。
+  // 尚未部署 Gemini key 的舊環境會繼續走 OpenAI，避免更新程式當下中斷服務。
+  LLM_PROVIDER: (
+    process.env.LLM_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : "openai")
+  ).trim().toLowerCase(),
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
+  GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  GEMINI_MAX_OUTPUT_TOKENS: Number(process.env.GEMINI_MAX_OUTPUT_TOKENS || 1500),
+  GEMINI_HISTORY_MAX_MESSAGES: Number(process.env.GEMINI_HISTORY_MAX_MESSAGES || 12),
   // 頭條摘要會一次要求模型回傳多則嚴格 JSON；推理模型的 max_output_tokens
   // 同時計入推理與可見輸出，不能沿用一般聊天回覆的較小預設值。
   OPENAI_HEADLINE_MAX_OUTPUT_TOKENS: Number(process.env.OPENAI_HEADLINE_MAX_OUTPUT_TOKENS || 3000),
