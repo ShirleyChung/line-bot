@@ -16,6 +16,7 @@ import { getUserMemory } from "./userMemoryService.js";
 import { createResponseWithUsage } from "./openaiResponseService.js";
 import {
   buildSessionKey,
+  clearOpenAiConversationState,
   getConversationState,
   setConversationState,
 } from "./conversationStateService.js";
@@ -27,6 +28,34 @@ let client;
 function getOpenAiClient() {
   client ||= new OpenAI({ apiKey: env.OPENAI_API_KEY });
   return client;
+}
+
+export function isBrokenOpenAiToolChain(error) {
+  const message = String(error?.message || error || "");
+  return error?.status === 400 && (
+    /No tool output found for function call/i.test(message) ||
+    /previous_response_id/i.test(message)
+  );
+}
+
+async function createInitialOpenAiResponse(params, sessionKey, hasPreviousResponse) {
+  try {
+    return await createResponseWithUsage(getOpenAiClient(), params, {
+      purpose: "llm_chat_initial",
+    });
+  } catch (error) {
+    if (!hasPreviousResponse || !isBrokenOpenAiToolChain(error)) throw error;
+
+    console.warn("[askLlmWithTools] OpenAI 對話鏈無法續接，清除 lastResponseId 後重試", {
+      sessionKey,
+      message: error?.message || String(error),
+    });
+    await clearOpenAiConversationState(sessionKey);
+    const { previous_response_id: _staleResponseId, ...freshParams } = params;
+    return createResponseWithUsage(getOpenAiClient(), freshParams, {
+      purpose: "llm_chat_initial_state_recovery",
+    });
+  }
 }
 
 function countUnclosedObjectBraces(jsonText) {
@@ -178,14 +207,15 @@ async function askOpenAiWithTools(userText, context = {}) {
   請優先呼叫 extract_image_data 工具，不要要求再次上傳圖片。）
   `;
   }
-  let response = await createResponseWithUsage(getOpenAiClient(), {
+  const previousResponseId = savedState?.lastResponseId || undefined;
+  let response = await createInitialOpenAiResponse({
     model: env.OPENAI_MODEL,
     max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
     instructions: instructions,
     input: userText,
-    previous_response_id: savedState?.lastResponseId || undefined,
+    previous_response_id: previousResponseId,
     tools: botTools,
-  }, { purpose: "llm_chat_initial" });
+  }, sessionKey, Boolean(previousResponseId));
 
   // 最多允許幾輪工具呼叫，避免模型陷入無限循環
   for (let round = 0; round < 5; round++) {
@@ -197,7 +227,7 @@ async function askOpenAiWithTools(userText, context = {}) {
     if (!functionCalls.length) {
       // 保存最新 response.id，供下一輪延續上下文
       if (response?.id) {
-        setConversationState(sessionKey, response.id);
+        await setConversationState(sessionKey, response.id);
       }
 
       return {
@@ -297,16 +327,15 @@ async function askOpenAiWithTools(userText, context = {}) {
     response = await createResponseWithUsage(getOpenAiClient(), {
       model: env.OPENAI_MODEL,
       max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
+      // Responses API 的 previous_response_id 不會沿用 top-level instructions。
+      instructions,
       previous_response_id: response.id,
       input: toolOutputs,
       tools: botTools,
     }, { purpose: "llm_chat_tool_followup" });
   }
-  // 即使超過迴圈，也盡量保存最後一次 response.id
-  if (response?.id) {
-    await setConversationState(sessionKey, response.id);
-  }
-
+  // 此時 response 仍可能含有尚未回傳 output 的 function call，不能保存為下一輪的
+  // previous_response_id，否則 OpenAI 會回 400 No tool output found。
   return {
     type: "text",
     text: "工具處理次數過多，已停止。",

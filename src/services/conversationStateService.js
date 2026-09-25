@@ -113,6 +113,27 @@ export async function setConversationState(sessionKey, lastResponseId) {
 }
 
 /**
+ * 只清除 OpenAI Responses API 的續接 ID，保留同一文件內的 Gemini 歷史等狀態。
+ * 當先前 response 留有未完成 tool call 或已失效時，用於自動重建對話鏈。
+ *
+ * @param {string} sessionKey
+ * @returns {Promise<void>}
+ */
+export async function clearOpenAiConversationState(sessionKey) {
+  if (!sessionKey) {
+    throw new Error("clearOpenAiConversationState 需要 sessionKey");
+  }
+
+  await getCollection().doc(sessionKey).set(
+    {
+      lastResponseId: null,
+      openAiStateResetAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+}
+
+/**
  * Gemini 沒有 previous_response_id，因此只保存有固定上限的文字對話。
  * tool call / tool response 不寫入 Firestore，避免大型結果讓文件持續膨脹。
  *

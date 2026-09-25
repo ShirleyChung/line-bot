@@ -9,11 +9,23 @@ process.env.PUBLISHED_SHEET_CSV_URL ||= "https://example.com/test.csv";
 process.env.GEMINI_API_KEY ||= "test";
 process.env.LLM_PROVIDER ||= "gemini";
 
-const [{ botTools }, { buildGeminiFunctionDeclarations }, reminderContent] = await Promise.all([
+const [{ botTools }, { buildGeminiFunctionDeclarations }, reminderContent, llmService] = await Promise.all([
   import("../src/llm/tools.js"),
   import("../src/services/geminiLlmService.js"),
   import("../src/services/reminderContentService.js"),
+  import("../src/services/llmService.js"),
 ]);
+
+test("detects an OpenAI response chain with missing tool output", () => {
+  assert.equal(llmService.isBrokenOpenAiToolChain({
+    status: 400,
+    message: "No tool output found for function call call_123.",
+  }), true);
+  assert.equal(llmService.isBrokenOpenAiToolChain({
+    status: 429,
+    message: "Rate limit exceeded",
+  }), false);
+});
 
 test("Gemini reminder schema requires only routing-critical fields", () => {
   const declaration = buildGeminiFunctionDeclarations(botTools)
