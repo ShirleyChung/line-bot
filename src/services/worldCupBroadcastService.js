@@ -1,14 +1,12 @@
-import OpenAI from "openai";
 import { db } from "./firestore.js";
 import { env } from "../config/env.js";
-import { createResponseWithUsage } from "./openaiResponseService.js";
+import { createLlmTextResponse, hasConfiguredLlm } from "./llmGenerationService.js";
 
 const SUBSCRIPTIONS_COLLECTION = "worldcup_broadcasts";
 const LIVE_STATUSES = new Set(["LIVE", "IN_PLAY", "PAUSED"]);
 const RECENT_STATUSES = new Set(["FINISHED", "IN_PLAY", "PAUSED", "LIVE"]);
 const API_FOOTBALL_LIVE_STATUS = new Set(["1H", "2H", "ET", "BT", "P", "LIVE"]);
 
-const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
 function getTaipeiDate(date = new Date()) {
   return new Intl.DateTimeFormat("sv-SE", {
@@ -544,16 +542,16 @@ export function formatWorldCupSnapshot(snapshot = {}) {
 }
 
 async function summarizeWithLlm(snapshot) {
-  if (!env.OPENAI_API_KEY || env.FOOTBALL_BROADCAST_USE_LLM === "false") {
+  if (!hasConfiguredLlm() || env.FOOTBALL_BROADCAST_USE_LLM === "false") {
     return "";
   }
 
-  const response = await createResponseWithUsage(client, {
-    model: env.OPENAI_MODEL,
-    max_output_tokens: 700,
+  const response = await createLlmTextResponse({
+    purpose: "world_cup_broadcast",
+    maxOutputTokens: 700,
     instructions: "你是即時足球文字主播。請把提供的 JSON 戰況改寫成繁體中文播報，保留比分、分鐘、進球者、助攻、牌證、射門、射正、犯規、控球與狀態；不要新增資料，不要猜測。語氣精準、短句、有臨場感，最多 10 行。",
     input: JSON.stringify(snapshot),
-  }, { purpose: "world_cup_broadcast" });
+  });
 
   return response.output_text?.trim() || "";
 }

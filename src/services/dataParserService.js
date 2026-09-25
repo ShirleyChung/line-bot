@@ -1,10 +1,7 @@
 // src/services/dataParserService.js
 
-import OpenAI from "openai";
 import { env } from "../config/env.js";
-import { createResponseWithUsage } from "./openaiResponseService.js";
-
-const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+import { createLlmTextResponse } from "./llmGenerationService.js";
 
 /**
  * 將 OCR 純文字交給 LLM 整理成 JSON。
@@ -13,15 +10,17 @@ const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
  * @returns {Promise<object>} 結構化的 JSON 物件
  */
 export async function parseOCRToJSON(text) {
-  const resp = await createResponseWithUsage(client, {
-    model: env.OPENAI_MODEL,
-    max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
+  const resp = await createLlmTextResponse({
+    purpose: "ocr_structure_extraction",
+    maxOutputTokens: env.LLM_PROVIDER === "gemini"
+      ? env.GEMINI_MAX_OUTPUT_TOKENS
+      : env.OPENAI_MAX_OUTPUT_TOKENS,
     input: `
 請從以下 OCR 文字中提取結構化資料，輸出 JSON：
 
 ${text}
 `,
-  }, { purpose: "ocr_structure_extraction" });
+  });
 
   try {
     return JSON.parse(resp.output_text);

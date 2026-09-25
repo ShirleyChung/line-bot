@@ -1,12 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import OpenAI from "openai";
 import { env } from "../config/env.js";
-import { createResponseWithUsage } from "./openaiResponseService.js";
-
-const client = new OpenAI({
-  apiKey: env.OPENAI_API_KEY,
-});
+import { createLlmTextResponse, hasConfiguredLlm } from "./llmGenerationService.js";
 
 const MAX_URLS = 3;
 const MAX_FETCH_BYTES = 800_000;
@@ -280,8 +275,8 @@ function trimForLine(text) {
 }
 
 export async function summarizeWebpageTargets(targets = []) {
-  if (!env.OPENAI_API_KEY) {
-    return "目前尚未設定 OpenAI API Key，無法摘要網頁。";
+  if (!hasConfiguredLlm()) {
+    return "目前尚未設定 LLM API Key，無法摘要網頁。";
   }
 
   const normalizedTargets = normalizeSummaryTargets(targets);
@@ -323,9 +318,11 @@ export async function summarizeWebpageTargets(targets = []) {
     })
     .join("\n\n---\n\n");
 
-  const response = await createResponseWithUsage(client, {
-    model: env.OPENAI_MODEL,
-    max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
+  const response = await createLlmTextResponse({
+    purpose: "webpage_summary",
+    maxOutputTokens: env.LLM_PROVIDER === "gemini"
+      ? env.GEMINI_MAX_OUTPUT_TOKENS
+      : env.OPENAI_MAX_OUTPUT_TOKENS,
     instructions: [
       "你是網頁內容摘要助手。請用繁體中文回覆。",
       "根據提供的網頁文字摘要，不要編造網頁文字中沒有的資訊。",
@@ -334,7 +331,7 @@ export async function summarizeWebpageTargets(targets = []) {
       "回覆要適合 LINE 訊息閱讀，簡潔但保留關鍵細節。",
     ].join("\n"),
     input,
-  }, { purpose: "webpage_summary" });
+  });
 
   const summary = response.output_text?.trim() || "我暫時無法產生網頁摘要。";
   const failureText = failures.length

@@ -24,12 +24,19 @@ const DIRECT_REPLY_TOOLS = new Set([
   "get_life_study_excerpt",
 ]);
 
-const geminiTools = [{
-  functionDeclarations: botTools.map(({ type: _type, strict: _strict, parameters, ...tool }) => ({
-    ...tool,
-    parametersJsonSchema: parameters,
-  })),
-}];
+export function buildGeminiFunctionDeclarations(tools = botTools) {
+  return tools.map(({ type: _type, strict: _strict, parameters, ...tool }) => {
+    const parametersJsonSchema = structuredClone(parameters);
+    // OpenAI strict mode 要求所有欄位均 required；Gemini 不需要。提醒工具若強迫模型
+    // 一次填滿十多個無關空欄位，容易不呼叫工具或產生無效參數。
+    if (tool.name === "create_reminder") {
+      parametersJsonSchema.required = ["time", "recurrence", "reminderType"];
+    }
+    return { ...tool, parametersJsonSchema };
+  });
+}
+
+const geminiTools = [{ functionDeclarations: buildGeminiFunctionDeclarations() }];
 
 function taipeiIsoNow() {
   return new Intl.DateTimeFormat("sv-SE", {
@@ -104,6 +111,11 @@ export async function askGeminiWithTools(userText, context = {}) {
     maxOutputTokens: env.GEMINI_MAX_OUTPUT_TOKENS,
     tools: geminiTools,
   };
+  if (/^gemini-2\.5-flash(?:-|$)/.test(env.GEMINI_MODEL)) {
+    // maxOutputTokens 也包含 thinking tokens；動態思考可能耗盡 1500 token，導致沒有
+    // function call。提醒與查詢路由不需深度推理，關閉 thinking 可避免這個問題。
+    config.thinkingConfig = { thinkingBudget: 0 };
+  }
 
   let response = await client.models.generateContent({
     model: env.GEMINI_MODEL,

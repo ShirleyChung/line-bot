@@ -22,9 +22,12 @@ import {
 import { askGeminiWithTools } from "./geminiLlmService.js";
 
 // 初始化 OpenAI client
-const client = new OpenAI({
-  apiKey: env.OPENAI_API_KEY,
-});
+let client;
+
+function getOpenAiClient() {
+  client ||= new OpenAI({ apiKey: env.OPENAI_API_KEY });
+  return client;
+}
 
 function countUnclosedObjectBraces(jsonText) {
   let depth = 0;
@@ -175,7 +178,7 @@ async function askOpenAiWithTools(userText, context = {}) {
   請優先呼叫 extract_image_data 工具，不要要求再次上傳圖片。）
   `;
   }
-  let response = await createResponseWithUsage(client, {
+  let response = await createResponseWithUsage(getOpenAiClient(), {
     model: env.OPENAI_MODEL,
     max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
     instructions: instructions,
@@ -291,7 +294,7 @@ async function askOpenAiWithTools(userText, context = {}) {
     }
 
     // 把工具執行結果再送回模型，讓模型產生下一步或最終回答
-    response = await createResponseWithUsage(client, {
+    response = await createResponseWithUsage(getOpenAiClient(), {
       model: env.OPENAI_MODEL,
       max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
       previous_response_id: response.id,

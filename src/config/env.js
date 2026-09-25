@@ -78,7 +78,7 @@ export const env = {
   AMAP_API_KEY: process.env.AMAP_API_KEY || "",
 
   // ===== OpenAI =====
-  OPENAI_API_KEY: required("OPENAI_API_KEY"),
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
   OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5-mini",
   OPENAI_MAX_OUTPUT_TOKENS: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 1500),
   // ===== LLM / Gemini =====

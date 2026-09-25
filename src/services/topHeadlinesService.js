@@ -1,9 +1,8 @@
 // 綜合頭條新聞：聚合多家國際主流媒體的即時 RSS（皆為直連原始網址、免 API 金鑰），
 // 每家最多取兩則，並產生短篇繁中摘要。
 // 不使用 Google News RSS，因其文章連結是不可逆的轉址 token，無法還原成原始媒體網址。
-import OpenAI from "openai";
 import { env } from "../config/env.js";
-import { createResponseWithUsage } from "./openaiResponseService.js";
+import { createLlmTextResponse, hasConfiguredLlm } from "./llmGenerationService.js";
 import { isAllowedNewsArticle } from "../utils/newsFilter.js";
 
 const SOURCES = [
@@ -28,7 +27,6 @@ const RSS_HEADERS = {
   Accept: "application/rss+xml, application/xml;q=0.9, */*;q=0.8",
 };
 const topHeadlinesCache = new Map();
-const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 const CHINESE_SUMMARY_UNAVAILABLE = "中文摘要暫時無法產生，請開啟原文連結閱覽";
 
 function decodeHtmlEntities(value) {
@@ -199,11 +197,11 @@ function toSummaryMap(response) {
 }
 
 async function createChineseSummaryResponse(input, maxOutputTokens) {
-  return createResponseWithUsage(client, {
-    model: env.OPENAI_MODEL,
+  return createLlmTextResponse({
+    purpose: "top_headlines_summary",
     // 頭條翻譯不需要複雜推理，降低推理強度可保留足夠 token 給結構化輸出。
-    reasoning: { effort: "low" },
-    max_output_tokens: maxOutputTokens,
+    reasoningEffort: "low",
+    maxOutputTokens,
     instructions: [
       "你是新聞編輯。根據每則提供的標題與導語，寫繁體中文的客觀摘要。",
       "每則摘要限 16 到 24 個中文字左右，不要加標點以外的前綴、不要臆測。",
@@ -211,12 +209,8 @@ async function createChineseSummaryResponse(input, maxOutputTokens) {
       "必須為每個輸入 id 各回傳一則摘要。",
     ].join("\n"),
     input: JSON.stringify(input),
-    text: {
-      format: {
-        type: "json_schema",
-        name: "headline_summaries",
-        strict: true,
-        schema: {
+    jsonSchemaName: "headline_summaries",
+    jsonSchema: {
           type: "object",
           properties: {
             summaries: {
@@ -234,14 +228,12 @@ async function createChineseSummaryResponse(input, maxOutputTokens) {
           },
           required: ["summaries"],
           additionalProperties: false,
-        },
-      },
     },
-  }, { purpose: "top_headlines_summary" });
+  });
 }
 
 async function addChineseSummaries(headlines) {
-  if (!headlines.length || !env.OPENAI_API_KEY) return headlines;
+  if (!headlines.length || !hasConfiguredLlm()) return headlines;
 
   const input = headlines.map((item, index) => ({
     id: index,

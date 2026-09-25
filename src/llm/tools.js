@@ -115,10 +115,6 @@ export const botTools = [
           enum: ["now", "tomorrow", ""],
           description: "天氣查詢時段。通常每日早上提醒用 now；非天氣提醒填空字串。",
         },
-        paperCount: {
-          type: "number",
-          description: "論文摘要篇數；固定配方推送填 11；非論文提醒填 0。",
-        },
         headlineCount: {
           type: "number",
           description: "綜合頭條（top_headlines）要回傳的則數，範圍 1 到 10；未指定填 10。非頭條提醒填 0。",
@@ -140,7 +136,7 @@ export const botTools = [
           description: "若希望以 email 取代聊天推送，填入一個或多個收件人 email 地址，例如 user@example.com 或 a@example.com, b@example.com；否則填空字串。",
         },
       },
-      required: ["target", "action", "time", "recurrence", "weekDays", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "paperCount", "headlineCount", "newsQuery", "newsCount", "bibleBookName", "emailRecipient"],
+      required: ["target", "action", "time", "recurrence", "weekDays", "reminderType", "city", "symbol", "commodity", "contract", "weatherTarget", "headlineCount", "newsQuery", "newsCount", "bibleBookName", "emailRecipient"],
       additionalProperties: false,
     },
     strict: true,
