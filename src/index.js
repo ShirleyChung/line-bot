@@ -13,6 +13,8 @@ import express from "express";
 import { env } from "./config/env.js";
 import { line, lineConfig, lineClient } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
+import { replyText } from "./platform/reply.js";
+import { toUserFacingErrorMessage } from "./utils/userFacingError.js";
 import { getSorLogResultFile } from "./services/sorLogService.js";
 import { normalizeTelegramUpdate, sendTelegramText, verifyTelegramSecret } from "./platform/telegram.js";
 import { normalizeMetaWebhook, sendMetaText, verifyMetaWebhook } from "./platform/meta.js";
@@ -76,22 +78,50 @@ app.get("/sor-log-results/:token", async (req, res) => {
 });
 
 /**
+ * 執行 router，並保證不會往外拋錯。
+ * 失敗時嘗試以平台回覆通知使用者；通知本身失敗也只記錄 log。
+ * @param {object} event - 標準化後的 message event
+ */
+async function routeEventWithErrorNotice(event) {
+  try {
+    await routeMessageEvent(event);
+  } catch (error) {
+    console.error(`routeMessageEvent failed (${event.platform || "unknown"}):`, error);
+    try {
+      await replyText(event, toUserFacingErrorMessage(error));
+    } catch (notifyError) {
+      console.error("Failed to notify user about error:", notifyError);
+    }
+  }
+}
+
+/**
+ * 處理一批 webhook 事件，不論成功與否都不會拋錯。
+ *
+ * 各平台（LINE、Telegram、Meta、Teams）收到非 2xx 都可能重送同一批事件，
+ * 造成重複處理與重複回覆。因此驗證通過後一律回 200，
+ * 內部錯誤（OpenAI 額度不足、Firestore 失敗等）改由訊息通知使用者。
+ * @param {string} label - log 用的平台名稱
+ * @param {() => Array} buildEvents - 產生標準化 event 陣列的函式（正規化失敗也會被攔截）
+ */
+async function processWebhookEvents(label, buildEvents) {
+  try {
+    const events = buildEvents();
+    // 平行處理同一批事件
+    await Promise.all(events.map(routeEventWithErrorNotice));
+  } catch (error) {
+    console.error(`${label} webhook error:`, error);
+  }
+}
+
+/**
  * LINE webhook 入口
  * 這裡使用 LINE SDK middleware 驗證簽章。
  * 驗證通過後再把每個 event 丟給共用 router。
  */
 app.post("/webhook", line.middleware(lineConfig), async (req, res) => {
-  try {
-    const events = attachRequestBaseUrl(req.body.events || [], req);
-
-    // 平行處理同一批事件
-    await Promise.all(events.map(routeMessageEvent));
-
-    res.status(200).end();
-  } catch (error) {
-    console.error("Webhook error:", error);
-    res.status(500).end();
-  }
+  await processWebhookEvents("LINE", () => attachRequestBaseUrl(req.body.events || [], req));
+  res.status(200).end();
 });
 
 /**
@@ -104,15 +134,10 @@ app.post("/telegram/webhook", express.json(), async (req, res) => {
     return res.status(401).send("invalid telegram secret");
   }
 
-  try {
-    const events = attachRequestBaseUrl(normalizeTelegramUpdate(req.body), req);
-    await Promise.all(events.map(routeMessageEvent));
-
-    res.status(200).send("ok");
-  } catch (error) {
-    console.error("Telegram webhook error:", error);
-    res.status(500).send("error");
-  }
+  await processWebhookEvents("Telegram", () =>
+    attachRequestBaseUrl(normalizeTelegramUpdate(req.body), req)
+  );
+  res.status(200).send("ok");
 });
 
 /**
@@ -121,15 +146,10 @@ app.post("/telegram/webhook", express.json(), async (req, res) => {
 app.get("/facebook/webhook", verifyMetaWebhook);
 
 app.post("/facebook/webhook", express.json(), async (req, res) => {
-  try {
-    const events = attachRequestBaseUrl(normalizeMetaWebhook(req.body, "facebook"), req);
-    await Promise.all(events.map(routeMessageEvent));
-
-    res.status(200).send("EVENT_RECEIVED");
-  } catch (error) {
-    console.error("Facebook webhook error:", error);
-    res.status(500).send("error");
-  }
+  await processWebhookEvents("Facebook", () =>
+    attachRequestBaseUrl(normalizeMetaWebhook(req.body, "facebook"), req)
+  );
+  res.status(200).send("EVENT_RECEIVED");
 });
 
 /**
@@ -138,15 +158,10 @@ app.post("/facebook/webhook", express.json(), async (req, res) => {
 app.get("/instagram/webhook", verifyMetaWebhook);
 
 app.post("/instagram/webhook", express.json(), async (req, res) => {
-  try {
-    const events = attachRequestBaseUrl(normalizeMetaWebhook(req.body, "instagram"), req);
-    await Promise.all(events.map(routeMessageEvent));
-
-    res.status(200).send("EVENT_RECEIVED");
-  } catch (error) {
-    console.error("Instagram webhook error:", error);
-    res.status(500).send("error");
-  }
+  await processWebhookEvents("Instagram", () =>
+    attachRequestBaseUrl(normalizeMetaWebhook(req.body, "instagram"), req)
+  );
+  res.status(200).send("EVENT_RECEIVED");
 });
 
 /**
@@ -161,15 +176,10 @@ app.post("/teams/webhook", express.json(), async (req, res) => {
     return res.status(401).send("invalid teams auth");
   }
 
-  try {
-    const events = attachRequestBaseUrl(normalizeTeamsActivity(req.body), req);
-    await Promise.all(events.map(routeMessageEvent));
-
-    res.status(200).end();
-  } catch (error) {
-    console.error("Teams webhook error:", error);
-    res.status(500).end();
-  }
+  await processWebhookEvents("Teams", () =>
+    attachRequestBaseUrl(normalizeTeamsActivity(req.body), req)
+  );
+  res.status(200).end();
 });
 
 /**

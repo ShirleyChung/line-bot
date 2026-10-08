@@ -16,6 +16,7 @@ import {
   shouldHandleWebpageSummary,
 } from "../handlers/webpageSummaryHandler.js";
 import { replyText } from "../platform/reply.js";
+import { toUserFacingErrorMessage } from "../utils/userFacingError.js";
 import {
   isTodayLinkCommand,
   isTodayBibleVerseCommand,
@@ -166,6 +167,6 @@ export async function routeMessageEvent(event) {
     return await handleLlmFallback(event, userText || rawText, context);
   } catch (error) {
     console.error("routeMessageEvent error:", error);
-    return replyText(event, "處理失敗，請稍後再試。");
+    return replyText(event, toUserFacingErrorMessage(error));
   }
 }

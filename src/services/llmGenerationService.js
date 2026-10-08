@@ -8,7 +8,11 @@ let geminiClient;
 
 function getOpenAiClient() {
   if (!env.OPENAI_API_KEY) throw new Error("目前尚未設定 OpenAI API Key");
-  openaiClient ||= new OpenAI({ apiKey: env.OPENAI_API_KEY });
+  openaiClient ||= new OpenAI({
+    apiKey: env.OPENAI_API_KEY,
+    // SDK 預設 429/5xx 重試 2 次；額度不足重試也不會成功，只會拖慢錯誤回覆，因此只保留 1 次重試。
+    maxRetries: 1,
+  });
   return openaiClient;
 }
 

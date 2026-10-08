@@ -26,7 +26,11 @@ import { askGeminiWithTools } from "./geminiLlmService.js";
 let client;
 
 function getOpenAiClient() {
-  client ||= new OpenAI({ apiKey: env.OPENAI_API_KEY });
+  client ||= new OpenAI({
+    apiKey: env.OPENAI_API_KEY,
+    // SDK 預設 429/5xx 重試 2 次；額度不足重試也不會成功，只會拖慢錯誤回覆，因此只保留 1 次重試。
+    maxRetries: 1,
+  });
   return client;
 }
 
