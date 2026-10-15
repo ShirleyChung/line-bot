@@ -10,6 +10,11 @@ export function toUserFacingErrorMessage(error) {
   const code = String(error?.code || error?.error?.code || "");
   const message = String(error?.message || "");
 
+  // LLM 斷路器開啟中：訊息本身就是給使用者看的說明。
+  if (code === "llm_circuit_open") {
+    return message;
+  }
+
   // OpenAI：429 + insufficient_quota；Gemini：429 + RESOURCE_EXHAUSTED（含免費額度用完）
   if (code === "insufficient_quota" || /insufficient_quota|exceeded your current quota/i.test(message)) {
     return "AI 服務額度已用完，暫時無法回覆，請通知管理員處理。";

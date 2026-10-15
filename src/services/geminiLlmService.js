@@ -2,27 +2,16 @@ import { GoogleGenAI } from "@google/genai";
 import { env } from "../config/env.js";
 import { botTools } from "../llm/tools.js";
 import { executeTool } from "../llm/toolDispatcher.js";
+import { contextForDirectReply, getDirectReplyText } from "../llm/directReplyTools.js";
 import { normalizeEmailRecipients } from "../utils/emailRecipients.js";
 import { sendEmail } from "./emailService.js";
 import { getUserMemory } from "./userMemoryService.js";
+import { guardLlmCall } from "./llmCircuitBreaker.js";
 import {
   buildSessionKey,
   getConversationState,
   setGeminiConversationState,
 } from "./conversationStateService.js";
-
-const DIRECT_TEXT_TOOLS = new Set([
-  "get_watch_prices", "get_stock_price", "get_etf_constituents",
-  "get_futures_price", "get_itf_tournaments",
-  "get_itf_tournament_details", "get_top_headlines", "summarize_article_url",
-]);
-
-const DIRECT_REPLY_TOOLS = new Set([
-  "find_nearby_parking", "find_nearby_facilities", "get_house_price",
-  "get_random_bible_verse", "get_recovery_bible_verses",
-  "get_recovery_bible_outline", "get_recovery_bible_notes",
-  "get_life_study_excerpt",
-]);
 
 export function buildGeminiFunctionDeclarations(tools = botTools) {
   return tools.map(({ type: _type, strict: _strict, parameters, ...tool }) => {
@@ -117,13 +106,14 @@ export async function askGeminiWithTools(userText, context = {}) {
     config.thinkingConfig = { thinkingBudget: 0 };
   }
 
-  let response = await client.models.generateContent({
+  let response = await guardLlmCall(() => client.models.generateContent({
     model: env.GEMINI_MODEL,
     contents,
     config,
-  });
+  }));
 
-  for (let round = 0; round < 5; round++) {
+  // 每多一輪就多一次 LLM 呼叫；與 OpenAI 路徑同樣限制為 3 輪。
+  for (let round = 0; round < 3; round++) {
     const modelContent = response?.candidates?.[0]?.content;
     const functionCalls = (modelContent?.parts || [])
       .filter((part) => part.functionCall)
@@ -137,6 +127,7 @@ export async function askGeminiWithTools(userText, context = {}) {
 
     contents.push(modelContent);
     const responseParts = [];
+    const directTexts = [];
     for (const call of functionCalls) {
       let result;
       try {
@@ -152,12 +143,8 @@ export async function askGeminiWithTools(userText, context = {}) {
           toolUsed: true,
         };
       }
-      if (DIRECT_TEXT_TOOLS.has(call.name) && result?.text) {
-        return deliverDirectResult(result.text, userText, context);
-      }
-      if (DIRECT_REPLY_TOOLS.has(call.name) && result?.replyText) {
-        return deliverDirectResult(result.replyText, userText, context);
-      }
+      const directText = getDirectReplyText(call.name, result);
+      if (directText) directTexts.push(directText);
 
       responseParts.push({
         functionResponse: {
@@ -168,8 +155,19 @@ export async function askGeminiWithTools(userText, context = {}) {
       });
     }
 
+    // 所有工具都已產生可直接回覆的文字時，合併回覆，不再呼叫模型。
+    if (directTexts.length && directTexts.length === functionCalls.length) {
+      return deliverDirectResult(
+        directTexts.join("\n\n"),
+        userText,
+        contextForDirectReply(functionCalls.map((c) => c.name), context),
+      );
+    }
+
     contents.push({ role: "user", parts: responseParts });
-    response = await client.models.generateContent({ model: env.GEMINI_MODEL, contents, config });
+    response = await guardLlmCall(() =>
+      client.models.generateContent({ model: env.GEMINI_MODEL, contents, config })
+    );
   }
 
   return { type: "text", text: "工具處理次數過多，已停止。", toolUsed: true };

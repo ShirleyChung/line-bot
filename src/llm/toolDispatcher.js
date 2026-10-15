@@ -170,6 +170,54 @@ const QUERY_TOOL_NAMES = new Set([
   "find_facilities_along_route",
 ]);
 
+const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
+
+function formatTaipeiDateTime(value) {
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value || "");
+  return new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function formatTaipeiTime(value) {
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value || "");
+  return new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+// 提醒時間描述：一次性顯示完整日期，週期性只顯示週期與時刻。
+function describeReminderSchedule({ time, recurrence, weekDays }) {
+  if (recurrence === "daily") return `每天 ${formatTaipeiTime(time)}`;
+  if (recurrence === "weekly") {
+    const days = (Array.isArray(weekDays) ? weekDays : [])
+      .map((day) => WEEKDAY_LABELS[day])
+      .filter(Boolean)
+      .join("、");
+    return `每週${days || ""} ${formatTaipeiTime(time)}`;
+  }
+  return formatTaipeiDateTime(time);
+}
+
+/**
+ * 提醒相關工具的固定格式回覆，讓 llmService 可直接回給使用者，不必再呼叫一次模型。
+ */
+export function formatReminderLine(reminder) {
+  const channel = reminder.emailRecipient ? `（寄到 ${reminder.emailRecipient}）` : "";
+  return `${describeReminderSchedule(reminder)}：${reminder.action || reminder.target || "提醒"}${channel}`;
+}
+
 function buildQueryFailureMessage(error) {
   const detail = String(error?.message || error || "").trim();
   if (!detail) {
@@ -500,6 +548,14 @@ export async function executeTool(name, args = {}, context = {}) {
         emailRecipient: emailRecipient || "",
         time: normalizedReminderTime.toISOString(),
         message: "提醒已設定完成；回覆使用者時不要包含提醒 ID。",
+        replyText: `✅ 已設定提醒\n${formatReminderLine({
+          time: normalizedReminderTime,
+          recurrence: reminderData.recurrence,
+          weekDays: reminderData.weekDays,
+          action: reminderData.action,
+          target: reminderData.target,
+          emailRecipient,
+        })}`,
       };
     }
 
@@ -511,13 +567,7 @@ export async function executeTool(name, args = {}, context = {}) {
       }
 
       const reminders = await listReminders(owner);
-
-      return {
-        ok: true,
-        tool: name,
-        owner,
-        count: reminders.length,
-        reminders: reminders.map((r) => ({
+      const items = reminders.map((r) => ({
           id: r.id,
           target: r.target,
           action: r.action,
@@ -528,7 +578,19 @@ export async function executeTool(name, args = {}, context = {}) {
           emailRecipient: r.payload?.emailRecipient || "",
           payload: r.payload || {},
           time: r.time?.toDate ? r.time.toDate().toISOString() : r.time,
-        })),
+      }));
+
+      return {
+        ok: true,
+        tool: name,
+        owner,
+        count: items.length,
+        reminders: items,
+        replyText: items.length
+          ? `目前共有 ${items.length} 個提醒：\n${items
+            .map((item, index) => `${index + 1}. ${formatReminderLine(item)}`)
+            .join("\n")}`
+          : "目前沒有任何提醒。",
       };
     }
 
@@ -555,6 +617,9 @@ export async function executeTool(name, args = {}, context = {}) {
         tool: name,
         owner,
         ...result,
+        replyText: result.deleted
+          ? `🗑️ 已刪除 ${result.deleted} 筆提醒`
+          : result.message || "找不到符合條件的提醒",
       };
     }
 
@@ -1335,6 +1400,7 @@ export async function executeTool(name, args = {}, context = {}) {
         tool: name,
         to,
         subject,
+        replyText: `📧 已寄出「${subject}」到 ${to}`,
       };
     }
 

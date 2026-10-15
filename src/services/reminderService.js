@@ -62,9 +62,49 @@ export async function rescheduleReminder(id, nextTime) {
   await db.collection(COLLECTION).doc(id).update({
     time: nextTime,
     notified: false,
+    scheduledTime: null,
+    failureCount: 0,
     lastNotifiedAt: new Date(),
     updatedAt: new Date(),
   });
+}
+
+/**
+ * 提醒推送失敗時延後重試（指數退避），避免每次 cron 都重新產生內容
+ * （頭條/新聞摘要會呼叫 LLM）而形成呼叫風暴。
+ * 連續失敗達上限就放棄這一次：週期提醒排到下一次，一次性提醒刪除。
+ *
+ * @returns {Promise<"retry"|"rescheduled"|"deleted">}
+ */
+export async function deferFailedReminder(reminder, now, nextOccurrence, { maxAttempts = 3 } = {}) {
+  const failureCount = (Number(reminder.failureCount) || 0) + 1;
+
+  if (failureCount < maxAttempts) {
+    const retryAt = new Date(now.getTime() + 5 * 60_000 * 2 ** (failureCount - 1));
+    await db.collection(COLLECTION).doc(reminder.id).update({
+      time: retryAt,
+      // 保留原本排定的時刻，重試成功後週期提醒仍以原時刻排下一次。
+      scheduledTime: reminder.scheduledTime || reminder.time,
+      failureCount,
+      lastFailedAt: new Date(),
+      updatedAt: new Date(),
+    });
+    return "retry";
+  }
+
+  if (nextOccurrence) {
+    await db.collection(COLLECTION).doc(reminder.id).update({
+      time: nextOccurrence,
+      scheduledTime: null,
+      failureCount: 0,
+      lastFailedAt: new Date(),
+      updatedAt: new Date(),
+    });
+    return "rescheduled";
+  }
+
+  await deleteReminder(reminder.id);
+  return "deleted";
 }
 
 /**

@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { env } from "../config/env.js";
 import { createResponseWithUsage } from "./openaiResponseService.js";
+import { guardLlmCall } from "./llmCircuitBreaker.js";
 
 let openaiClient;
 let geminiClient;
@@ -96,11 +97,11 @@ export async function createLlmTextResponse({
   }
 
   const startedAt = Date.now();
-  const response = await getGeminiClient().models.generateContent({
+  const response = await guardLlmCall(() => getGeminiClient().models.generateContent({
     model: env.GEMINI_MODEL,
     contents: input,
     config,
-  });
+  }));
   logGeminiUsage(response, purpose, startedAt);
   return {
     output_text: String(response?.text || ""),

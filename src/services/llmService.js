@@ -10,6 +10,7 @@ import OpenAI from "openai";
 import { env } from "../config/env.js";
 import { botTools } from "../llm/tools.js";
 import { executeTool } from "../llm/toolDispatcher.js";
+import { contextForDirectReply, getDirectReplyText } from "../llm/directReplyTools.js";
 import { sendEmail } from "./emailService.js";
 import { normalizeEmailRecipients } from "../utils/emailRecipients.js";
 import { getUserMemory } from "./userMemoryService.js";
@@ -32,6 +33,45 @@ function getOpenAiClient() {
     maxRetries: 1,
   });
   return client;
+}
+
+// 單次訊息最多的工具呼叫輪數；每多一輪就多一次 LLM 呼叫。
+const MAX_TOOL_ROUNDS = 3;
+
+// 推理模型（gpt-5 / gpt-6 / o 系列）才支援 reasoning 參數；舊模型帶上會回 400。
+function supportsReasoningEffort(model) {
+  return /^(gpt-[5-9]|o\d)/i.test(model || "");
+}
+
+function buildModelParams() {
+  const params = {
+    model: env.OPENAI_MODEL,
+    max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
+  };
+  // 工具路由不需深度推理；降低 effort 可大幅減少計費的 reasoning tokens。
+  if (env.OPENAI_REASONING_EFFORT && supportsReasoningEffort(env.OPENAI_MODEL)) {
+    params.reasoning = { effort: env.OPENAI_REASONING_EFFORT };
+  }
+  return params;
+}
+
+/**
+ * previous_response_id 會把整段歷史重新計入 input tokens，對話越長每次越貴。
+ * 閒置太久或輪數超過上限時就開新對話鏈，控制每次請求的 token 量。
+ */
+function shouldContinueConversation(savedState) {
+  if (!savedState?.lastResponseId) return false;
+
+  const maxTurns = env.OPENAI_CONVERSATION_MAX_TURNS;
+  if (maxTurns > 0 && (Number(savedState.turnCount) || 0) >= maxTurns) return false;
+
+  const idleMinutes = env.OPENAI_CONVERSATION_IDLE_MINUTES;
+  const updatedAt = Date.parse(savedState.updatedAt || "");
+  if (idleMinutes > 0 && Number.isFinite(updatedAt) &&
+      Date.now() - updatedAt > idleMinutes * 60_000) {
+    return false;
+  }
+  return true;
 }
 
 export function isBrokenOpenAiToolChain(error) {
@@ -211,18 +251,22 @@ async function askOpenAiWithTools(userText, context = {}) {
   請優先呼叫 extract_image_data 工具，不要要求再次上傳圖片。）
   `;
   }
-  const previousResponseId = savedState?.lastResponseId || undefined;
+  const continueChain = shouldContinueConversation(savedState);
+  const previousResponseId = continueChain ? savedState.lastResponseId : undefined;
+  const turnCount = continueChain ? (Number(savedState.turnCount) || 0) + 1 : 1;
   let response = await createInitialOpenAiResponse({
-    model: env.OPENAI_MODEL,
-    max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
+    ...buildModelParams(),
     instructions: instructions,
     input: userText,
     previous_response_id: previousResponseId,
     tools: botTools,
   }, sessionKey, Boolean(previousResponseId));
 
+  // 參數 JSON 格式錯誤時只讓模型重試一次，避免同一錯誤反覆觸發 LLM 呼叫。
+  let argumentRetryUsed = false;
+
   // 最多允許幾輪工具呼叫，避免模型陷入無限循環
-  for (let round = 0; round < 5; round++) {
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const functionCalls = (response.output || []).filter(
       (item) => item.type === "function_call"
     );
@@ -231,7 +275,7 @@ async function askOpenAiWithTools(userText, context = {}) {
     if (!functionCalls.length) {
       // 保存最新 response.id，供下一輪延續上下文
       if (response?.id) {
-        await setConversationState(sessionKey, response.id);
+        await setConversationState(sessionKey, response.id, { turnCount });
       }
 
       return {
@@ -243,6 +287,7 @@ async function askOpenAiWithTools(userText, context = {}) {
 
     // 逐一執行模型要求的工具
     const toolOutputs = [];
+    const directTexts = [];
 
     for (const call of functionCalls) {
       let args = {};
@@ -265,6 +310,14 @@ async function askOpenAiWithTools(userText, context = {}) {
           message: error?.message || String(error),
           arguments: call.arguments,
         });
+        if (argumentRetryUsed) {
+          return {
+            type: "text",
+            text: "抱歉，這次無法正確解析指令，請換個說法再試一次。",
+            toolUsed: true,
+          };
+        }
+        argumentRetryUsed = true;
         toolOutputs.push({
           type: "function_call_output",
           call_id: call.call_id,
@@ -294,25 +347,8 @@ async function askOpenAiWithTools(userText, context = {}) {
           toolUsed: true,
         };
       }
-      // 已經格式化好的工具結果，若有 emailRecipient 則直接寄送；否則回聊天室。
-      if (["get_watch_prices", "get_stock_price", "get_etf_constituents", "get_futures_price", "get_itf_tournaments", "get_itf_tournament_details", "get_top_headlines", "summarize_article_url"].includes(call.name) && result?.text) {
-        return deliverDirectResult(result.text, userText, context);
-      }
-      if (
-        [
-          "find_nearby_parking",
-          "find_nearby_facilities",
-          "get_house_price",
-          "get_random_bible_verse",
-          "get_recovery_bible_verses",
-          "get_recovery_bible_outline",
-          "get_recovery_bible_notes",
-          "get_life_study_excerpt",
-        ].includes(call.name) &&
-        result?.replyText
-      ) {
-        return deliverDirectResult(result.replyText, userText, context);
-      }
+      const directText = getDirectReplyText(call.name, result);
+      if (directText) directTexts.push(directText);
       toolOutputs.push({
         type: "function_call_output",
         call_id: call.call_id,
@@ -327,10 +363,19 @@ async function askOpenAiWithTools(userText, context = {}) {
       );
     }
 
+    // 這一輪所有工具都已產生可直接回覆的文字（例如同時設定多個提醒），
+    // 直接合併回覆，不再把結果送回模型，省下一輪 LLM 呼叫。
+    if (directTexts.length && directTexts.length === functionCalls.length) {
+      return deliverDirectResult(
+        directTexts.join("\n\n"),
+        userText,
+        contextForDirectReply(functionCalls.map((c) => c.name), context),
+      );
+    }
+
     // 把工具執行結果再送回模型，讓模型產生下一步或最終回答
     response = await createResponseWithUsage(getOpenAiClient(), {
-      model: env.OPENAI_MODEL,
-      max_output_tokens: env.OPENAI_MAX_OUTPUT_TOKENS,
+      ...buildModelParams(),
       // Responses API 的 previous_response_id 不會沿用 top-level instructions。
       instructions,
       previous_response_id: response.id,

@@ -13,13 +13,19 @@ import express from "express";
 import { env } from "./config/env.js";
 import { line, lineConfig, lineClient } from "./line/client.js";
 import { routeMessageEvent } from "./router/commandRouter.js";
+import { claimWebhookEvent } from "./services/eventDedupeService.js";
 import { replyText } from "./platform/reply.js";
 import { toUserFacingErrorMessage } from "./utils/userFacingError.js";
 import { getSorLogResultFile } from "./services/sorLogService.js";
 import { normalizeTelegramUpdate, sendTelegramText, verifyTelegramSecret } from "./platform/telegram.js";
 import { normalizeMetaWebhook, sendMetaText, verifyMetaWebhook } from "./platform/meta.js";
 import { normalizeTeamsActivity, pushTeamsReminder, verifyTeamsRequest } from "./platform/teams.js";
-import { getDueReminders, deleteReminder, rescheduleReminder } from "./services/reminderService.js";
+import {
+  getDueReminders,
+  deleteReminder,
+  rescheduleReminder,
+  deferFailedReminder,
+} from "./services/reminderService.js";
 import { buildReminderMessage, getNextReminderTime } from "./services/reminderContentService.js";
 import { sendEmail } from "./services/emailService.js";
 import { normalizeEmailRecipients } from "./utils/emailRecipients.js";
@@ -84,6 +90,8 @@ app.get("/sor-log-results/:token", async (req, res) => {
  */
 async function routeEventWithErrorNotice(event) {
   try {
+    // 平台重送的同一事件只處理一次，避免重複觸發 LLM。
+    if (!(await claimWebhookEvent(event))) return;
     await routeMessageEvent(event);
   } catch (error) {
     console.error(`routeMessageEvent failed (${event.platform || "unknown"}):`, error);
@@ -338,6 +346,17 @@ app.get("/cron/check-reminders", async (req, res) => {
         time: r.time?.toDate ? r.time.toDate().toISOString() : r.time,
       });
 
+      // 重試中的提醒以原排定時刻計算下一次，避免重試時間把週期提醒往後推。
+      let nextTime = null;
+      try {
+        nextTime = getNextReminderTime(
+          r.scheduledTime ? { ...r, time: r.scheduledTime } : r,
+          now
+        );
+      } catch (err) {
+        console.error("[cron] compute next reminder time failed:", r.id, err);
+      }
+
       try {
         let text;
         try {
@@ -357,7 +376,6 @@ app.get("/cron/check-reminders", async (req, res) => {
           targetId: pushResult.targetId,
         });
 
-        const nextTime = getNextReminderTime(r, now);
         if (nextTime) {
           await rescheduleReminder(r.id, nextTime);
           console.log("[cron] rescheduled reminder:", r.id, nextTime.toISOString());
@@ -367,6 +385,13 @@ app.get("/cron/check-reminders", async (req, res) => {
         }
       } catch (err) {
         console.error("[cron] reminder failed:", r.id, err);
+        // 推送失敗若不處理，下一次 cron 會重新產生內容（可能呼叫 LLM）再失敗，形成呼叫風暴。
+        try {
+          const outcome = await deferFailedReminder(r, now, nextTime);
+          console.warn("[cron] reminder deferred after failure:", r.id, outcome);
+        } catch (deferError) {
+          console.error("[cron] defer failed reminder error:", r.id, deferError);
+        }
       }
     }
 

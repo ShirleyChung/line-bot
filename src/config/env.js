@@ -79,8 +79,18 @@ export const env = {
 
   // ===== OpenAI =====
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
-  OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5-mini",
+  // gpt-5-nano 是目前 OpenAI 單價最低的模型（$0.05 / $0.40 per 1M tokens，2026-10）。
+  OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-5-nano",
   OPENAI_MAX_OUTPUT_TOKENS: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 1500),
+  // 聊天/工具路由的 reasoning effort（minimal/low/medium/high）；設為空字串則不傳。
+  OPENAI_REASONING_EFFORT: (process.env.OPENAI_REASONING_EFFORT ?? "low").trim(),
+  // previous_response_id 對話鏈的上限：超過輪數或閒置過久就開新鏈，避免歷史 token 無限累積。0 表示不限制。
+  OPENAI_CONVERSATION_MAX_TURNS: Number(process.env.OPENAI_CONVERSATION_MAX_TURNS ?? 10),
+  OPENAI_CONVERSATION_IDLE_MINUTES: Number(process.env.OPENAI_CONVERSATION_IDLE_MINUTES ?? 30),
+  // LLM 斷路器：額度用完/金鑰錯誤立即停用一段時間；暫時性錯誤連續達門檻才停用。
+  LLM_CIRCUIT_FATAL_COOLDOWN_MS: Number(process.env.LLM_CIRCUIT_FATAL_COOLDOWN_MS || 10 * 60_000),
+  LLM_CIRCUIT_TRANSIENT_COOLDOWN_MS: Number(process.env.LLM_CIRCUIT_TRANSIENT_COOLDOWN_MS || 2 * 60_000),
+  LLM_CIRCUIT_FAILURE_THRESHOLD: Number(process.env.LLM_CIRCUIT_FAILURE_THRESHOLD || 3),
   // ===== LLM / Gemini =====
   // 設定 Gemini key 後預設使用 Gemini；也可明確設成 openai 切回 Responses API。
   // 尚未部署 Gemini key 的舊環境會繼續走 OpenAI，避免更新程式當下中斷服務。

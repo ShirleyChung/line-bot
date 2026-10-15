@@ -92,7 +92,7 @@ export async function getConversationState(sessionKey) {
  * @param {string} lastResponseId
  * @returns {Promise<void>}
  */
-export async function setConversationState(sessionKey, lastResponseId) {
+export async function setConversationState(sessionKey, lastResponseId, { turnCount } = {}) {
   if (!sessionKey) {
     throw new Error("setConversationState 需要 sessionKey");
   }
@@ -106,6 +106,8 @@ export async function setConversationState(sessionKey, lastResponseId) {
   await docRef.set(
     {
       lastResponseId,
+      // 對話鏈已累積的輪數，用來決定何時開新鏈以控制 input tokens。
+      turnCount: turnCount || 1,
       updatedAt: new Date().toISOString(),
     },
     { merge: true }

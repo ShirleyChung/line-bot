@@ -1,10 +1,12 @@
+import { guardLlmCall } from "./llmCircuitBreaker.js";
+
 /**
  * 統一呼叫 Responses API，並記錄每次成功回應的 token usage。
  * purpose 用來區分一般聊天、OCR、摘要等流量來源，方便在 Cloud Run logs 彙整。
  */
 export async function createResponseWithUsage(client, params, { purpose = "unknown" } = {}) {
   const startedAt = Date.now();
-  const response = await client.responses.create(params);
+  const response = await guardLlmCall(() => client.responses.create(params));
 
   const usage = response?.usage || {};
   // Cloud Run 會將單行 JSON 解析為 jsonPayload，方便直接篩選欄位及建立 metrics。

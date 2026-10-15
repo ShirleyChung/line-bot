@@ -32,7 +32,10 @@ GEMINI_HISTORY_MAX_MESSAGES=12
 
 # 選用 openai provider 時才需要；保留作為 GPT 回切接口
 OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-5.5
+OPENAI_MODEL=gpt-5-nano
+OPENAI_REASONING_EFFORT=low
+OPENAI_CONVERSATION_MAX_TURNS=10
+OPENAI_CONVERSATION_IDLE_MINUTES=30
 OPENAI_SYSTEM_PROMPT=你是一個親切、準確、簡潔的 LINE 助手。遇到已知工具型問題時，不要捏造資料。
 
 # =========================
