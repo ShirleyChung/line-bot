@@ -146,6 +146,14 @@ export async function listReminders(owner) {
   }));
 }
 
+// 去掉空白與「提醒/自己/我的」這類不具辨識度的字，只留下可比對的關鍵字。
+export function normalizeReminderKeyword(text) {
+  return String(text || "")
+    .replace(/\s+/g, "")
+    .replace(/提醒|通知|自己|我的|我|的/g, "")
+    .toLowerCase();
+}
+
 /**
  * 根據條件刪除使用者的提醒
  * @param {string} owner - 提醒擁有者
@@ -157,42 +165,53 @@ export async function deleteReminderByOwner(owner, criteria = {}) {
     throw new Error("deleteReminderByOwner 需要 owner 參數");
   }
 
-  // 如果提供 id，直接刪除該筆
+  // 如果提供 id，直接刪除該筆；模型可能編造不存在的 id，此時改用編號/關鍵字比對。
   if (criteria.id) {
     const doc = await db.collection(COLLECTION).doc(criteria.id).get();
-    if (!doc.exists) {
+    if (doc.exists && doc.data().owner === owner) {
+      await db.collection(COLLECTION).doc(criteria.id).delete();
+      return { deleted: 1, id: criteria.id, reminder: doc.data() };
+    }
+    if (!criteria.index && !criteria.target && !criteria.action) {
       return { deleted: 0, message: "找不到此提醒" };
     }
-    const data = doc.data();
-    if (data.owner !== owner) {
-      return { deleted: 0, message: "無權刪除此提醒" };
+  }
+
+  const reminders = await listReminders(owner);
+
+  // 依「列出提醒」顯示的編號刪除（1 起算，與 listReminders 的排序一致）。
+  let matched;
+  if (Number.isInteger(criteria.index) && criteria.index > 0) {
+    const reminder = reminders[criteria.index - 1];
+    if (!reminder) {
+      return { deleted: 0, message: `找不到第 ${criteria.index} 個提醒，目前共有 ${reminders.length} 個提醒` };
     }
-    await db.collection(COLLECTION).doc(criteria.id).delete();
-    return { deleted: 1, id: criteria.id, reminder: data };
+    matched = [reminder];
+  } else {
+    // 模型給的 target/action 常與儲存值不完全相同（例如「訂蛋糕」vs「提醒我訂蛋糕」），
+    // 改用關鍵字模糊比對：每個有意義的關鍵字都要出現在提醒的 target/action 中。
+    const keywords = [criteria.target, criteria.action]
+      .map(normalizeReminderKeyword)
+      .filter(Boolean);
+    if (!keywords.length) {
+      return { deleted: 0, message: "請說明要刪除哪一個提醒，例如「刪除訂蛋糕的提醒」或「刪除第 1 個提醒」" };
+    }
+    matched = reminders.filter((reminder) => {
+      const haystack = normalizeReminderKeyword(`${reminder.target || ""}${reminder.action || ""}`);
+      return keywords.every((keyword) => haystack.includes(keyword));
+    });
   }
 
-  // 否則根據條件查詢後刪除
-  let query = db.collection(COLLECTION).where("owner", "==", owner).where("notified", "==", false);
-
-  if (criteria.target) {
-    query = query.where("target", "==", criteria.target);
-  }
-  if (criteria.action) {
-    query = query.where("action", "==", criteria.action);
-  }
-
-  const snapshot = await query.get();
-
-  if (snapshot.empty) {
+  if (!matched.length) {
     return { deleted: 0, message: "找不到符合條件的提醒" };
   }
 
   // 刪除所有符合的提醒
   const batch = db.batch();
   const deletedReminders = [];
-  snapshot.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-    deletedReminders.push({ id: doc.id, ...doc.data() });
+  matched.forEach((reminder) => {
+    batch.delete(db.collection(COLLECTION).doc(reminder.id));
+    deletedReminders.push(reminder);
   });
 
   await batch.commit();

@@ -27,6 +27,23 @@ test("action confirmations are never emailed", () => {
   assert.equal(contextForDirectReply(["get_stock_price"], context), context);
 });
 
+test("one-shot reminder requests are not treated as recurring", async () => {
+  const { hasRecurringIntent } = await import("../src/llm/toolDispatcher.js");
+  assert.equal(hasRecurringIntent("提醒我下午1點訂蛋糕"), false);
+  assert.equal(hasRecurringIntent("明天早上8點提醒我開會"), false);
+  assert.equal(hasRecurringIntent("每天下午1點提醒我吃藥"), true);
+  assert.equal(hasRecurringIntent("每個星期五早上8點通知我天氣"), true);
+  assert.equal(hasRecurringIntent("除了星期四外每天20:00通知我今天連結"), true);
+});
+
+test("reminder delete keywords ignore filler words", async () => {
+  const { normalizeReminderKeyword } = await import("../src/services/reminderService.js");
+  const stored = normalizeReminderKeyword("提醒我訂蛋糕");
+  assert.ok(stored.includes(normalizeReminderKeyword("訂蛋糕")));
+  assert.ok(stored.includes(normalizeReminderKeyword("訂蛋糕的提醒")));
+  assert.equal(normalizeReminderKeyword("提醒"), "");
+});
+
 test("reminder lines render Taipei time by recurrence", () => {
   const time = new Date("2026-10-15T08:30:00+08:00");
   assert.equal(

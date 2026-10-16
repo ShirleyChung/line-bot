@@ -17,6 +17,8 @@ export async function handleLlmFallback(event, userText, context = {}) {
     event,
     replyToken: event.replyToken,
     source: event.source,
+    // 工具執行時用來核對使用者原話（例如是否真的要求重複提醒）。
+    userText,
     ...context,
   });
   if (result.type === "text" && result.text) {

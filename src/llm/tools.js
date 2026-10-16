@@ -181,13 +181,17 @@ export const botTools = [
   {
     type: "function",
     name: "delete_reminder",
-    description: "刪除提醒事項。可以指定 id 刪除特定提醒，或用 target/action 刪除符合條件的提醒",
+    description: "刪除提醒事項。可用「列出提醒」顯示的編號（index）刪除，或用關鍵字（target/action，模糊比對）刪除符合的提醒",
     parameters: {
       type: "object",
       properties: {
         id: {
           type: ["string", "null"],
-          description: "提醒的 id，若提供則直接刪除該筆",
+          description: "提醒的 id，若提供則直接刪除該筆；不知道 id 時填 null，不要自行編造",
+        },
+        index: {
+          type: ["integer", "null"],
+          description: "使用者說「刪除第 N 個提醒」時填 N（1 起算，對應列出提醒時的編號）；否則填 null",
         },
         target: {
           type: ["string", "null"],
@@ -195,10 +199,10 @@ export const botTools = [
         },
         action: {
           type: ["string", "null"],
-          description: "提醒動作，例如「吃藥」、「開會」",
+          description: "要刪除的提醒關鍵字，例如「吃藥」、「訂蛋糕」；只填使用者提到的核心詞，不要加「提醒」等字",
         },
       },
-      required: ["id", "target", "action"],
+      required: ["id", "index", "target", "action"],
       additionalProperties: false,
     },
     strict: true,

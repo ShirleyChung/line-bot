@@ -172,6 +172,13 @@ const QUERY_TOOL_NAMES = new Set([
 
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 
+// 使用者原話中表示「重複」的字眼：每天/每週/每個星期X/天天/固定/排程/平日/工作日/除了星期X外…
+const RECURRING_INTENT_PATTERN = /每|天天|固定|排程|平日|工作日|除了|週一到週五|周一到周五|星期一到星期五/;
+
+export function hasRecurringIntent(text) {
+  return RECURRING_INTENT_PATTERN.test(String(text || ""));
+}
+
 function formatTaipeiDateTime(value) {
   const date = value?.toDate ? value.toDate() : new Date(value);
   if (Number.isNaN(date.getTime())) return String(value || "");
@@ -463,8 +470,18 @@ export async function executeTool(name, args = {}, context = {}) {
         throw new Error(`create_reminder 時間格式錯誤：${args.time}`);
       }
 
-      const recurrence =
+      let recurrence =
         args.recurrence === "weekly" || args.recurrence === "daily" ? args.recurrence : "none";
+      // 小模型偶爾把一次性提醒判成 daily（例如「提醒我下午 1 點訂蛋糕」）。
+      // 使用者原話沒有任何重複字眼時，強制改回一次性提醒。
+      const requestText = context.originalUserText || context.userText || "";
+      if (recurrence !== "none" && requestText && !hasRecurringIntent(requestText)) {
+        console.warn("[toolDispatcher] recurrence downgraded to none:", {
+          requested: recurrence,
+          userText: requestText,
+        });
+        recurrence = "none";
+      }
       const weekDays = recurrence === "weekly" ? normalizeWeekDays(args.weekDays) : [];
 
       if (recurrence === "weekly" && weekDays.length === 0) {
@@ -486,7 +503,7 @@ export async function executeTool(name, args = {}, context = {}) {
       }
 
       if (!normalizedReminderTime || normalizedReminderTime <= now) {
-        throw new Error(`create_reminder 時間已過：${args.time}`);
+        throw new Error(`提醒時間 ${formatTaipeiDateTime(reminderTime)} 已經過了，請提供未來的時間。`);
       }
 
       const payload = {};
@@ -603,11 +620,12 @@ export async function executeTool(name, args = {}, context = {}) {
 
       const criteria = {};
       if (args.id) criteria.id = args.id;
+      if (Number.isInteger(args.index)) criteria.index = args.index;
       if (args.target) criteria.target = args.target;
       if (args.action) criteria.action = args.action;
 
-      if (!criteria.id && !criteria.target && !criteria.action) {
-        throw new Error("delete_reminder 需要至少提供 id、target 或 action 其中一項");
+      if (!criteria.id && !criteria.index && !criteria.target && !criteria.action) {
+        throw new Error("請說明要刪除哪一個提醒，例如「刪除訂蛋糕的提醒」或「刪除第 1 個提醒」");
       }
 
       const result = await deleteReminderByOwner(owner, criteria);
